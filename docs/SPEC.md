@@ -11,7 +11,9 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 | フロントエンド | React + Vite (SPA) |
 | バックエンド | Rust + axum |
 | データベース | Firestore |
-| 認証 | OAuth (Google 等) |
+| 認証 | Google OAuth + JWT (有効期限15分、リフレッシュトークン使用) |
+| 状態管理 | jotai |
+| CSS | Tailwind CSS |
 | デプロイ | Cloud Run / Docker (ローカル) |
 
 ## 機能一覧
@@ -25,7 +27,9 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 
 - アカウントの作成・編集・削除
 - 複数ユーザーでのアカウント共有
-- 共有メンバーの招待・管理
+- 共有メンバーの招待・管理 (※初期バージョンでは保留、DB直接操作で対応)
+- オーナー権限: アカウント削除、メンバー追加・削除が可能
+- メンバー権限: 収支の登録・編集・削除、カテゴリ管理が可能
 
 ### 3. 収支記録
 
@@ -33,22 +37,19 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 - 支出の登録・編集・削除
 - 日付、金額、カテゴリ、メモの入力
 - 対応通貨: 日本円のみ
+- 編集・削除権限: 作成者以外のメンバーも可能
 
 ### 4. カテゴリ管理
 
 - ユーザーによるカテゴリのカスタマイズ
-- カテゴリの追加・編集・削除
-- デフォルトカテゴリの提供
+- カテゴリの追加・編集・削除 (論理削除)
+- 新規カテゴリの order: 既存カテゴリ数 + 1
+- 削除されたカテゴリ: 一覧に非表示、新規取引で選択不可、既存取引の値は維持
+- デフォルトカテゴリなし (ユーザーが自身で作成)
 
-### 5. レポート・グラフ
+### 5. データエクスポート
 
-- 月次の収支サマリー
-- カテゴリ別支出の円グラフ
-- 月別推移の棒グラフ・折れ線グラフ
-
-### 6. データエクスポート
-
-- JSON 形式でのエクスポート
+- JSON 形式でのエクスポート (月別)
 
 ## データモデル
 
@@ -59,7 +60,6 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 | id | string | ユーザー ID (Firebase Auth UID) |
 | email | string | メールアドレス |
 | displayName | string | 表示名 |
-| photoURL | string? | プロフィール画像 URL |
 | createdAt | timestamp | 作成日時 |
 
 ### Account (アカウント)
@@ -83,6 +83,7 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 | type | string | "income" または "expense" |
 | order | number | 表示順 |
 | createdAt | timestamp | 作成日時 |
+| deletedAt | timestamp? | 削除日時 (論理削除) |
 
 ### Transaction (収支記録)
 
@@ -107,10 +108,16 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 - `GET /auth/callback` - OAuth コールバック
 - `POST /auth/logout` - ログアウト
 - `GET /auth/me` - 現在のユーザー情報取得
+- `POST /auth/refresh` - トークンリフレッシュ
+
+### ユーザー
+
+- `GET /users/:id` - ユーザー情報取得
+- `PATCH /users/:id` - ユーザー情報更新 (displayName)
 
 ### アカウント
 
-- `GET /accounts` - アカウント一覧取得
+- `GET /accounts` - アカウント一覧取得 (オーナーまたはメンバーのアカウント)
 - `POST /accounts` - アカウント作成
 - `GET /accounts/:id` - アカウント詳細取得
 - `PATCH /accounts/:id` - アカウント更新
@@ -127,34 +134,28 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 
 ### 収支記録
 
-- `GET /accounts/:id/transactions` - 取引一覧取得 (フィルタ・ページング対応)
+- `GET /accounts/:id/transactions` - 取引一覧取得 (20件/ページ、日付降順、cursor ベース: `?after=<id>`)
 - `POST /accounts/:id/transactions` - 取引作成
 - `PATCH /accounts/:id/transactions/:transactionId` - 取引更新
 - `DELETE /accounts/:id/transactions/:transactionId` - 取引削除
 
-### レポート
-
-- `GET /accounts/:id/reports/summary` - 収支サマリー取得
-- `GET /accounts/:id/reports/by-category` - カテゴリ別集計取得
-- `GET /accounts/:id/reports/monthly-trend` - 月別推移取得
-
 ### エクスポート
 
-- `GET /accounts/:id/export/json` - JSON エクスポート
+- `GET /accounts/:id/export/json?year=YYYY&month=MM` - JSON エクスポート (月別)
 
 ## 画面一覧
 
 1. ログイン画面
-2. ダッシュボード (アカウント選択・サマリー表示)
+2. ダッシュボード (アカウント選択)
 3. 収支一覧画面
 4. 収支登録・編集画面
 5. カテゴリ管理画面
-6. レポート画面
-7. アカウント設定画面 (メンバー管理含む)
-8. ユーザー設定画面
+6. アカウント設定画面 (メンバー管理含む)
+7. ユーザー設定画面
 
 ## 非機能要件
 
 - レスポンシブデザイン (モバイル対応)
 - 日本語 UI
 - セキュアな認証・認可
+- API エラーレスポンス: RFC 9457 (Problem Details for HTTP APIs) 準拠
