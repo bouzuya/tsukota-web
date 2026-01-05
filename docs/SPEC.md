@@ -1,5 +1,10 @@
 # tsukota-web 仕様書
 
+> このドキュメントは、tsukota-web の**機能要件**と**外部仕様**を定義します。
+> 「何を作るか」（機能一覧、データモデル、API仕様、画面構成）を記載しています。
+>
+> 技術選定やアーキテクチャ設計など「どう作るか」については [ARCHITECTURE.md](./ARCHITECTURE.md) を参照してください。
+
 ## 概要
 
 tsukota-web は、複数ユーザーで共有可能なアカウント・支出管理 Web アプリケーションです。
@@ -11,10 +16,12 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 | フロントエンド | React + Vite (SPA) |
 | バックエンド | Rust + axum |
 | データベース | Firestore |
-| 認証 | Google OAuth + JWT (有効期限15分、リフレッシュトークン使用) |
+| 認証 | Google OAuth + JWT |
 | 状態管理 | jotai |
 | CSS | Tailwind CSS |
 | デプロイ | Cloud Run / Docker (ローカル) |
+
+詳細なアーキテクチャ設計については [ARCHITECTURE.md](./ARCHITECTURE.md) を参照してください。
 
 ## 機能一覧
 
@@ -52,6 +59,9 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 - JSON 形式でのエクスポート (月別)
 
 ## データモデル
+
+以下のデータモデルは API レスポンスおよび読み取りモデル (Projection) を表します。
+アカウント、カテゴリ、取引の実体はイベントソーシングにより管理されます（詳細は [ARCHITECTURE.md](./ARCHITECTURE.md) 参照）。
 
 ### User
 
