@@ -1,7 +1,5 @@
 use super::commands::AccountCommand;
-use super::events::{
-    AccountEvent, AccountId, CategoryId, CategoryType, TransactionId, TransactionType, UserId,
-};
+use super::events::{AccountEvent, AccountId, CategoryId, TransactionId, UserId};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
@@ -50,7 +48,6 @@ pub enum AccountError {
 pub struct Category {
     pub id: CategoryId,
     pub name: String,
-    pub category_type: CategoryType,
     pub order: u32,
     pub deleted: bool,
 }
@@ -59,7 +56,6 @@ pub struct Category {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transaction {
     pub id: TransactionId,
-    pub transaction_type: TransactionType,
     pub amount: u64,
     pub category_id: CategoryId,
     pub date: String,
@@ -130,9 +126,8 @@ impl Account {
             AccountCommand::CreateCategory {
                 category_id,
                 name,
-                category_type,
                 order,
-            } => self.handle_create_category(category_id, name, category_type, order),
+            } => self.handle_create_category(category_id, name, order),
 
             AccountCommand::RenameCategory { category_id, name } => {
                 self.handle_rename_category(category_id, name)
@@ -148,7 +143,6 @@ impl Account {
 
             AccountCommand::CreateTransaction {
                 transaction_id,
-                transaction_type,
                 amount,
                 category_id,
                 date,
@@ -156,7 +150,6 @@ impl Account {
                 created_by,
             } => self.handle_create_transaction(
                 transaction_id,
-                transaction_type,
                 amount,
                 category_id,
                 date,
@@ -166,14 +159,12 @@ impl Account {
 
             AccountCommand::UpdateTransaction {
                 transaction_id,
-                transaction_type,
                 amount,
                 category_id,
                 date,
                 memo,
             } => self.handle_update_transaction(
                 transaction_id,
-                transaction_type,
                 amount,
                 category_id,
                 date,
@@ -215,7 +206,6 @@ impl Account {
             AccountEvent::CategoryCreated {
                 category_id,
                 name,
-                category_type,
                 order,
             } => {
                 self.categories.insert(
@@ -223,7 +213,6 @@ impl Account {
                     Category {
                         id: category_id.clone(),
                         name: name.clone(),
-                        category_type: *category_type,
                         order: *order,
                         deleted: false,
                     },
@@ -250,7 +239,6 @@ impl Account {
 
             AccountEvent::TransactionCreated {
                 transaction_id,
-                transaction_type,
                 amount,
                 category_id,
                 date,
@@ -261,7 +249,6 @@ impl Account {
                     transaction_id.clone(),
                     Transaction {
                         id: transaction_id.clone(),
-                        transaction_type: *transaction_type,
                         amount: *amount,
                         category_id: category_id.clone(),
                         date: date.clone(),
@@ -273,14 +260,12 @@ impl Account {
 
             AccountEvent::TransactionUpdated {
                 transaction_id,
-                transaction_type,
                 amount,
                 category_id,
                 date,
                 memo,
             } => {
                 if let Some(transaction) = self.transactions.get_mut(transaction_id) {
-                    transaction.transaction_type = *transaction_type;
                     transaction.amount = *amount;
                     transaction.category_id = category_id.clone();
                     transaction.date = date.clone();
@@ -361,7 +346,6 @@ impl Account {
         &self,
         category_id: CategoryId,
         name: String,
-        category_type: CategoryType,
         order: u32,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         if self.id.is_none() {
@@ -375,7 +359,6 @@ impl Account {
         Ok(vec![AccountEvent::CategoryCreated {
             category_id,
             name,
-            category_type,
             order,
         }])
     }
@@ -449,7 +432,6 @@ impl Account {
     fn handle_create_transaction(
         &self,
         transaction_id: TransactionId,
-        transaction_type: TransactionType,
         amount: u64,
         category_id: CategoryId,
         date: String,
@@ -476,7 +458,6 @@ impl Account {
 
         Ok(vec![AccountEvent::TransactionCreated {
             transaction_id,
-            transaction_type,
             amount,
             category_id,
             date,
@@ -488,7 +469,6 @@ impl Account {
     fn handle_update_transaction(
         &self,
         transaction_id: TransactionId,
-        transaction_type: TransactionType,
         amount: u64,
         category_id: CategoryId,
         date: String,
@@ -518,7 +498,6 @@ impl Account {
 
         Ok(vec![AccountEvent::TransactionUpdated {
             transaction_id,
-            transaction_type,
             amount,
             category_id,
             date,

@@ -1,4 +1,4 @@
-use super::events::{AccountId, CategoryId, CategoryType, TransactionId, TransactionType, UserId};
+use super::events::{AccountId, CategoryId, TransactionId, UserId};
 
 /// アカウント集約に対するコマンド
 #[derive(Debug, Clone, PartialEq)]
@@ -29,7 +29,6 @@ pub enum AccountCommand {
     CreateCategory {
         category_id: CategoryId,
         name: String,
-        category_type: CategoryType,
         order: u32,
     },
 
@@ -53,7 +52,6 @@ pub enum AccountCommand {
     /// 取引を作成する
     CreateTransaction {
         transaction_id: TransactionId,
-        transaction_type: TransactionType,
         amount: u64,
         category_id: CategoryId,
         date: String, // ISO 8601 format (YYYY-MM-DD)
@@ -64,7 +62,6 @@ pub enum AccountCommand {
     /// 取引を更新する
     UpdateTransaction {
         transaction_id: TransactionId,
-        transaction_type: TransactionType,
         amount: u64,
         category_id: CategoryId,
         date: String,

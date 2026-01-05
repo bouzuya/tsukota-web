@@ -42,7 +42,6 @@ pub enum AccountEvent {
     CategoryCreated {
         category_id: CategoryId,
         name: String,
-        category_type: CategoryType,
         order: u32,
     },
 
@@ -66,7 +65,6 @@ pub enum AccountEvent {
     /// 取引が作成された
     TransactionCreated {
         transaction_id: TransactionId,
-        transaction_type: TransactionType,
         amount: u64,
         category_id: CategoryId,
         date: String, // ISO 8601 format (YYYY-MM-DD)
@@ -77,7 +75,6 @@ pub enum AccountEvent {
     /// 取引が更新された
     TransactionUpdated {
         transaction_id: TransactionId,
-        transaction_type: TransactionType,
         amount: u64,
         category_id: CategoryId,
         date: String,
@@ -88,20 +85,4 @@ pub enum AccountEvent {
     TransactionDeleted {
         transaction_id: TransactionId,
     },
-}
-
-/// カテゴリの種類
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum CategoryType {
-    Income,
-    Expense,
-}
-
-/// 取引の種類
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum TransactionType {
-    Income,
-    Expense,
 }
