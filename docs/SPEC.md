@@ -34,25 +34,23 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 
 - アカウントの作成・編集・削除
 - 複数ユーザーでのアカウント共有
-- 共有メンバーの招待・管理 (※初期バージョンでは保留、DB直接操作で対応)
-- オーナー権限: アカウント削除、メンバー追加・削除が可能
-- メンバー権限: 収支の登録・編集・削除、カテゴリ管理が可能
+- 複数オーナーによる共同管理
+- 共有オーナーの招待・管理 (※初期バージョンでは保留、DB直接操作で対応)
+- すべてのオーナーが同等の権限を持つ: アカウント削除、オーナー追加・削除、収支・カテゴリ管理
 
 ### 3. 収支記録
 
-- 収入の登録・編集・削除
-- 支出の登録・編集・削除
-- 日付、金額、カテゴリ、メモの入力
+- 取引の登録・編集・削除
+- 日付、金額、カテゴリ、コメントの入力
 - 対応通貨: 日本円のみ
-- 編集・削除権限: 作成者以外のメンバーも可能
+- すべてのオーナーが編集・削除可能
 
 ### 4. カテゴリ管理
 
-- ユーザーによるカテゴリのカスタマイズ
+- オーナーによるカテゴリのカスタマイズ
 - カテゴリの追加・編集・削除 (論理削除)
-- 新規カテゴリの order: 既存カテゴリ数 + 1
 - 削除されたカテゴリ: 一覧に非表示、新規取引で選択不可、既存取引の値は維持
-- デフォルトカテゴリなし (ユーザーが自身で作成)
+- デフォルトカテゴリなし (オーナーが自身で作成)
 
 ### 5. データエクスポート
 
@@ -78,8 +76,7 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 |-----------|-----|------|
 | id | string | アカウント ID |
 | name | string | アカウント名 |
-| ownerId | string | オーナーのユーザー ID |
-| memberIds | string[] | メンバーのユーザー ID 一覧 |
+| ownerIds | string[] | オーナーのユーザー ID 一覧 |
 | createdAt | timestamp | 作成日時 |
 | updatedAt | timestamp | 更新日時 |
 
@@ -90,8 +87,6 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 | id | string | カテゴリ ID |
 | accountId | string | 所属するアカウント ID |
 | name | string | カテゴリ名 |
-| type | string | "income" または "expense" |
-| order | number | 表示順 |
 | createdAt | timestamp | 作成日時 |
 | deletedAt | timestamp? | 削除日時 (論理削除) |
 
@@ -101,12 +96,10 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 |-----------|-----|------|
 | id | string | 取引 ID |
 | accountId | string | 所属するアカウント ID |
-| type | string | "income" または "expense" |
-| amount | number | 金額 (円) |
+| amount | string | 金額 (文字列形式) |
 | categoryId | string | カテゴリ ID |
-| date | date | 取引日 |
-| memo | string? | メモ |
-| createdBy | string | 作成者のユーザー ID |
+| date | string | 取引日 (ISO 8601 format: YYYY-MM-DD) |
+| comment | string | コメント |
 | createdAt | timestamp | 作成日時 |
 | updatedAt | timestamp | 更新日時 |
 
@@ -127,13 +120,13 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 
 ### アカウント
 
-- `GET /accounts` - アカウント一覧取得 (オーナーまたはメンバーのアカウント)
+- `GET /accounts` - アカウント一覧取得 (オーナーのアカウント)
 - `POST /accounts` - アカウント作成
 - `GET /accounts/:id` - アカウント詳細取得
 - `PATCH /accounts/:id` - アカウント更新
 - `DELETE /accounts/:id` - アカウント削除
-- `POST /accounts/:id/members` - メンバー招待
-- `DELETE /accounts/:id/members/:userId` - メンバー削除
+- `POST /accounts/:id/owners` - オーナー招待
+- `DELETE /accounts/:id/owners/:userId` - オーナー削除
 
 ### カテゴリ
 
@@ -160,7 +153,7 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 3. 収支一覧画面
 4. 収支登録・編集画面
 5. カテゴリ管理画面
-6. アカウント設定画面 (メンバー管理含む)
+6. アカウント設定画面 (オーナー管理含む)
 7. ユーザー設定画面
 
 ## 非機能要件
