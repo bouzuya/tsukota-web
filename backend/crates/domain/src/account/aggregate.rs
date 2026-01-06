@@ -164,7 +164,8 @@ impl Account {
             AccountEvent::AccountCreated { name, owners, .. } => {
                 let owners_set: BTreeSet<String> = owners.iter().cloned().collect();
                 *self = Account::Active {
-                    id: AccountId::from(event.account_id().clone()),
+                    id: AccountId::parse(event.account_id())
+                        .expect("Failed to parse account_id from event"),
                     name: name.clone(),
                     owners: owners_set,
                     categories: BTreeMap::new(),
@@ -554,7 +555,7 @@ impl Account {
 
     fn create_common_props(account_id: &AccountId) -> AccountEventCommonProps {
         AccountEventCommonProps {
-            account_id: account_id.as_ref().to_string(),
+            account_id: account_id.to_string(),
             at: chrono::Utc::now().to_rfc3339(),
             id: uuid::Uuid::new_v4().to_string(),
             protocol_version: 1,
@@ -588,8 +589,9 @@ mod tests {
     #[test]
     fn test_create_account() -> anyhow::Result<()> {
         let account = Account::new();
+        let account_id = AccountId::new();
         let command = AccountCommand::CreateAccount {
-            account_id: AccountId::new("acc-1"),
+            account_id,
             name: "My Account".to_string(),
             owners: vec!["user-1".to_string()],
         };
@@ -609,8 +611,9 @@ mod tests {
 
     #[test]
     fn test_account_from_events() -> anyhow::Result<()> {
+        let account_uuid = "550e8400-e29b-41d4-a716-446655440000";
         let common = AccountEventCommonProps {
-            account_id: "acc-1".to_string(),
+            account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
             id: "evt-1".to_string(),
             protocol_version: 1,
@@ -627,7 +630,7 @@ mod tests {
             Account::Active {
                 id, name, owners, ..
             } => {
-                assert_eq!(id.as_str(), "acc-1");
+                assert_eq!(id.to_string(), account_uuid);
                 assert_eq!(name, "My Account");
                 assert!(owners.contains("user-1"));
                 Ok(())
@@ -638,8 +641,9 @@ mod tests {
 
     #[test]
     fn test_add_owner() -> anyhow::Result<()> {
+        let account_uuid = "550e8400-e29b-41d4-a716-446655440000";
         let common = AccountEventCommonProps {
-            account_id: "acc-1".to_string(),
+            account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
             id: "evt-1".to_string(),
             protocol_version: 1,
@@ -671,8 +675,9 @@ mod tests {
 
     #[test]
     fn test_cannot_remove_last_owner() -> anyhow::Result<()> {
+        let account_uuid = "550e8400-e29b-41d4-a716-446655440000";
         let common = AccountEventCommonProps {
-            account_id: "acc-1".to_string(),
+            account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
             id: "evt-1".to_string(),
             protocol_version: 1,
