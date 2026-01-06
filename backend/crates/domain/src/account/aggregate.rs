@@ -1,6 +1,6 @@
 use super::commands::AccountCommand;
 use super::events::{AccountEvent, AccountId, CategoryId, TransactionId, UserId};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
 /// アカウント集約のエラー
@@ -65,19 +65,24 @@ pub struct Transaction {
 
 /// アカウント集約
 #[derive(Debug, Clone, PartialEq)]
-pub struct Account {
-    /// アカウント ID
-    pub id: Option<AccountId>,
-    /// アカウント名
-    pub name: Option<String>,
-    /// オーナー ID
-    pub owner_id: Option<UserId>,
-    /// メンバー ID のセット
-    pub member_ids: HashSet<UserId>,
-    /// カテゴリのマップ
-    pub categories: HashMap<CategoryId, Category>,
-    /// 取引のマップ
-    pub transactions: HashMap<TransactionId, Transaction>,
+pub enum Account {
+    /// アカウント作成前の空の状態
+    Empty,
+    /// アカウント作成後のアクティブな状態
+    Active {
+        /// アカウント ID
+        id: AccountId,
+        /// アカウント名
+        name: String,
+        /// オーナー ID
+        owner_id: UserId,
+        /// メンバー ID のセット (オーナーを含む)
+        member_ids: BTreeSet<UserId>,
+        /// カテゴリのマップ
+        categories: BTreeMap<CategoryId, Category>,
+        /// 取引のマップ
+        transactions: BTreeMap<TransactionId, Transaction>,
+    },
 }
 
 impl Default for Account {
@@ -89,14 +94,7 @@ impl Default for Account {
 impl Account {
     /// 新しい空の集約を作成
     pub fn new() -> Self {
-        Self {
-            id: None,
-            name: None,
-            owner_id: None,
-            member_ids: HashSet::new(),
-            categories: HashMap::new(),
-            transactions: HashMap::new(),
-        }
+        Self::Empty
     }
 
     /// イベントストリームから集約を再構築
@@ -109,7 +107,10 @@ impl Account {
     }
 
     /// コマンドを処理してイベントを生成
-    pub fn handle_command(&self, command: AccountCommand) -> Result<Vec<AccountEvent>, AccountError> {
+    pub fn handle_command(
+        &self,
+        command: AccountCommand,
+    ) -> Result<Vec<AccountEvent>, AccountError> {
         match command {
             AccountCommand::CreateAccount {
                 account_id,
@@ -163,13 +164,7 @@ impl Account {
                 category_id,
                 date,
                 memo,
-            } => self.handle_update_transaction(
-                transaction_id,
-                amount,
-                category_id,
-                date,
-                memo,
-            ),
+            } => self.handle_update_transaction(transaction_id, amount, category_id, date, memo),
 
             AccountCommand::DeleteTransaction { transaction_id } => {
                 self.handle_delete_transaction(transaction_id)
@@ -185,57 +180,94 @@ impl Account {
                 name,
                 owner_id,
             } => {
-                self.id = Some(account_id.clone());
-                self.name = Some(name.clone());
-                self.owner_id = Some(owner_id.clone());
-                self.member_ids.insert(owner_id.clone());
+                let mut member_ids = BTreeSet::new();
+                member_ids.insert(owner_id.clone());
+                *self = Account::Active {
+                    id: account_id.clone(),
+                    name: name.clone(),
+                    owner_id: owner_id.clone(),
+                    member_ids,
+                    categories: BTreeMap::new(),
+                    transactions: BTreeMap::new(),
+                };
             }
 
-            AccountEvent::AccountRenamed { name } => {
-                self.name = Some(name.clone());
-            }
+            AccountEvent::AccountRenamed { name } => match self {
+                Account::Active {
+                    name: current_name, ..
+                } => {
+                    *current_name = name.clone();
+                }
+                Account::Empty => unreachable!("AccountRenamed event applied to Empty account"),
+            },
 
-            AccountEvent::MemberAdded { user_id } => {
-                self.member_ids.insert(user_id.clone());
-            }
+            AccountEvent::MemberAdded { user_id } => match self {
+                Account::Active { member_ids, .. } => {
+                    member_ids.insert(user_id.clone());
+                }
+                Account::Empty => unreachable!("MemberAdded event applied to Empty account"),
+            },
 
-            AccountEvent::MemberRemoved { user_id } => {
-                self.member_ids.remove(user_id);
-            }
+            AccountEvent::MemberRemoved { user_id } => match self {
+                Account::Active { member_ids, .. } => {
+                    member_ids.remove(user_id);
+                }
+                Account::Empty => unreachable!("MemberRemoved event applied to Empty account"),
+            },
 
             AccountEvent::CategoryCreated {
                 category_id,
                 name,
                 order,
-            } => {
-                self.categories.insert(
-                    category_id.clone(),
-                    Category {
-                        id: category_id.clone(),
-                        name: name.clone(),
-                        order: *order,
-                        deleted: false,
-                    },
-                );
-            }
-
-            AccountEvent::CategoryRenamed { category_id, name } => {
-                if let Some(category) = self.categories.get_mut(category_id) {
-                    category.name = name.clone();
+            } => match self {
+                Account::Active { categories, .. } => {
+                    categories.insert(
+                        category_id.clone(),
+                        Category {
+                            id: category_id.clone(),
+                            name: name.clone(),
+                            order: *order,
+                            deleted: false,
+                        },
+                    );
                 }
-            }
-
-            AccountEvent::CategoryReordered { category_id, order } => {
-                if let Some(category) = self.categories.get_mut(category_id) {
-                    category.order = *order;
+                Account::Empty => {
+                    unreachable!("CategoryCreated event applied to Empty account")
                 }
-            }
+            },
 
-            AccountEvent::CategoryDeleted { category_id } => {
-                if let Some(category) = self.categories.get_mut(category_id) {
-                    category.deleted = true;
+            AccountEvent::CategoryRenamed { category_id, name } => match self {
+                Account::Active { categories, .. } => {
+                    if let Some(category) = categories.get_mut(category_id) {
+                        category.name = name.clone();
+                    }
                 }
-            }
+                Account::Empty => {
+                    unreachable!("CategoryRenamed event applied to Empty account")
+                }
+            },
+
+            AccountEvent::CategoryReordered { category_id, order } => match self {
+                Account::Active { categories, .. } => {
+                    if let Some(category) = categories.get_mut(category_id) {
+                        category.order = *order;
+                    }
+                }
+                Account::Empty => {
+                    unreachable!("CategoryReordered event applied to Empty account")
+                }
+            },
+
+            AccountEvent::CategoryDeleted { category_id } => match self {
+                Account::Active { categories, .. } => {
+                    if let Some(category) = categories.get_mut(category_id) {
+                        category.deleted = true;
+                    }
+                }
+                Account::Empty => {
+                    unreachable!("CategoryDeleted event applied to Empty account")
+                }
+            },
 
             AccountEvent::TransactionCreated {
                 transaction_id,
@@ -244,19 +276,24 @@ impl Account {
                 date,
                 memo,
                 created_by,
-            } => {
-                self.transactions.insert(
-                    transaction_id.clone(),
-                    Transaction {
-                        id: transaction_id.clone(),
-                        amount: *amount,
-                        category_id: category_id.clone(),
-                        date: date.clone(),
-                        memo: memo.clone(),
-                        created_by: created_by.clone(),
-                    },
-                );
-            }
+            } => match self {
+                Account::Active { transactions, .. } => {
+                    transactions.insert(
+                        transaction_id.clone(),
+                        Transaction {
+                            id: transaction_id.clone(),
+                            amount: *amount,
+                            category_id: category_id.clone(),
+                            date: date.clone(),
+                            memo: memo.clone(),
+                            created_by: created_by.clone(),
+                        },
+                    );
+                }
+                Account::Empty => {
+                    unreachable!("TransactionCreated event applied to Empty account")
+                }
+            },
 
             AccountEvent::TransactionUpdated {
                 transaction_id,
@@ -264,18 +301,28 @@ impl Account {
                 category_id,
                 date,
                 memo,
-            } => {
-                if let Some(transaction) = self.transactions.get_mut(transaction_id) {
-                    transaction.amount = *amount;
-                    transaction.category_id = category_id.clone();
-                    transaction.date = date.clone();
-                    transaction.memo = memo.clone();
+            } => match self {
+                Account::Active { transactions, .. } => {
+                    if let Some(transaction) = transactions.get_mut(transaction_id) {
+                        transaction.amount = *amount;
+                        transaction.category_id = category_id.clone();
+                        transaction.date = date.clone();
+                        transaction.memo = memo.clone();
+                    }
                 }
-            }
+                Account::Empty => {
+                    unreachable!("TransactionUpdated event applied to Empty account")
+                }
+            },
 
-            AccountEvent::TransactionDeleted { transaction_id } => {
-                self.transactions.remove(transaction_id);
-            }
+            AccountEvent::TransactionDeleted { transaction_id } => match self {
+                Account::Active { transactions, .. } => {
+                    transactions.remove(transaction_id);
+                }
+                Account::Empty => {
+                    unreachable!("TransactionDeleted event applied to Empty account")
+                }
+            },
         }
     }
 
@@ -287,7 +334,7 @@ impl Account {
         name: String,
         owner_id: UserId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_some() {
+        if !matches!(self, Account::Empty) {
             return Err(AccountError::AccountAlreadyExists);
         }
 
@@ -303,7 +350,7 @@ impl Account {
     }
 
     fn handle_rename_account(&self, name: String) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        if !matches!(self, Account::Active { .. }) {
             return Err(AccountError::AccountNotFound);
         }
 
@@ -315,11 +362,11 @@ impl Account {
     }
 
     fn handle_add_member(&self, user_id: UserId) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active { member_ids, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
-        if self.member_ids.contains(&user_id) {
+        if member_ids.contains(&user_id) {
             return Err(AccountError::MemberAlreadyExists);
         }
 
@@ -327,15 +374,20 @@ impl Account {
     }
 
     fn handle_remove_member(&self, user_id: UserId) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active {
+            owner_id,
+            member_ids,
+            ..
+        } = self
+        else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
-        if Some(&user_id) == self.owner_id.as_ref() {
+        if &user_id == owner_id {
             return Err(AccountError::CannotRemoveOwner);
         }
 
-        if !self.member_ids.contains(&user_id) {
+        if !member_ids.contains(&user_id) {
             return Err(AccountError::MemberNotFound);
         }
 
@@ -348,7 +400,7 @@ impl Account {
         name: String,
         order: u32,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        if !matches!(self, Account::Active { .. }) {
             return Err(AccountError::AccountNotFound);
         }
 
@@ -368,12 +420,11 @@ impl Account {
         category_id: CategoryId,
         name: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active { categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
-        let category = self
-            .categories
+        let category = categories
             .get(&category_id)
             .ok_or(AccountError::CategoryNotFound)?;
 
@@ -393,12 +444,11 @@ impl Account {
         category_id: CategoryId,
         order: u32,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active { categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
-        let category = self
-            .categories
+        let category = categories
             .get(&category_id)
             .ok_or(AccountError::CategoryNotFound)?;
 
@@ -413,12 +463,11 @@ impl Account {
         &self,
         category_id: CategoryId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active { categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
-        let category = self
-            .categories
+        let category = categories
             .get(&category_id)
             .ok_or(AccountError::CategoryNotFound)?;
 
@@ -438,16 +487,16 @@ impl Account {
         memo: Option<String>,
         created_by: UserId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active { categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
         if amount == 0 {
             return Err(AccountError::InvalidAmount);
         }
 
         // カテゴリの存在確認（削除されていても既存の取引では使用可能）
-        self.categories
+        categories
             .get(&category_id)
             .ok_or(AccountError::CategoryNotFound)?;
 
@@ -474,11 +523,16 @@ impl Account {
         date: String,
         memo: Option<String>,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active {
+            categories,
+            transactions,
+            ..
+        } = self
+        else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
-        if !self.transactions.contains_key(&transaction_id) {
+        if !transactions.contains_key(&transaction_id) {
             return Err(AccountError::TransactionNotFound);
         }
 
@@ -487,7 +541,7 @@ impl Account {
         }
 
         // カテゴリの存在確認
-        self.categories
+        categories
             .get(&category_id)
             .ok_or(AccountError::CategoryNotFound)?;
 
@@ -509,11 +563,11 @@ impl Account {
         &self,
         transaction_id: TransactionId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if self.id.is_none() {
+        let Account::Active { transactions, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
-        if !self.transactions.contains_key(&transaction_id) {
+        if !transactions.contains_key(&transaction_id) {
             return Err(AccountError::TransactionNotFound);
         }
 
@@ -560,10 +614,21 @@ mod tests {
         }];
 
         let account = Account::from_events(events);
-        assert_eq!(account.id, Some("acc-1".to_string()));
-        assert_eq!(account.name, Some("My Account".to_string()));
-        assert_eq!(account.owner_id, Some("user-1".to_string()));
-        assert!(account.member_ids.contains("user-1"));
+        match account {
+            Account::Active {
+                id,
+                name,
+                owner_id,
+                member_ids,
+                ..
+            } => {
+                assert_eq!(id, "acc-1");
+                assert_eq!(name, "My Account");
+                assert_eq!(owner_id, "user-1");
+                assert!(member_ids.contains("user-1"));
+            }
+            Account::Empty => panic!("Expected Active account"),
+        }
     }
 
     #[test]
@@ -583,7 +648,12 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         account.apply_event(&events[0]);
-        assert!(account.member_ids.contains("user-2"));
+        match account {
+            Account::Active { member_ids, .. } => {
+                assert!(member_ids.contains("user-2"));
+            }
+            Account::Empty => panic!("Expected Active account"),
+        }
     }
 
     #[test]
