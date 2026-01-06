@@ -1,6 +1,6 @@
 use super::commands::AccountCommand;
 use super::events::{AccountEvent, AccountEventCommonProps, TransactionProps};
-use super::value_objects::AccountId;
+use super::value_objects::{AccountId, CategoryId};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// アカウント集約のエラー
@@ -46,7 +46,7 @@ pub enum AccountError {
 /// カテゴリの状態
 #[derive(Clone, Debug, PartialEq)]
 pub struct Category {
-    pub id: String,
+    pub id: CategoryId,
     pub name: String,
     pub deleted: bool,
 }
@@ -56,7 +56,7 @@ pub struct Category {
 pub struct Transaction {
     pub id: String,
     pub amount: String,
-    pub category_id: String,
+    pub category_id: CategoryId,
     pub comment: String,
     pub date: String,
 }
@@ -75,7 +75,7 @@ pub enum Account {
         /// オーナーのセット
         owners: BTreeSet<String>,
         /// カテゴリのマップ
-        categories: BTreeMap<String, Category>,
+        categories: BTreeMap<CategoryId, Category>,
         /// 取引のマップ
         transactions: BTreeMap<String, Transaction>,
     },
@@ -204,10 +204,12 @@ impl Account {
                 category_id, name, ..
             } => match self {
                 Account::Active { categories, .. } => {
+                    let id = CategoryId::parse(category_id)
+                        .expect("Failed to parse category_id from event");
                     categories.insert(
-                        category_id.clone(),
+                        id,
                         Category {
-                            id: category_id.clone(),
+                            id,
                             name: name.clone(),
                             deleted: false,
                         },
@@ -222,7 +224,9 @@ impl Account {
                 category_id, name, ..
             } => match self {
                 Account::Active { categories, .. } => {
-                    if let Some(category) = categories.get_mut(category_id) {
+                    let id = CategoryId::parse(category_id)
+                        .expect("Failed to parse category_id from event");
+                    if let Some(category) = categories.get_mut(&id) {
                         category.name = name.clone();
                     }
                 }
@@ -233,7 +237,9 @@ impl Account {
 
             AccountEvent::CategoryDeleted { category_id, .. } => match self {
                 Account::Active { categories, .. } => {
-                    if let Some(category) = categories.get_mut(category_id) {
+                    let id = CategoryId::parse(category_id)
+                        .expect("Failed to parse category_id from event");
+                    if let Some(category) = categories.get_mut(&id) {
                         category.deleted = true;
                     }
                 }
@@ -253,7 +259,8 @@ impl Account {
                         Transaction {
                             id: transaction_id.clone(),
                             amount: props.amount.clone(),
-                            category_id: props.category_id.clone(),
+                            category_id: CategoryId::parse(&props.category_id)
+                                .expect("Failed to parse category_id from event"),
                             comment: props.comment.clone(),
                             date: props.date.clone(),
                         },
@@ -272,7 +279,8 @@ impl Account {
                 Account::Active { transactions, .. } => {
                     if let Some(transaction) = transactions.get_mut(transaction_id) {
                         transaction.amount = props.amount.clone();
-                        transaction.category_id = props.category_id.clone();
+                        transaction.category_id = CategoryId::parse(&props.category_id)
+                            .expect("Failed to parse category_id from event");
                         transaction.comment = props.comment.clone();
                         transaction.date = props.date.clone();
                     }
@@ -373,7 +381,7 @@ impl Account {
 
     fn handle_add_category(
         &self,
-        category_id: String,
+        category_id: CategoryId,
         name: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, .. } = self else {
@@ -386,7 +394,7 @@ impl Account {
 
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::CategoryAdded {
-            category_id,
+            category_id: category_id.to_string(),
             name,
             common,
         }])
@@ -394,7 +402,7 @@ impl Account {
 
     fn handle_update_category(
         &self,
-        category_id: String,
+        category_id: CategoryId,
         name: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, categories, .. } = self else {
@@ -415,7 +423,7 @@ impl Account {
 
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::CategoryUpdated {
-            category_id,
+            category_id: category_id.to_string(),
             name,
             common,
         }])
@@ -423,7 +431,7 @@ impl Account {
 
     fn handle_delete_category(
         &self,
-        category_id: String,
+        category_id: CategoryId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
@@ -439,7 +447,7 @@ impl Account {
 
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::CategoryDeleted {
-            category_id,
+            category_id: category_id.to_string(),
             common,
         }])
     }
@@ -448,7 +456,7 @@ impl Account {
         &self,
         transaction_id: String,
         amount: String,
-        category_id: String,
+        category_id: CategoryId,
         comment: String,
         date: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
@@ -475,7 +483,7 @@ impl Account {
             transaction_id,
             props: TransactionProps {
                 amount,
-                category_id,
+                category_id: category_id.to_string(),
                 comment,
                 date,
             },
@@ -487,7 +495,7 @@ impl Account {
         &self,
         transaction_id: String,
         amount: String,
-        category_id: String,
+        category_id: CategoryId,
         comment: String,
         date: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
@@ -524,7 +532,7 @@ impl Account {
             transaction_id,
             props: TransactionProps {
                 amount,
-                category_id,
+                category_id: category_id.to_string(),
                 comment,
                 date,
             },
