@@ -1,8 +1,6 @@
 use super::commands::AccountCommand;
-use super::events::{
-    AccountEvent, AccountEventCommonProps, AccountId, CategoryId, TransactionId,
-    TransactionProps, UserId,
-};
+use super::events::{AccountEvent, AccountEventCommonProps, TransactionProps};
+use super::value_objects::AccountId;
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
@@ -49,7 +47,7 @@ pub enum AccountError {
 /// カテゴリの状態
 #[derive(Debug, Clone, PartialEq)]
 pub struct Category {
-    pub id: CategoryId,
+    pub id: String,
     pub name: String,
     pub deleted: bool,
 }
@@ -57,9 +55,9 @@ pub struct Category {
 /// 取引の状態
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transaction {
-    pub id: TransactionId,
+    pub id: String,
     pub amount: String,
-    pub category_id: CategoryId,
+    pub category_id: String,
     pub comment: String,
     pub date: String,
 }
@@ -76,11 +74,11 @@ pub enum Account {
         /// アカウント名
         name: String,
         /// オーナーのセット
-        owners: BTreeSet<UserId>,
+        owners: BTreeSet<String>,
         /// カテゴリのマップ
-        categories: BTreeMap<CategoryId, Category>,
+        categories: BTreeMap<String, Category>,
         /// 取引のマップ
-        transactions: BTreeMap<TransactionId, Transaction>,
+        transactions: BTreeMap<String, Transaction>,
     },
 }
 
@@ -165,9 +163,9 @@ impl Account {
     pub fn apply_event(&mut self, event: &AccountEvent) {
         match event {
             AccountEvent::AccountCreated { name, owners, .. } => {
-                let owners_set: BTreeSet<UserId> = owners.iter().cloned().collect();
+                let owners_set: BTreeSet<String> = owners.iter().cloned().collect();
                 *self = Account::Active {
-                    id: event.account_id().clone(),
+                    id: AccountId::from(event.account_id().clone()),
                     name: name.clone(),
                     owners: owners_set,
                     categories: BTreeMap::new(),
@@ -303,7 +301,7 @@ impl Account {
         &self,
         account_id: AccountId,
         name: String,
-        owners: Vec<UserId>,
+        owners: Vec<String>,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         if !matches!(self, Account::Empty) {
             return Err(AccountError::AccountAlreadyExists);
@@ -313,7 +311,7 @@ impl Account {
             return Err(AccountError::EmptyAccountName);
         }
 
-        let common = Self::create_common_props(account_id);
+        let common = Self::create_common_props(&account_id);
         Ok(vec![AccountEvent::AccountCreated {
             name,
             owners,
@@ -326,7 +324,7 @@ impl Account {
             return Err(AccountError::AccountNotFound);
         };
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::AccountDeleted { common }])
     }
 
@@ -339,11 +337,11 @@ impl Account {
             return Err(AccountError::EmptyAccountName);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::AccountUpdated { name, common }])
     }
 
-    fn handle_add_owner(&self, owner: UserId) -> Result<Vec<AccountEvent>, AccountError> {
+    fn handle_add_owner(&self, owner: String) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, owners, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
@@ -352,11 +350,11 @@ impl Account {
             return Err(AccountError::OwnerAlreadyExists);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::OwnerAdded { owner, common }])
     }
 
-    fn handle_remove_owner(&self, owner: UserId) -> Result<Vec<AccountEvent>, AccountError> {
+    fn handle_remove_owner(&self, owner: String) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, owners, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
@@ -369,13 +367,13 @@ impl Account {
             return Err(AccountError::CannotRemoveLastOwner);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::OwnerRemoved { owner, common }])
     }
 
     fn handle_add_category(
         &self,
-        category_id: CategoryId,
+        category_id: String,
         name: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, .. } = self else {
@@ -386,7 +384,7 @@ impl Account {
             return Err(AccountError::EmptyCategoryName);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::CategoryAdded {
             category_id,
             name,
@@ -396,7 +394,7 @@ impl Account {
 
     fn handle_update_category(
         &self,
-        category_id: CategoryId,
+        category_id: String,
         name: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, categories, .. } = self else {
@@ -415,7 +413,7 @@ impl Account {
             return Err(AccountError::EmptyCategoryName);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::CategoryUpdated {
             category_id,
             name,
@@ -425,7 +423,7 @@ impl Account {
 
     fn handle_delete_category(
         &self,
-        category_id: CategoryId,
+        category_id: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
@@ -439,7 +437,7 @@ impl Account {
             return Err(AccountError::CategoryAlreadyDeleted);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::CategoryDeleted {
             category_id,
             common,
@@ -448,9 +446,9 @@ impl Account {
 
     fn handle_add_transaction(
         &self,
-        transaction_id: TransactionId,
+        transaction_id: String,
         amount: String,
-        category_id: CategoryId,
+        category_id: String,
         comment: String,
         date: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
@@ -472,7 +470,7 @@ impl Account {
             return Err(AccountError::InvalidDateFormat);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionAdded {
             transaction_id,
             props: TransactionProps {
@@ -487,9 +485,9 @@ impl Account {
 
     fn handle_update_transaction(
         &self,
-        transaction_id: TransactionId,
+        transaction_id: String,
         amount: String,
-        category_id: CategoryId,
+        category_id: String,
         comment: String,
         date: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
@@ -521,7 +519,7 @@ impl Account {
             return Err(AccountError::InvalidDateFormat);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionUpdated {
             transaction_id,
             props: TransactionProps {
@@ -536,7 +534,7 @@ impl Account {
 
     fn handle_delete_transaction(
         &self,
-        transaction_id: TransactionId,
+        transaction_id: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, transactions, .. } = self else {
             return Err(AccountError::AccountNotFound);
@@ -546,7 +544,7 @@ impl Account {
             return Err(AccountError::TransactionNotFound);
         }
 
-        let common = Self::create_common_props(id.clone());
+        let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionDeleted {
             transaction_id,
             common,
@@ -555,9 +553,9 @@ impl Account {
 
     // ヘルパーメソッド
 
-    fn create_common_props(account_id: AccountId) -> AccountEventCommonProps {
+    fn create_common_props(account_id: &AccountId) -> AccountEventCommonProps {
         AccountEventCommonProps {
-            account_id,
+            account_id: account_id.as_ref().to_string(),
             at: chrono::Utc::now().to_rfc3339(),
             id: uuid::Uuid::new_v4().to_string(),
             protocol_version: 1,
@@ -567,7 +565,7 @@ impl Account {
 
 // AccountEvent にヘルパーメソッドを追加
 impl AccountEvent {
-    pub fn account_id(&self) -> &AccountId {
+    pub fn account_id(&self) -> &String {
         match self {
             AccountEvent::AccountCreated { common, .. } => &common.account_id,
             AccountEvent::AccountDeleted { common, .. } => &common.account_id,
@@ -592,7 +590,7 @@ mod tests {
     fn test_create_account() -> anyhow::Result<()> {
         let account = Account::new();
         let command = AccountCommand::CreateAccount {
-            account_id: "acc-1".to_string(),
+            account_id: AccountId::new("acc-1"),
             name: "My Account".to_string(),
             owners: vec!["user-1".to_string()],
         };
@@ -630,7 +628,7 @@ mod tests {
             Account::Active {
                 id, name, owners, ..
             } => {
-                assert_eq!(id, "acc-1");
+                assert_eq!(id.as_str(), "acc-1");
                 assert_eq!(name, "My Account");
                 assert!(owners.contains("user-1"));
                 Ok(())

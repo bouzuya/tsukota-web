@@ -1,4 +1,4 @@
-use super::events::{AccountId, CategoryId, TransactionId, UserId};
+use super::value_objects::AccountId;
 
 /// アカウント集約に対するコマンド
 #[derive(Debug, Clone, PartialEq)]
@@ -7,7 +7,7 @@ pub enum AccountCommand {
     CreateAccount {
         account_id: AccountId,
         name: String,
-        owners: Vec<UserId>,
+        owners: Vec<String>,
     },
 
     /// アカウントを削除する
@@ -17,41 +17,41 @@ pub enum AccountCommand {
     UpdateAccount { name: String },
 
     /// オーナーを追加する
-    AddOwner { owner: UserId },
+    AddOwner { owner: String },
 
     /// オーナーを削除する
-    RemoveOwner { owner: UserId },
+    RemoveOwner { owner: String },
 
     /// カテゴリを追加する
-    AddCategory { category_id: CategoryId, name: String },
+    AddCategory { category_id: String, name: String },
 
     /// カテゴリ名を変更する
     UpdateCategory {
-        category_id: CategoryId,
+        category_id: String,
         name: String,
     },
 
     /// カテゴリを削除する（論理削除）
-    DeleteCategory { category_id: CategoryId },
+    DeleteCategory { category_id: String },
 
     /// 取引を追加する
     AddTransaction {
-        transaction_id: TransactionId,
+        transaction_id: String,
         amount: String,
-        category_id: CategoryId,
+        category_id: String,
         comment: String,
         date: String,
     },
 
     /// 取引を更新する
     UpdateTransaction {
-        transaction_id: TransactionId,
+        transaction_id: String,
         amount: String,
-        category_id: CategoryId,
+        category_id: String,
         comment: String,
         date: String,
     },
 
     /// 取引を削除する
-    DeleteTransaction { transaction_id: TransactionId },
+    DeleteTransaction { transaction_id: String },
 }

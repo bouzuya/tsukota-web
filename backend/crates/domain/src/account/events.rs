@@ -1,21 +1,7 @@
-use serde::{Deserialize, Serialize};
-
-/// アカウント ID
-pub type AccountId = String;
-
-/// ユーザー ID (オーナー)
-pub type UserId = String;
-
-/// カテゴリ ID
-pub type CategoryId = String;
-
-/// 取引 ID
-pub type TransactionId = String;
-
 /// イベントの共通プロパティ
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct AccountEventCommonProps {
-    pub account_id: AccountId,
+    pub account_id: String,
     pub at: String,
     pub id: String,
     pub protocol_version: u32,
@@ -25,7 +11,7 @@ pub struct AccountEventCommonProps {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TransactionProps {
     pub amount: String,
-    pub category_id: CategoryId,
+    pub category_id: String,
     pub comment: String,
     pub date: String,
 }
@@ -38,7 +24,7 @@ pub enum AccountEvent {
     #[serde(rename_all = "camelCase")]
     AccountCreated {
         name: String,
-        owners: Vec<UserId>,
+        owners: Vec<String>,
         #[serde(flatten)]
         common: AccountEventCommonProps,
     },
@@ -61,7 +47,7 @@ pub enum AccountEvent {
     /// カテゴリが追加された
     #[serde(rename_all = "camelCase")]
     CategoryAdded {
-        category_id: CategoryId,
+        category_id: String,
         name: String,
         #[serde(flatten)]
         common: AccountEventCommonProps,
@@ -70,7 +56,7 @@ pub enum AccountEvent {
     /// カテゴリが削除された
     #[serde(rename_all = "camelCase")]
     CategoryDeleted {
-        category_id: CategoryId,
+        category_id: String,
         #[serde(flatten)]
         common: AccountEventCommonProps,
     },
@@ -78,7 +64,7 @@ pub enum AccountEvent {
     /// カテゴリ名が変更された
     #[serde(rename_all = "camelCase")]
     CategoryUpdated {
-        category_id: CategoryId,
+        category_id: String,
         name: String,
         #[serde(flatten)]
         common: AccountEventCommonProps,
@@ -87,7 +73,7 @@ pub enum AccountEvent {
     /// オーナーが追加された
     #[serde(rename_all = "camelCase")]
     OwnerAdded {
-        owner: UserId,
+        owner: String,
         #[serde(flatten)]
         common: AccountEventCommonProps,
     },
@@ -95,7 +81,7 @@ pub enum AccountEvent {
     /// オーナーが削除された
     #[serde(rename_all = "camelCase")]
     OwnerRemoved {
-        owner: UserId,
+        owner: String,
         #[serde(flatten)]
         common: AccountEventCommonProps,
     },
@@ -103,7 +89,7 @@ pub enum AccountEvent {
     /// 取引が追加された
     #[serde(rename_all = "camelCase")]
     TransactionAdded {
-        transaction_id: TransactionId,
+        transaction_id: String,
         #[serde(flatten)]
         props: TransactionProps,
         #[serde(flatten)]
@@ -113,7 +99,7 @@ pub enum AccountEvent {
     /// 取引が削除された
     #[serde(rename_all = "camelCase")]
     TransactionDeleted {
-        transaction_id: TransactionId,
+        transaction_id: String,
         #[serde(flatten)]
         common: AccountEventCommonProps,
     },
@@ -121,7 +107,7 @@ pub enum AccountEvent {
     /// 取引が更新された
     #[serde(rename_all = "camelCase")]
     TransactionUpdated {
-        transaction_id: TransactionId,
+        transaction_id: String,
         #[serde(flatten)]
         props: TransactionProps,
         #[serde(flatten)]
