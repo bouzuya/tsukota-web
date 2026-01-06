@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 /// アカウント ID
 pub type AccountId = String;
 
-/// ユーザー ID
+/// ユーザー ID (オーナー)
 pub type UserId = String;
 
 /// カテゴリ ID
@@ -12,77 +12,119 @@ pub type CategoryId = String;
 /// 取引 ID
 pub type TransactionId = String;
 
+/// イベントの共通プロパティ
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AccountEventCommonProps {
+    pub account_id: AccountId,
+    pub at: String,
+    pub id: String,
+    pub protocol_version: u32,
+}
+
+/// 取引のプロパティ
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TransactionProps {
+    pub amount: String,
+    pub category_id: CategoryId,
+    pub comment: String,
+    pub date: String,
+}
+
 /// アカウント集約に対するイベント
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "event_type")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum AccountEvent {
     /// アカウントが作成された
+    #[serde(rename_all = "camelCase")]
     AccountCreated {
-        account_id: AccountId,
         name: String,
-        owner_id: UserId,
+        owners: Vec<UserId>,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
+    },
+
+    /// アカウントが削除された
+    #[serde(rename_all = "camelCase")]
+    AccountDeleted {
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 
     /// アカウント名が変更された
-    AccountRenamed {
+    #[serde(rename_all = "camelCase")]
+    AccountUpdated {
         name: String,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 
-    /// メンバーが追加された
-    MemberAdded {
-        user_id: UserId,
-    },
-
-    /// メンバーが削除された
-    MemberRemoved {
-        user_id: UserId,
-    },
-
-    /// カテゴリが作成された
-    CategoryCreated {
+    /// カテゴリが追加された
+    #[serde(rename_all = "camelCase")]
+    CategoryAdded {
         category_id: CategoryId,
         name: String,
-        order: u32,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
+    },
+
+    /// カテゴリが削除された
+    #[serde(rename_all = "camelCase")]
+    CategoryDeleted {
+        category_id: CategoryId,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 
     /// カテゴリ名が変更された
-    CategoryRenamed {
+    #[serde(rename_all = "camelCase")]
+    CategoryUpdated {
         category_id: CategoryId,
         name: String,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 
-    /// カテゴリの表示順が変更された
-    CategoryReordered {
-        category_id: CategoryId,
-        order: u32,
+    /// オーナーが追加された
+    #[serde(rename_all = "camelCase")]
+    OwnerAdded {
+        owner: UserId,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 
-    /// カテゴリが削除された（論理削除）
-    CategoryDeleted {
-        category_id: CategoryId,
+    /// オーナーが削除された
+    #[serde(rename_all = "camelCase")]
+    OwnerRemoved {
+        owner: UserId,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 
-    /// 取引が作成された
-    TransactionCreated {
+    /// 取引が追加された
+    #[serde(rename_all = "camelCase")]
+    TransactionAdded {
         transaction_id: TransactionId,
-        amount: u64,
-        category_id: CategoryId,
-        date: String, // ISO 8601 format (YYYY-MM-DD)
-        memo: Option<String>,
-        created_by: UserId,
-    },
-
-    /// 取引が更新された
-    TransactionUpdated {
-        transaction_id: TransactionId,
-        amount: u64,
-        category_id: CategoryId,
-        date: String,
-        memo: Option<String>,
+        #[serde(flatten)]
+        props: TransactionProps,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 
     /// 取引が削除された
+    #[serde(rename_all = "camelCase")]
     TransactionDeleted {
         transaction_id: TransactionId,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
+    },
+
+    /// 取引が更新された
+    #[serde(rename_all = "camelCase")]
+    TransactionUpdated {
+        transaction_id: TransactionId,
+        #[serde(flatten)]
+        props: TransactionProps,
+        #[serde(flatten)]
+        common: AccountEventCommonProps,
     },
 }

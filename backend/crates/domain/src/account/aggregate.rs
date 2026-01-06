@@ -1,5 +1,8 @@
 use super::commands::AccountCommand;
-use super::events::{AccountEvent, AccountId, CategoryId, TransactionId, UserId};
+use super::events::{
+    AccountEvent, AccountEventCommonProps, AccountId, CategoryId, TransactionId,
+    TransactionProps, UserId,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 
@@ -15,14 +18,14 @@ pub enum AccountError {
     #[error("Account name cannot be empty")]
     EmptyAccountName,
 
-    #[error("Member already exists")]
-    MemberAlreadyExists,
+    #[error("Owner already exists")]
+    OwnerAlreadyExists,
 
-    #[error("Member not found")]
-    MemberNotFound,
+    #[error("Owner not found")]
+    OwnerNotFound,
 
-    #[error("Cannot remove owner")]
-    CannotRemoveOwner,
+    #[error("Cannot remove the last owner")]
+    CannotRemoveLastOwner,
 
     #[error("Category not found")]
     CategoryNotFound,
@@ -39,8 +42,8 @@ pub enum AccountError {
     #[error("Invalid date format")]
     InvalidDateFormat,
 
-    #[error("Amount must be greater than 0")]
-    InvalidAmount,
+    #[error("Amount cannot be empty")]
+    EmptyAmount,
 }
 
 /// カテゴリの状態
@@ -48,7 +51,6 @@ pub enum AccountError {
 pub struct Category {
     pub id: CategoryId,
     pub name: String,
-    pub order: u32,
     pub deleted: bool,
 }
 
@@ -56,11 +58,10 @@ pub struct Category {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transaction {
     pub id: TransactionId,
-    pub amount: u64,
+    pub amount: String,
     pub category_id: CategoryId,
+    pub comment: String,
     pub date: String,
-    pub memo: Option<String>,
-    pub created_by: UserId,
 }
 
 /// アカウント集約
@@ -74,10 +75,8 @@ pub enum Account {
         id: AccountId,
         /// アカウント名
         name: String,
-        /// オーナー ID
-        owner_id: UserId,
-        /// メンバー ID のセット (オーナーを含む)
-        member_ids: BTreeSet<UserId>,
+        /// オーナーのセット
+        owners: BTreeSet<UserId>,
         /// カテゴリのマップ
         categories: BTreeMap<CategoryId, Category>,
         /// 取引のマップ
@@ -115,56 +114,46 @@ impl Account {
             AccountCommand::CreateAccount {
                 account_id,
                 name,
-                owner_id,
-            } => self.handle_create_account(account_id, name, owner_id),
+                owners,
+            } => self.handle_create_account(account_id, name, owners),
 
-            AccountCommand::RenameAccount { name } => self.handle_rename_account(name),
+            AccountCommand::DeleteAccount => self.handle_delete_account(),
 
-            AccountCommand::AddMember { user_id } => self.handle_add_member(user_id),
+            AccountCommand::UpdateAccount { name } => self.handle_update_account(name),
 
-            AccountCommand::RemoveMember { user_id } => self.handle_remove_member(user_id),
+            AccountCommand::AddOwner { owner } => self.handle_add_owner(owner),
 
-            AccountCommand::CreateCategory {
-                category_id,
-                name,
-                order,
-            } => self.handle_create_category(category_id, name, order),
+            AccountCommand::RemoveOwner { owner } => self.handle_remove_owner(owner),
 
-            AccountCommand::RenameCategory { category_id, name } => {
-                self.handle_rename_category(category_id, name)
+            AccountCommand::AddCategory { category_id, name } => {
+                self.handle_add_category(category_id, name)
             }
 
-            AccountCommand::ReorderCategory { category_id, order } => {
-                self.handle_reorder_category(category_id, order)
+            AccountCommand::UpdateCategory { category_id, name } => {
+                self.handle_update_category(category_id, name)
             }
 
             AccountCommand::DeleteCategory { category_id } => {
                 self.handle_delete_category(category_id)
             }
 
-            AccountCommand::CreateTransaction {
+            AccountCommand::AddTransaction {
                 transaction_id,
                 amount,
                 category_id,
+                comment,
                 date,
-                memo,
-                created_by,
-            } => self.handle_create_transaction(
-                transaction_id,
-                amount,
-                category_id,
-                date,
-                memo,
-                created_by,
-            ),
+            } => self.handle_add_transaction(transaction_id, amount, category_id, comment, date),
 
             AccountCommand::UpdateTransaction {
                 transaction_id,
                 amount,
                 category_id,
+                comment,
                 date,
-                memo,
-            } => self.handle_update_transaction(transaction_id, amount, category_id, date, memo),
+            } => {
+                self.handle_update_transaction(transaction_id, amount, category_id, comment, date)
+            }
 
             AccountCommand::DeleteTransaction { transaction_id } => {
                 self.handle_delete_transaction(transaction_id)
@@ -175,50 +164,46 @@ impl Account {
     /// イベントを適用して状態を更新
     pub fn apply_event(&mut self, event: &AccountEvent) {
         match event {
-            AccountEvent::AccountCreated {
-                account_id,
-                name,
-                owner_id,
-            } => {
-                let mut member_ids = BTreeSet::new();
-                member_ids.insert(owner_id.clone());
+            AccountEvent::AccountCreated { name, owners, .. } => {
+                let owners_set: BTreeSet<UserId> = owners.iter().cloned().collect();
                 *self = Account::Active {
-                    id: account_id.clone(),
+                    id: event.account_id().clone(),
                     name: name.clone(),
-                    owner_id: owner_id.clone(),
-                    member_ids,
+                    owners: owners_set,
                     categories: BTreeMap::new(),
                     transactions: BTreeMap::new(),
                 };
             }
 
-            AccountEvent::AccountRenamed { name } => match self {
+            AccountEvent::AccountDeleted { .. } => {
+                *self = Account::Empty;
+            }
+
+            AccountEvent::AccountUpdated { name, .. } => match self {
                 Account::Active {
                     name: current_name, ..
                 } => {
                     *current_name = name.clone();
                 }
-                Account::Empty => unreachable!("AccountRenamed event applied to Empty account"),
+                Account::Empty => unreachable!("AccountUpdated event applied to Empty account"),
             },
 
-            AccountEvent::MemberAdded { user_id } => match self {
-                Account::Active { member_ids, .. } => {
-                    member_ids.insert(user_id.clone());
+            AccountEvent::OwnerAdded { owner, .. } => match self {
+                Account::Active { owners, .. } => {
+                    owners.insert(owner.clone());
                 }
-                Account::Empty => unreachable!("MemberAdded event applied to Empty account"),
+                Account::Empty => unreachable!("OwnerAdded event applied to Empty account"),
             },
 
-            AccountEvent::MemberRemoved { user_id } => match self {
-                Account::Active { member_ids, .. } => {
-                    member_ids.remove(user_id);
+            AccountEvent::OwnerRemoved { owner, .. } => match self {
+                Account::Active { owners, .. } => {
+                    owners.remove(owner);
                 }
-                Account::Empty => unreachable!("MemberRemoved event applied to Empty account"),
+                Account::Empty => unreachable!("OwnerRemoved event applied to Empty account"),
             },
 
-            AccountEvent::CategoryCreated {
-                category_id,
-                name,
-                order,
+            AccountEvent::CategoryAdded {
+                category_id, name, ..
             } => match self {
                 Account::Active { categories, .. } => {
                     categories.insert(
@@ -226,39 +211,29 @@ impl Account {
                         Category {
                             id: category_id.clone(),
                             name: name.clone(),
-                            order: *order,
                             deleted: false,
                         },
                     );
                 }
                 Account::Empty => {
-                    unreachable!("CategoryCreated event applied to Empty account")
+                    unreachable!("CategoryAdded event applied to Empty account")
                 }
             },
 
-            AccountEvent::CategoryRenamed { category_id, name } => match self {
+            AccountEvent::CategoryUpdated {
+                category_id, name, ..
+            } => match self {
                 Account::Active { categories, .. } => {
                     if let Some(category) = categories.get_mut(category_id) {
                         category.name = name.clone();
                     }
                 }
                 Account::Empty => {
-                    unreachable!("CategoryRenamed event applied to Empty account")
+                    unreachable!("CategoryUpdated event applied to Empty account")
                 }
             },
 
-            AccountEvent::CategoryReordered { category_id, order } => match self {
-                Account::Active { categories, .. } => {
-                    if let Some(category) = categories.get_mut(category_id) {
-                        category.order = *order;
-                    }
-                }
-                Account::Empty => {
-                    unreachable!("CategoryReordered event applied to Empty account")
-                }
-            },
-
-            AccountEvent::CategoryDeleted { category_id } => match self {
+            AccountEvent::CategoryDeleted { category_id, .. } => match self {
                 Account::Active { categories, .. } => {
                     if let Some(category) = categories.get_mut(category_id) {
                         category.deleted = true;
@@ -269,45 +244,39 @@ impl Account {
                 }
             },
 
-            AccountEvent::TransactionCreated {
+            AccountEvent::TransactionAdded {
                 transaction_id,
-                amount,
-                category_id,
-                date,
-                memo,
-                created_by,
+                props,
+                ..
             } => match self {
                 Account::Active { transactions, .. } => {
                     transactions.insert(
                         transaction_id.clone(),
                         Transaction {
                             id: transaction_id.clone(),
-                            amount: *amount,
-                            category_id: category_id.clone(),
-                            date: date.clone(),
-                            memo: memo.clone(),
-                            created_by: created_by.clone(),
+                            amount: props.amount.clone(),
+                            category_id: props.category_id.clone(),
+                            comment: props.comment.clone(),
+                            date: props.date.clone(),
                         },
                     );
                 }
                 Account::Empty => {
-                    unreachable!("TransactionCreated event applied to Empty account")
+                    unreachable!("TransactionAdded event applied to Empty account")
                 }
             },
 
             AccountEvent::TransactionUpdated {
                 transaction_id,
-                amount,
-                category_id,
-                date,
-                memo,
+                props,
+                ..
             } => match self {
                 Account::Active { transactions, .. } => {
                     if let Some(transaction) = transactions.get_mut(transaction_id) {
-                        transaction.amount = *amount;
-                        transaction.category_id = category_id.clone();
-                        transaction.date = date.clone();
-                        transaction.memo = memo.clone();
+                        transaction.amount = props.amount.clone();
+                        transaction.category_id = props.category_id.clone();
+                        transaction.comment = props.comment.clone();
+                        transaction.date = props.date.clone();
                     }
                 }
                 Account::Empty => {
@@ -315,7 +284,9 @@ impl Account {
                 }
             },
 
-            AccountEvent::TransactionDeleted { transaction_id } => match self {
+            AccountEvent::TransactionDeleted {
+                transaction_id, ..
+            } => match self {
                 Account::Active { transactions, .. } => {
                     transactions.remove(transaction_id);
                 }
@@ -332,7 +303,7 @@ impl Account {
         &self,
         account_id: AccountId,
         name: String,
-        owner_id: UserId,
+        owners: Vec<UserId>,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         if !matches!(self, Account::Empty) {
             return Err(AccountError::AccountAlreadyExists);
@@ -342,85 +313,93 @@ impl Account {
             return Err(AccountError::EmptyAccountName);
         }
 
+        let common = Self::create_common_props(account_id);
         Ok(vec![AccountEvent::AccountCreated {
-            account_id,
             name,
-            owner_id,
+            owners,
+            common,
         }])
     }
 
-    fn handle_rename_account(&self, name: String) -> Result<Vec<AccountEvent>, AccountError> {
-        if !matches!(self, Account::Active { .. }) {
+    fn handle_delete_account(&self) -> Result<Vec<AccountEvent>, AccountError> {
+        let Account::Active { id, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
+
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::AccountDeleted { common }])
+    }
+
+    fn handle_update_account(&self, name: String) -> Result<Vec<AccountEvent>, AccountError> {
+        let Account::Active { id, .. } = self else {
+            return Err(AccountError::AccountNotFound);
+        };
 
         if name.trim().is_empty() {
             return Err(AccountError::EmptyAccountName);
         }
 
-        Ok(vec![AccountEvent::AccountRenamed { name }])
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::AccountUpdated { name, common }])
     }
 
-    fn handle_add_member(&self, user_id: UserId) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active { member_ids, .. } = self else {
+    fn handle_add_owner(&self, owner: UserId) -> Result<Vec<AccountEvent>, AccountError> {
+        let Account::Active { id, owners, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
 
-        if member_ids.contains(&user_id) {
-            return Err(AccountError::MemberAlreadyExists);
+        if owners.contains(&owner) {
+            return Err(AccountError::OwnerAlreadyExists);
         }
 
-        Ok(vec![AccountEvent::MemberAdded { user_id }])
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::OwnerAdded { owner, common }])
     }
 
-    fn handle_remove_member(&self, user_id: UserId) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active {
-            owner_id,
-            member_ids,
-            ..
-        } = self
-        else {
+    fn handle_remove_owner(&self, owner: UserId) -> Result<Vec<AccountEvent>, AccountError> {
+        let Account::Active { id, owners, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
 
-        if &user_id == owner_id {
-            return Err(AccountError::CannotRemoveOwner);
+        if !owners.contains(&owner) {
+            return Err(AccountError::OwnerNotFound);
         }
 
-        if !member_ids.contains(&user_id) {
-            return Err(AccountError::MemberNotFound);
+        if owners.len() == 1 {
+            return Err(AccountError::CannotRemoveLastOwner);
         }
 
-        Ok(vec![AccountEvent::MemberRemoved { user_id }])
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::OwnerRemoved { owner, common }])
     }
 
-    fn handle_create_category(
+    fn handle_add_category(
         &self,
         category_id: CategoryId,
         name: String,
-        order: u32,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        if !matches!(self, Account::Active { .. }) {
+        let Account::Active { id, .. } = self else {
             return Err(AccountError::AccountNotFound);
-        }
+        };
 
         if name.trim().is_empty() {
             return Err(AccountError::EmptyCategoryName);
         }
 
-        Ok(vec![AccountEvent::CategoryCreated {
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::CategoryAdded {
             category_id,
             name,
-            order,
+            common,
         }])
     }
 
-    fn handle_rename_category(
+    fn handle_update_category(
         &self,
         category_id: CategoryId,
         name: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active { categories, .. } = self else {
+        let Account::Active { id, categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
 
@@ -436,34 +415,19 @@ impl Account {
             return Err(AccountError::EmptyCategoryName);
         }
 
-        Ok(vec![AccountEvent::CategoryRenamed { category_id, name }])
-    }
-
-    fn handle_reorder_category(
-        &self,
-        category_id: CategoryId,
-        order: u32,
-    ) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active { categories, .. } = self else {
-            return Err(AccountError::AccountNotFound);
-        };
-
-        let category = categories
-            .get(&category_id)
-            .ok_or(AccountError::CategoryNotFound)?;
-
-        if category.deleted {
-            return Err(AccountError::CategoryAlreadyDeleted);
-        }
-
-        Ok(vec![AccountEvent::CategoryReordered { category_id, order }])
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::CategoryUpdated {
+            category_id,
+            name,
+            common,
+        }])
     }
 
     fn handle_delete_category(
         &self,
         category_id: CategoryId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active { categories, .. } = self else {
+        let Account::Active { id, categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
 
@@ -475,24 +439,27 @@ impl Account {
             return Err(AccountError::CategoryAlreadyDeleted);
         }
 
-        Ok(vec![AccountEvent::CategoryDeleted { category_id }])
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::CategoryDeleted {
+            category_id,
+            common,
+        }])
     }
 
-    fn handle_create_transaction(
+    fn handle_add_transaction(
         &self,
         transaction_id: TransactionId,
-        amount: u64,
+        amount: String,
         category_id: CategoryId,
+        comment: String,
         date: String,
-        memo: Option<String>,
-        created_by: UserId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active { categories, .. } = self else {
+        let Account::Active { id, categories, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
 
-        if amount == 0 {
-            return Err(AccountError::InvalidAmount);
+        if amount.trim().is_empty() {
+            return Err(AccountError::EmptyAmount);
         }
 
         // カテゴリの存在確認（削除されていても既存の取引では使用可能）
@@ -505,25 +472,29 @@ impl Account {
             return Err(AccountError::InvalidDateFormat);
         }
 
-        Ok(vec![AccountEvent::TransactionCreated {
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::TransactionAdded {
             transaction_id,
-            amount,
-            category_id,
-            date,
-            memo,
-            created_by,
+            props: TransactionProps {
+                amount,
+                category_id,
+                comment,
+                date,
+            },
+            common,
         }])
     }
 
     fn handle_update_transaction(
         &self,
         transaction_id: TransactionId,
-        amount: u64,
+        amount: String,
         category_id: CategoryId,
+        comment: String,
         date: String,
-        memo: Option<String>,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active {
+            id,
             categories,
             transactions,
             ..
@@ -536,8 +507,8 @@ impl Account {
             return Err(AccountError::TransactionNotFound);
         }
 
-        if amount == 0 {
-            return Err(AccountError::InvalidAmount);
+        if amount.trim().is_empty() {
+            return Err(AccountError::EmptyAmount);
         }
 
         // カテゴリの存在確認
@@ -550,12 +521,16 @@ impl Account {
             return Err(AccountError::InvalidDateFormat);
         }
 
+        let common = Self::create_common_props(id.clone());
         Ok(vec![AccountEvent::TransactionUpdated {
             transaction_id,
-            amount,
-            category_id,
-            date,
-            memo,
+            props: TransactionProps {
+                amount,
+                category_id,
+                comment,
+                date,
+            },
+            common,
         }])
     }
 
@@ -563,7 +538,7 @@ impl Account {
         &self,
         transaction_id: TransactionId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active { transactions, .. } = self else {
+        let Account::Active { id, transactions, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
 
@@ -571,7 +546,41 @@ impl Account {
             return Err(AccountError::TransactionNotFound);
         }
 
-        Ok(vec![AccountEvent::TransactionDeleted { transaction_id }])
+        let common = Self::create_common_props(id.clone());
+        Ok(vec![AccountEvent::TransactionDeleted {
+            transaction_id,
+            common,
+        }])
+    }
+
+    // ヘルパーメソッド
+
+    fn create_common_props(account_id: AccountId) -> AccountEventCommonProps {
+        AccountEventCommonProps {
+            account_id,
+            at: chrono::Utc::now().to_rfc3339(),
+            id: uuid::Uuid::new_v4().to_string(),
+            protocol_version: 1,
+        }
+    }
+}
+
+// AccountEvent にヘルパーメソッドを追加
+impl AccountEvent {
+    pub fn account_id(&self) -> &AccountId {
+        match self {
+            AccountEvent::AccountCreated { common, .. } => &common.account_id,
+            AccountEvent::AccountDeleted { common, .. } => &common.account_id,
+            AccountEvent::AccountUpdated { common, .. } => &common.account_id,
+            AccountEvent::CategoryAdded { common, .. } => &common.account_id,
+            AccountEvent::CategoryDeleted { common, .. } => &common.account_id,
+            AccountEvent::CategoryUpdated { common, .. } => &common.account_id,
+            AccountEvent::OwnerAdded { common, .. } => &common.account_id,
+            AccountEvent::OwnerRemoved { common, .. } => &common.account_id,
+            AccountEvent::TransactionAdded { common, .. } => &common.account_id,
+            AccountEvent::TransactionDeleted { common, .. } => &common.account_id,
+            AccountEvent::TransactionUpdated { common, .. } => &common.account_id,
+        }
     }
 }
 
@@ -585,21 +594,16 @@ mod tests {
         let command = AccountCommand::CreateAccount {
             account_id: "acc-1".to_string(),
             name: "My Account".to_string(),
-            owner_id: "user-1".to_string(),
+            owners: vec!["user-1".to_string()],
         };
 
         let events = account.handle_command(command)?;
         assert_eq!(events.len(), 1);
 
         match &events[0] {
-            AccountEvent::AccountCreated {
-                account_id,
-                name,
-                owner_id,
-            } => {
-                assert_eq!(account_id, "acc-1");
+            AccountEvent::AccountCreated { name, owners, .. } => {
                 assert_eq!(name, "My Account");
-                assert_eq!(owner_id, "user-1");
+                assert_eq!(owners, &vec!["user-1".to_string()]);
                 Ok(())
             }
             event => anyhow::bail!("Expected AccountCreated event, got {:?}", event),
@@ -608,25 +612,27 @@ mod tests {
 
     #[test]
     fn test_account_from_events() -> anyhow::Result<()> {
-        let events = vec![AccountEvent::AccountCreated {
+        let common = AccountEventCommonProps {
             account_id: "acc-1".to_string(),
+            at: "2024-01-01T00:00:00Z".to_string(),
+            id: "evt-1".to_string(),
+            protocol_version: 1,
+        };
+
+        let events = vec![AccountEvent::AccountCreated {
             name: "My Account".to_string(),
-            owner_id: "user-1".to_string(),
+            owners: vec!["user-1".to_string()],
+            common,
         }];
 
         let account = Account::from_events(events);
         match account {
             Account::Active {
-                id,
-                name,
-                owner_id,
-                member_ids,
-                ..
+                id, name, owners, ..
             } => {
                 assert_eq!(id, "acc-1");
                 assert_eq!(name, "My Account");
-                assert_eq!(owner_id, "user-1");
-                assert!(member_ids.contains("user-1"));
+                assert!(owners.contains("user-1"));
                 Ok(())
             }
             Account::Empty => anyhow::bail!("Expected Active account, got Empty"),
@@ -634,16 +640,23 @@ mod tests {
     }
 
     #[test]
-    fn test_add_member() -> anyhow::Result<()> {
+    fn test_add_owner() -> anyhow::Result<()> {
+        let common = AccountEventCommonProps {
+            account_id: "acc-1".to_string(),
+            at: "2024-01-01T00:00:00Z".to_string(),
+            id: "evt-1".to_string(),
+            protocol_version: 1,
+        };
+
         let mut account = Account::new();
         account.apply_event(&AccountEvent::AccountCreated {
-            account_id: "acc-1".to_string(),
             name: "My Account".to_string(),
-            owner_id: "user-1".to_string(),
+            owners: vec!["user-1".to_string()],
+            common,
         });
 
-        let command = AccountCommand::AddMember {
-            user_id: "user-2".to_string(),
+        let command = AccountCommand::AddOwner {
+            owner: "user-2".to_string(),
         };
 
         let events = account.handle_command(command)?;
@@ -651,8 +664,8 @@ mod tests {
 
         account.apply_event(&events[0]);
         match account {
-            Account::Active { member_ids, .. } => {
-                assert!(member_ids.contains("user-2"));
+            Account::Active { owners, .. } => {
+                assert!(owners.contains("user-2"));
                 Ok(())
             }
             Account::Empty => anyhow::bail!("Expected Active account, got Empty"),
@@ -660,23 +673,30 @@ mod tests {
     }
 
     #[test]
-    fn test_cannot_remove_owner() -> anyhow::Result<()> {
+    fn test_cannot_remove_last_owner() -> anyhow::Result<()> {
+        let common = AccountEventCommonProps {
+            account_id: "acc-1".to_string(),
+            at: "2024-01-01T00:00:00Z".to_string(),
+            id: "evt-1".to_string(),
+            protocol_version: 1,
+        };
+
         let mut account = Account::new();
         account.apply_event(&AccountEvent::AccountCreated {
-            account_id: "acc-1".to_string(),
             name: "My Account".to_string(),
-            owner_id: "user-1".to_string(),
+            owners: vec!["user-1".to_string()],
+            common,
         });
 
-        let command = AccountCommand::RemoveMember {
-            user_id: "user-1".to_string(),
+        let command = AccountCommand::RemoveOwner {
+            owner: "user-1".to_string(),
         };
 
         let result = account.handle_command(command);
         match result {
-            Err(AccountError::CannotRemoveOwner) => Ok(()),
-            Ok(_) => anyhow::bail!("Expected CannotRemoveOwner error, but command succeeded"),
-            Err(e) => anyhow::bail!("Expected CannotRemoveOwner error, got {:?}", e),
+            Err(AccountError::CannotRemoveLastOwner) => Ok(()),
+            Ok(_) => anyhow::bail!("Expected CannotRemoveLastOwner error, but command succeeded"),
+            Err(e) => anyhow::bail!("Expected CannotRemoveLastOwner error, got {:?}", e),
         }
     }
 }

@@ -7,69 +7,51 @@ pub enum AccountCommand {
     CreateAccount {
         account_id: AccountId,
         name: String,
-        owner_id: UserId,
+        owners: Vec<UserId>,
     },
+
+    /// アカウントを削除する
+    DeleteAccount,
 
     /// アカウント名を変更する
-    RenameAccount {
-        name: String,
-    },
+    UpdateAccount { name: String },
 
-    /// メンバーを追加する
-    AddMember {
-        user_id: UserId,
-    },
+    /// オーナーを追加する
+    AddOwner { owner: UserId },
 
-    /// メンバーを削除する
-    RemoveMember {
-        user_id: UserId,
-    },
+    /// オーナーを削除する
+    RemoveOwner { owner: UserId },
 
-    /// カテゴリを作成する
-    CreateCategory {
-        category_id: CategoryId,
-        name: String,
-        order: u32,
-    },
+    /// カテゴリを追加する
+    AddCategory { category_id: CategoryId, name: String },
 
     /// カテゴリ名を変更する
-    RenameCategory {
+    UpdateCategory {
         category_id: CategoryId,
         name: String,
-    },
-
-    /// カテゴリの表示順を変更する
-    ReorderCategory {
-        category_id: CategoryId,
-        order: u32,
     },
 
     /// カテゴリを削除する（論理削除）
-    DeleteCategory {
-        category_id: CategoryId,
-    },
+    DeleteCategory { category_id: CategoryId },
 
-    /// 取引を作成する
-    CreateTransaction {
+    /// 取引を追加する
+    AddTransaction {
         transaction_id: TransactionId,
-        amount: u64,
+        amount: String,
         category_id: CategoryId,
-        date: String, // ISO 8601 format (YYYY-MM-DD)
-        memo: Option<String>,
-        created_by: UserId,
+        comment: String,
+        date: String,
     },
 
     /// 取引を更新する
     UpdateTransaction {
         transaction_id: TransactionId,
-        amount: u64,
+        amount: String,
         category_id: CategoryId,
+        comment: String,
         date: String,
-        memo: Option<String>,
     },
 
     /// 取引を削除する
-    DeleteTransaction {
-        transaction_id: TransactionId,
-    },
+    DeleteTransaction { transaction_id: TransactionId },
 }
