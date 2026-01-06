@@ -1,7 +1,7 @@
 use super::value_objects::AccountId;
 
 /// アカウント集約に対するコマンド
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AccountCommand {
     /// アカウントを作成する
     CreateAccount {

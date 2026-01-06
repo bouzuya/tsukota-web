@@ -8,7 +8,7 @@ pub struct AccountEventCommonProps {
 }
 
 /// 取引のプロパティ
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct TransactionProps {
     pub amount: String,
     pub category_id: String,
@@ -17,7 +17,7 @@ pub struct TransactionProps {
 }
 
 /// アカウント集約に対するイベント
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum AccountEvent {
     /// アカウントが作成された

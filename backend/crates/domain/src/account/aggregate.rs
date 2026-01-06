@@ -2,10 +2,9 @@ use super::commands::AccountCommand;
 use super::events::{AccountEvent, AccountEventCommonProps, TransactionProps};
 use super::value_objects::AccountId;
 use std::collections::{BTreeMap, BTreeSet};
-use thiserror::Error;
 
 /// アカウント集約のエラー
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum AccountError {
     #[error("Account already exists")]
     AccountAlreadyExists,
@@ -45,7 +44,7 @@ pub enum AccountError {
 }
 
 /// カテゴリの状態
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Category {
     pub id: String,
     pub name: String,
@@ -53,7 +52,7 @@ pub struct Category {
 }
 
 /// 取引の状態
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Transaction {
     pub id: String,
     pub amount: String,
@@ -63,7 +62,7 @@ pub struct Transaction {
 }
 
 /// アカウント集約
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Account {
     /// アカウント作成前の空の状態
     Empty,
