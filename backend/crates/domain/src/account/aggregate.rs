@@ -580,7 +580,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_create_account() {
+    fn test_create_account() -> anyhow::Result<()> {
         let account = Account::new();
         let command = AccountCommand::CreateAccount {
             account_id: "acc-1".to_string(),
@@ -588,7 +588,7 @@ mod tests {
             owner_id: "user-1".to_string(),
         };
 
-        let events = account.handle_command(command).unwrap();
+        let events = account.handle_command(command)?;
         assert_eq!(events.len(), 1);
 
         match &events[0] {
@@ -600,13 +600,14 @@ mod tests {
                 assert_eq!(account_id, "acc-1");
                 assert_eq!(name, "My Account");
                 assert_eq!(owner_id, "user-1");
+                Ok(())
             }
-            _ => panic!("Expected AccountCreated event"),
+            event => anyhow::bail!("Expected AccountCreated event, got {:?}", event),
         }
     }
 
     #[test]
-    fn test_account_from_events() {
+    fn test_account_from_events() -> anyhow::Result<()> {
         let events = vec![AccountEvent::AccountCreated {
             account_id: "acc-1".to_string(),
             name: "My Account".to_string(),
@@ -626,13 +627,14 @@ mod tests {
                 assert_eq!(name, "My Account");
                 assert_eq!(owner_id, "user-1");
                 assert!(member_ids.contains("user-1"));
+                Ok(())
             }
-            Account::Empty => panic!("Expected Active account"),
+            Account::Empty => anyhow::bail!("Expected Active account, got Empty"),
         }
     }
 
     #[test]
-    fn test_add_member() {
+    fn test_add_member() -> anyhow::Result<()> {
         let mut account = Account::new();
         account.apply_event(&AccountEvent::AccountCreated {
             account_id: "acc-1".to_string(),
@@ -644,20 +646,21 @@ mod tests {
             user_id: "user-2".to_string(),
         };
 
-        let events = account.handle_command(command).unwrap();
+        let events = account.handle_command(command)?;
         assert_eq!(events.len(), 1);
 
         account.apply_event(&events[0]);
         match account {
             Account::Active { member_ids, .. } => {
                 assert!(member_ids.contains("user-2"));
+                Ok(())
             }
-            Account::Empty => panic!("Expected Active account"),
+            Account::Empty => anyhow::bail!("Expected Active account, got Empty"),
         }
     }
 
     #[test]
-    fn test_cannot_remove_owner() {
+    fn test_cannot_remove_owner() -> anyhow::Result<()> {
         let mut account = Account::new();
         account.apply_event(&AccountEvent::AccountCreated {
             account_id: "acc-1".to_string(),
@@ -670,6 +673,10 @@ mod tests {
         };
 
         let result = account.handle_command(command);
-        assert!(matches!(result, Err(AccountError::CannotRemoveOwner)));
+        match result {
+            Err(AccountError::CannotRemoveOwner) => Ok(()),
+            Ok(_) => anyhow::bail!("Expected CannotRemoveOwner error, but command succeeded"),
+            Err(e) => anyhow::bail!("Expected CannotRemoveOwner error, got {:?}", e),
+        }
     }
 }
