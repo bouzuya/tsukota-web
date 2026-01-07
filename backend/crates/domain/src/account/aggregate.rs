@@ -166,7 +166,9 @@ impl Account {
             AccountEvent::AccountCreated { name, owners, .. } => {
                 let owners_set: BTreeSet<String> = owners.iter().cloned().collect();
                 *self = Account::Active {
-                    id: AccountId::parse(event.account_id())
+                    id: event
+                        .account_id()
+                        .parse()
                         .expect("Failed to parse account_id from event"),
                     name: name.clone(),
                     owners: owners_set,
@@ -206,7 +208,8 @@ impl Account {
                 category_id, name, ..
             } => match self {
                 Account::Active { categories, .. } => {
-                    let id = CategoryId::parse(category_id)
+                    let id: CategoryId = category_id
+                        .parse()
                         .expect("Failed to parse category_id from event");
                     categories.insert(
                         id,
@@ -226,7 +229,8 @@ impl Account {
                 category_id, name, ..
             } => match self {
                 Account::Active { categories, .. } => {
-                    let id = CategoryId::parse(category_id)
+                    let id: CategoryId = category_id
+                        .parse()
                         .expect("Failed to parse category_id from event");
                     if let Some(category) = categories.get_mut(&id) {
                         category.name = name.clone();
@@ -239,7 +243,8 @@ impl Account {
 
             AccountEvent::CategoryDeleted { category_id, .. } => match self {
                 Account::Active { categories, .. } => {
-                    let id = CategoryId::parse(category_id)
+                    let id: CategoryId = category_id
+                        .parse()
                         .expect("Failed to parse category_id from event");
                     if let Some(category) = categories.get_mut(&id) {
                         category.deleted = true;
@@ -261,7 +266,9 @@ impl Account {
                         Transaction {
                             id: transaction_id.clone(),
                             amount: props.amount.clone(),
-                            category_id: CategoryId::parse(&props.category_id)
+                            category_id: props
+                                .category_id
+                                .parse()
                                 .expect("Failed to parse category_id from event"),
                             comment: props.comment.clone(),
                             date: props.date.clone(),
@@ -281,7 +288,9 @@ impl Account {
                 Account::Active { transactions, .. } => {
                     if let Some(transaction) = transactions.get_mut(transaction_id) {
                         transaction.amount = props.amount.clone();
-                        transaction.category_id = CategoryId::parse(&props.category_id)
+                        transaction.category_id = props
+                            .category_id
+                            .parse()
                             .expect("Failed to parse category_id from event");
                         transaction.comment = props.comment.clone();
                         transaction.date = props.date.clone();
