@@ -1,4 +1,5 @@
-use super::value_objects::{AccountId, CategoryId};
+use super::value_objects::AccountId;
+use super::value_objects::CategoryId;
 
 /// アカウント集約に対するコマンド
 #[derive(Clone, Debug, PartialEq)]
@@ -23,7 +24,10 @@ pub enum AccountCommand {
     RemoveOwner { owner: String },
 
     /// カテゴリを追加する
-    AddCategory { category_id: CategoryId, name: String },
+    AddCategory {
+        category_id: CategoryId,
+        name: String,
+    },
 
     /// カテゴリ名を変更する
     UpdateCategory {

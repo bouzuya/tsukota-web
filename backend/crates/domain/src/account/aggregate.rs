@@ -1,7 +1,11 @@
 use super::commands::AccountCommand;
-use super::events::{AccountEvent, AccountEventCommonProps, TransactionProps};
-use super::value_objects::{AccountId, CategoryId};
-use std::collections::{BTreeMap, BTreeSet};
+use super::events::AccountEvent;
+use super::events::AccountEventCommonProps;
+use super::events::TransactionProps;
+use super::value_objects::AccountId;
+use super::value_objects::CategoryId;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 /// アカウント集約のエラー
 #[derive(Debug, thiserror::Error)]
@@ -148,9 +152,7 @@ impl Account {
                 category_id,
                 comment,
                 date,
-            } => {
-                self.handle_update_transaction(transaction_id, amount, category_id, comment, date)
-            }
+            } => self.handle_update_transaction(transaction_id, amount, category_id, comment, date),
 
             AccountCommand::DeleteTransaction { transaction_id } => {
                 self.handle_delete_transaction(transaction_id)
@@ -290,9 +292,7 @@ impl Account {
                 }
             },
 
-            AccountEvent::TransactionDeleted {
-                transaction_id, ..
-            } => match self {
+            AccountEvent::TransactionDeleted { transaction_id, .. } => match self {
                 Account::Active { transactions, .. } => {
                     transactions.remove(transaction_id);
                 }
@@ -544,7 +544,10 @@ impl Account {
         &self,
         transaction_id: String,
     ) -> Result<Vec<AccountEvent>, AccountError> {
-        let Account::Active { id, transactions, .. } = self else {
+        let Account::Active {
+            id, transactions, ..
+        } = self
+        else {
             return Err(AccountError::AccountNotFound);
         };
 
