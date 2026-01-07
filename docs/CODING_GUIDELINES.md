@@ -36,20 +36,41 @@ license = "MIT OR Apache-2.0"
 
 ### モジュール構成
 
-#### Value Objects の配置
+#### モジュールファイルの配置
 
-各 Value Object は独立したファイルとして配置し、`mod.rs` で公開する：
+**ルール**: `mod.rs` を使用せず、名前付きモジュールファイルを使用する
 
 ```
-value_objects/
-├── mod.rs              # pub use で各型を公開
-├── account_id.rs       # AccountId + ParseAccountIdError
-├── category_id.rs      # CategoryId + ParseCategoryIdError
-├── transaction_id.rs   # TransactionId + ParseTransactionIdError
-└── user_id.rs          # UserId + ParseUserIdError
+src/
+├── lib.rs
+├── account.rs          # account モジュールの宣言
+└── account/
+    ├── aggregate.rs
+    ├── commands.rs
+    ├── events.rs
+    ├── value_objects.rs    # value_objects サブモジュールの宣言
+    └── value_objects/
+        ├── account_id.rs
+        ├── category_id.rs
+        ├── transaction_id.rs
+        └── user_id.rs
 ```
 
-**mod.rs の例**:
+**account.rs の例**:
+
+```rust
+mod aggregate;
+mod commands;
+mod events;
+mod value_objects;
+
+pub use aggregate::*;
+pub use commands::*;
+pub use events::*;
+pub use value_objects::*;
+```
+
+**account/value_objects.rs の例**:
 
 ```rust
 mod account_id;
@@ -69,8 +90,11 @@ pub use user_id::UserId;
 
 **ルール**:
 
+- `mod.rs` は使用しない（`account/mod.rs` ではなく `account.rs`）
+- Rust は自動的に `account.rs` の隣の `account/` ディレクトリからサブモジュールを探す
+- `#[path = "..."]` 属性は不要（Rust の規約に従う）
 - 型とそのエラー型は同じモジュールに配置
-- `mod.rs` では個別に `pub use` を記述（グループ化しない）
+- モジュールファイルでは個別に `pub use` を記述（グループ化しない）
 - alphabetical order で記述
 
 ## Rust コーディングスタイル
