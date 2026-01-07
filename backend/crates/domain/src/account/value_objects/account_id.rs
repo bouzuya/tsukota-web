@@ -33,12 +33,6 @@ impl fmt::Display for AccountId {
     }
 }
 
-impl From<AccountId> for String {
-    fn from(value: AccountId) -> Self {
-        value.0.to_string()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,7 +67,7 @@ mod tests {
     fn test_account_id_into_string() -> anyhow::Result<()> {
         let id_str = "550e8400-e29b-41d4-a716-446655440000";
         let id: AccountId = id_str.parse()?;
-        let s: String = id.into();
+        let s = id.to_string();
         assert_eq!(s, id_str);
         Ok(())
     }
