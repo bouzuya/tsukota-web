@@ -5,6 +5,7 @@ use super::events::TransactionProps;
 use super::value_objects::AccountId;
 use super::value_objects::CategoryId;
 use super::value_objects::TransactionId;
+use super::value_objects::UserId;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -78,7 +79,7 @@ pub enum Account {
         /// アカウント名
         name: String,
         /// オーナーのセット
-        owners: BTreeSet<String>,
+        owners: BTreeSet<UserId>,
         /// カテゴリのマップ
         categories: BTreeMap<CategoryId, Category>,
         /// 取引のマップ
@@ -165,7 +166,10 @@ impl Account {
     pub fn apply_event(&mut self, event: &AccountEvent) {
         match event {
             AccountEvent::AccountCreated { name, owners, .. } => {
-                let owners_set: BTreeSet<String> = owners.iter().cloned().collect();
+                let owners_set: BTreeSet<UserId> = owners
+                    .iter()
+                    .map(|owner| owner.parse().expect("Failed to parse owner from event"))
+                    .collect();
                 *self = Account::Active {
                     id: event
                         .account_id()
@@ -193,14 +197,16 @@ impl Account {
 
             AccountEvent::OwnerAdded { owner, .. } => match self {
                 Account::Active { owners, .. } => {
-                    owners.insert(owner.clone());
+                    let user_id: UserId = owner.parse().expect("Failed to parse owner from event");
+                    owners.insert(user_id);
                 }
                 Account::Empty => unreachable!("OwnerAdded event applied to Empty account"),
             },
 
             AccountEvent::OwnerRemoved { owner, .. } => match self {
                 Account::Active { owners, .. } => {
-                    owners.remove(owner);
+                    let user_id: UserId = owner.parse().expect("Failed to parse owner from event");
+                    owners.remove(&user_id);
                 }
                 Account::Empty => unreachable!("OwnerRemoved event applied to Empty account"),
             },
@@ -328,7 +334,7 @@ impl Account {
         &self,
         account_id: AccountId,
         name: String,
-        owners: Vec<String>,
+        owners: Vec<UserId>,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         if !matches!(self, Account::Empty) {
             return Err(AccountError::AccountAlreadyExists);
@@ -341,7 +347,7 @@ impl Account {
         let common = Self::create_common_props(&account_id);
         Ok(vec![AccountEvent::AccountCreated {
             name,
-            owners,
+            owners: owners.iter().map(|owner| owner.to_string()).collect(),
             common,
         }])
     }
@@ -368,7 +374,7 @@ impl Account {
         Ok(vec![AccountEvent::AccountUpdated { name, common }])
     }
 
-    fn handle_add_owner(&self, owner: String) -> Result<Vec<AccountEvent>, AccountError> {
+    fn handle_add_owner(&self, owner: UserId) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, owners, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
@@ -378,10 +384,13 @@ impl Account {
         }
 
         let common = Self::create_common_props(id);
-        Ok(vec![AccountEvent::OwnerAdded { owner, common }])
+        Ok(vec![AccountEvent::OwnerAdded {
+            owner: owner.to_string(),
+            common,
+        }])
     }
 
-    fn handle_remove_owner(&self, owner: String) -> Result<Vec<AccountEvent>, AccountError> {
+    fn handle_remove_owner(&self, owner: UserId) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active { id, owners, .. } = self else {
             return Err(AccountError::AccountNotFound);
         };
@@ -395,7 +404,10 @@ impl Account {
         }
 
         let common = Self::create_common_props(id);
-        Ok(vec![AccountEvent::OwnerRemoved { owner, common }])
+        Ok(vec![AccountEvent::OwnerRemoved {
+            owner: owner.to_string(),
+            common,
+        }])
     }
 
     fn handle_add_category(
@@ -620,10 +632,11 @@ mod tests {
     fn test_create_account() -> anyhow::Result<()> {
         let account = Account::new();
         let account_id = AccountId::new();
+        let user_id = UserId::new();
         let command = AccountCommand::CreateAccount {
             account_id,
             name: "My Account".to_string(),
-            owners: vec!["user-1".to_string()],
+            owners: vec![user_id],
         };
 
         let events = account.handle_command(command)?;
@@ -632,7 +645,7 @@ mod tests {
         match &events[0] {
             AccountEvent::AccountCreated { name, owners, .. } => {
                 assert_eq!(name, "My Account");
-                assert_eq!(owners, &vec!["user-1".to_string()]);
+                assert_eq!(owners, &vec![user_id.to_string()]);
                 Ok(())
             }
             event => anyhow::bail!("Expected AccountCreated event, got {:?}", event),
@@ -642,6 +655,7 @@ mod tests {
     #[test]
     fn test_account_from_events() -> anyhow::Result<()> {
         let account_uuid = "550e8400-e29b-41d4-a716-446655440000";
+        let user_uuid = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
         let common = AccountEventCommonProps {
             account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
@@ -651,7 +665,7 @@ mod tests {
 
         let events = vec![AccountEvent::AccountCreated {
             name: "My Account".to_string(),
-            owners: vec!["user-1".to_string()],
+            owners: vec![user_uuid.to_string()],
             common,
         }];
 
@@ -662,7 +676,8 @@ mod tests {
             } => {
                 assert_eq!(id.to_string(), account_uuid);
                 assert_eq!(name, "My Account");
-                assert!(owners.contains("user-1"));
+                let expected_user_id: UserId = user_uuid.parse()?;
+                assert!(owners.contains(&expected_user_id));
                 Ok(())
             }
             Account::Empty => anyhow::bail!("Expected Active account, got Empty"),
@@ -672,6 +687,8 @@ mod tests {
     #[test]
     fn test_add_owner() -> anyhow::Result<()> {
         let account_uuid = "550e8400-e29b-41d4-a716-446655440000";
+        let user1_uuid = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+        let user2_id = UserId::new();
         let common = AccountEventCommonProps {
             account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
@@ -682,13 +699,11 @@ mod tests {
         let mut account = Account::new();
         account.apply_event(&AccountEvent::AccountCreated {
             name: "My Account".to_string(),
-            owners: vec!["user-1".to_string()],
+            owners: vec![user1_uuid.to_string()],
             common,
         });
 
-        let command = AccountCommand::AddOwner {
-            owner: "user-2".to_string(),
-        };
+        let command = AccountCommand::AddOwner { owner: user2_id };
 
         let events = account.handle_command(command)?;
         assert_eq!(events.len(), 1);
@@ -696,7 +711,7 @@ mod tests {
         account.apply_event(&events[0]);
         match account {
             Account::Active { owners, .. } => {
-                assert!(owners.contains("user-2"));
+                assert!(owners.contains(&user2_id));
                 Ok(())
             }
             Account::Empty => anyhow::bail!("Expected Active account, got Empty"),
@@ -706,6 +721,8 @@ mod tests {
     #[test]
     fn test_cannot_remove_last_owner() -> anyhow::Result<()> {
         let account_uuid = "550e8400-e29b-41d4-a716-446655440000";
+        let user_uuid = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+        let user_id: UserId = user_uuid.parse()?;
         let common = AccountEventCommonProps {
             account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
@@ -716,13 +733,11 @@ mod tests {
         let mut account = Account::new();
         account.apply_event(&AccountEvent::AccountCreated {
             name: "My Account".to_string(),
-            owners: vec!["user-1".to_string()],
+            owners: vec![user_uuid.to_string()],
             common,
         });
 
-        let command = AccountCommand::RemoveOwner {
-            owner: "user-1".to_string(),
-        };
+        let command = AccountCommand::RemoveOwner { owner: user_id };
 
         let result = account.handle_command(command);
         match result {

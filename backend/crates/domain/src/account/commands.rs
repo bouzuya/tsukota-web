@@ -1,6 +1,7 @@
 use super::value_objects::AccountId;
 use super::value_objects::CategoryId;
 use super::value_objects::TransactionId;
+use super::value_objects::UserId;
 
 /// アカウント集約に対するコマンド
 #[derive(Clone, Debug, PartialEq)]
@@ -9,7 +10,7 @@ pub enum AccountCommand {
     CreateAccount {
         account_id: AccountId,
         name: String,
-        owners: Vec<String>,
+        owners: Vec<UserId>,
     },
 
     /// アカウントを削除する
@@ -19,10 +20,10 @@ pub enum AccountCommand {
     UpdateAccount { name: String },
 
     /// オーナーを追加する
-    AddOwner { owner: String },
+    AddOwner { owner: UserId },
 
     /// オーナーを削除する
-    RemoveOwner { owner: String },
+    RemoveOwner { owner: UserId },
 
     /// カテゴリを追加する
     AddCategory {
