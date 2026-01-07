@@ -4,6 +4,7 @@ use super::events::AccountEventCommonProps;
 use super::events::TransactionProps;
 use super::value_objects::AccountId;
 use super::value_objects::CategoryId;
+use super::value_objects::TransactionId;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -58,7 +59,7 @@ pub struct Category {
 /// 取引の状態
 #[derive(Clone, Debug, PartialEq)]
 pub struct Transaction {
-    pub id: String,
+    pub id: TransactionId,
     pub amount: String,
     pub category_id: CategoryId,
     pub comment: String,
@@ -81,7 +82,7 @@ pub enum Account {
         /// カテゴリのマップ
         categories: BTreeMap<CategoryId, Category>,
         /// 取引のマップ
-        transactions: BTreeMap<String, Transaction>,
+        transactions: BTreeMap<TransactionId, Transaction>,
     },
 }
 
@@ -261,10 +262,13 @@ impl Account {
                 ..
             } => match self {
                 Account::Active { transactions, .. } => {
+                    let id: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id from event");
                     transactions.insert(
-                        transaction_id.clone(),
+                        id,
                         Transaction {
-                            id: transaction_id.clone(),
+                            id,
                             amount: props.amount.clone(),
                             category_id: props
                                 .category_id
@@ -286,7 +290,10 @@ impl Account {
                 ..
             } => match self {
                 Account::Active { transactions, .. } => {
-                    if let Some(transaction) = transactions.get_mut(transaction_id) {
+                    let id: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id from event");
+                    if let Some(transaction) = transactions.get_mut(&id) {
                         transaction.amount = props.amount.clone();
                         transaction.category_id = props
                             .category_id
@@ -303,7 +310,10 @@ impl Account {
 
             AccountEvent::TransactionDeleted { transaction_id, .. } => match self {
                 Account::Active { transactions, .. } => {
-                    transactions.remove(transaction_id);
+                    let id: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id from event");
+                    transactions.remove(&id);
                 }
                 Account::Empty => {
                     unreachable!("TransactionDeleted event applied to Empty account")
@@ -463,7 +473,7 @@ impl Account {
 
     fn handle_add_transaction(
         &self,
-        transaction_id: String,
+        transaction_id: TransactionId,
         amount: String,
         category_id: CategoryId,
         comment: String,
@@ -489,7 +499,7 @@ impl Account {
 
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionAdded {
-            transaction_id,
+            transaction_id: transaction_id.to_string(),
             props: TransactionProps {
                 amount,
                 category_id: category_id.to_string(),
@@ -502,7 +512,7 @@ impl Account {
 
     fn handle_update_transaction(
         &self,
-        transaction_id: String,
+        transaction_id: TransactionId,
         amount: String,
         category_id: CategoryId,
         comment: String,
@@ -538,7 +548,7 @@ impl Account {
 
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionUpdated {
-            transaction_id,
+            transaction_id: transaction_id.to_string(),
             props: TransactionProps {
                 amount,
                 category_id: category_id.to_string(),
@@ -551,7 +561,7 @@ impl Account {
 
     fn handle_delete_transaction(
         &self,
-        transaction_id: String,
+        transaction_id: TransactionId,
     ) -> Result<Vec<AccountEvent>, AccountError> {
         let Account::Active {
             id, transactions, ..
@@ -566,7 +576,7 @@ impl Account {
 
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionDeleted {
-            transaction_id,
+            transaction_id: transaction_id.to_string(),
             common,
         }])
     }

@@ -1,5 +1,6 @@
 use super::value_objects::AccountId;
 use super::value_objects::CategoryId;
+use super::value_objects::TransactionId;
 
 /// アカウント集約に対するコマンド
 #[derive(Clone, Debug, PartialEq)]
@@ -40,7 +41,7 @@ pub enum AccountCommand {
 
     /// 取引を追加する
     AddTransaction {
-        transaction_id: String,
+        transaction_id: TransactionId,
         amount: String,
         category_id: CategoryId,
         comment: String,
@@ -49,7 +50,7 @@ pub enum AccountCommand {
 
     /// 取引を更新する
     UpdateTransaction {
-        transaction_id: String,
+        transaction_id: TransactionId,
         amount: String,
         category_id: CategoryId,
         comment: String,
@@ -57,5 +58,5 @@ pub enum AccountCommand {
     },
 
     /// 取引を削除する
-    DeleteTransaction { transaction_id: String },
+    DeleteTransaction { transaction_id: TransactionId },
 }
