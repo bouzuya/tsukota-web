@@ -34,9 +34,89 @@ authors = ["bouzuya"]
 license = "MIT OR Apache-2.0"
 ```
 
+### モジュール構成
+
+#### Value Objects の配置
+
+各 Value Object は独立したファイルとして配置し、`mod.rs` で公開する：
+
+```
+value_objects/
+├── mod.rs              # pub use で各型を公開
+├── account_id.rs       # AccountId + ParseAccountIdError
+├── category_id.rs      # CategoryId + ParseCategoryIdError
+├── transaction_id.rs   # TransactionId + ParseTransactionIdError
+└── user_id.rs          # UserId + ParseUserIdError
+```
+
+**mod.rs の例**:
+
+```rust
+mod account_id;
+mod category_id;
+mod transaction_id;
+mod user_id;
+
+pub use account_id::AccountId;
+pub use account_id::ParseAccountIdError;
+pub use category_id::CategoryId;
+pub use category_id::ParseCategoryIdError;
+pub use transaction_id::ParseTransactionIdError;
+pub use transaction_id::TransactionId;
+pub use user_id::ParseUserIdError;
+pub use user_id::UserId;
+```
+
+**ルール**:
+
+- 型とそのエラー型は同じモジュールに配置
+- `mod.rs` では個別に `pub use` を記述（グループ化しない）
+- alphabetical order で記述
+
 ## Rust コーディングスタイル
 
-### 1. コレクション型の選択
+### 0. インポート形式
+
+**ルール**: インポートは `imports_granularity = "Item"` に従い、個別に記述する
+
+```rust
+// ❌ 避ける
+use std::collections::{BTreeMap, BTreeSet};
+use super::value_objects::{AccountId, CategoryId};
+
+// ✅ 推奨
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use super::value_objects::AccountId;
+use super::value_objects::CategoryId;
+```
+
+**設定**: `rustfmt.toml` に以下を記述
+
+```toml
+unstable_features = true
+imports_granularity = "Item"
+```
+
+**フォーマット**: `cargo +nightly fmt` で自動整形
+
+### 1. derive マクロの順序
+
+**ルール**: derive マクロは alphabetical order で記述する
+
+```rust
+// ✅ 推奨
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct AccountId(uuid::Uuid);
+
+// ❌ 避ける
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AccountId(uuid::Uuid);
+```
+
+**理由**: 順序の一貫性を保ち、視認性を向上させる
+
+### 2. コレクション型の選択
 
 **ルール**: `HashSet` / `HashMap` ではなく `BTreeSet` / `BTreeMap` を使用する
 
@@ -50,7 +130,7 @@ use std::collections::{HashMap, HashSet};
 use std::collections::{BTreeMap, BTreeSet};
 ```
 
-### 2. パターンマッチング
+### 3. パターンマッチング
 
 **ルール**: `if let` ではなく `match` を使用し、到達を想定していない箇所は `unreachable!()` で明示
 
@@ -71,7 +151,7 @@ match self {
 
 **理由**: すべてのケースを明示的に扱い、到達不可能なコードを文書化する
 
-### 3. テストコードのエラーハンドリング
+### 4. テストコードのエラーハンドリング
 
 **ルール**: テストは `anyhow::Result<()>` を返し、`unwrap()`, `expect()`, `panic!()` の使用を避ける
 
@@ -104,7 +184,7 @@ match result {
 }
 ```
 
-### 4. 状態の型安全性
+### 5. 状態の型安全性
 
 **ルール**: `Option<T>` による null チェックではなく、enum で状態を表現する
 
@@ -176,14 +256,73 @@ pub fn apply_event(&mut self, event: &AccountEvent) {
 - **動詞 + 名詞**: `CreateAccount`, `AddOwner`, `DeleteCategory`
 - **Update vs Rename**: 汎用的な更新は `Update`, 名前のみは `Rename` (ただし tsukota に合わせて `Update` を使用)
 
-### 型エイリアス
+### Value Objects
+
+**ルール**: ID 型は型エイリアスではなく、Value Object として定義する
+
+すべての ID 型（`AccountId`, `UserId`, `CategoryId`, `TransactionId`）は newtype パターンで実装し、以下の trait を実装する：
+
+- `FromStr`: 文字列からのパース
+- `Display`: 文字列への変換
+- `Clone`, `Copy`, `Debug`, `Eq`, `Hash`, `Ord`, `PartialEq`, `PartialOrd`: 標準的な派生
+
+**実装例**:
 
 ```rust
-pub type AccountId = String;
-pub type UserId = String;
-pub type CategoryId = String;
-pub type TransactionId = String;
+use std::fmt;
+use std::str::FromStr;
+
+/// アカウント ID の Value Object
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct AccountId(uuid::Uuid);
+
+/// AccountId のパースエラー
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid AccountId format")]
+pub struct ParseAccountIdError;
+
+impl AccountId {
+    /// 新しい AccountId を生成する
+    pub fn new() -> Self {
+        Self(uuid::Uuid::new_v4())
+    }
+}
+
+impl FromStr for AccountId {
+    type Err = ParseAccountIdError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        uuid::Uuid::parse_str(s)
+            .map(Self)
+            .map_err(|_| ParseAccountIdError)
+    }
+}
+
+impl fmt::Display for AccountId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 ```
+
+**使用方法**:
+
+```rust
+// パース
+let id: AccountId = "550e8400-e29b-41d4-a716-446655440000".parse()?;
+
+// 文字列への変換
+let id_str = id.to_string();
+
+// 新規生成
+let new_id = AccountId::new();
+```
+
+**注意**:
+
+- `From<AccountId> for String` は実装しない（`Display` trait で十分）
+- カスタムメソッド `parse()` や `to_string()` は定義せず、標準 trait を使用
+- イベントとの境界では `to_string()` / `.parse()` で変換
 
 ## レイヤー間の依存関係
 
