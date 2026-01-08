@@ -6,3 +6,8 @@ license.workspace = true
 version.workspace = true
 
 [dependencies]
+async-trait = "0.1"
+chrono = "0.4"
+domain = { path = "../domain" }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
