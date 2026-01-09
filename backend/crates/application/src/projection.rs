@@ -19,10 +19,7 @@ pub trait AccountProjection: Send + Sync {
     ) -> Result<Option<AccountView>, ApplicationError>;
 
     /// List all accounts owned by a user
-    async fn list_accounts(
-        &self,
-        owner_id: &UserId,
-    ) -> Result<Vec<AccountView>, ApplicationError>;
+    async fn list_accounts(&self, owner_id: &UserId) -> Result<Vec<AccountView>, ApplicationError>;
 }
 
 /// Projection trait for Category read models
