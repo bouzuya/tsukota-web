@@ -1,8 +1,5 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Category view model for API responses
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct CategoryView {
     pub id: String,
     pub account_id: String,

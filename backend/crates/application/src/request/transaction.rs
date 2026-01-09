@@ -1,8 +1,5 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Request to add a transaction
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct AddTransactionRequest {
     pub amount: String,
     pub category_id: String,
@@ -11,10 +8,10 @@ pub struct AddTransactionRequest {
 }
 
 /// Request to update a transaction
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct UpdateTransactionRequest {
     pub amount: String,
     pub category_id: String,
-    pub date: String,
     pub comment: String,
+    pub date: String,
 }

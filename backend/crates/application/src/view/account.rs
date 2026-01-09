@@ -1,8 +1,5 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Account view model for API responses
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct AccountView {
     pub id: String,
     pub name: String,

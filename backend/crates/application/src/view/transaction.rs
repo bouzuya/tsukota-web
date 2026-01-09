@@ -1,8 +1,5 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Transaction view model for API responses
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct TransactionView {
     pub id: String,
     pub account_id: String,
@@ -15,7 +12,7 @@ pub struct TransactionView {
 }
 
 /// Transaction list with pagination support
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct TransactionList {
     pub transactions: Vec<TransactionView>,
     pub next_cursor: Option<String>,
