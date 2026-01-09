@@ -4,7 +4,7 @@ use domain::account::AccountId;
 use domain::account::TransactionId;
 use domain::account::UserId;
 
-use crate::error::Result;
+use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 
 /// Use case for deleting a transaction
@@ -22,7 +22,7 @@ impl<R: EventStoreRepository> DeleteTransactionUseCase<R> {
         account_id: &AccountId,
         transaction_id: &TransactionId,
         _user_id: &UserId,
-    ) -> Result<()> {
+    ) -> Result<(), ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 

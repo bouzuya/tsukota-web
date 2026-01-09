@@ -24,5 +24,3 @@ pub enum ApplicationError {
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
 }
-
-pub type Result<T> = std::result::Result<T, ApplicationError>;

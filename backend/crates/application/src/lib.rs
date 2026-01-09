@@ -7,4 +7,3 @@ pub mod use_case;
 pub mod view;
 
 pub use error::ApplicationError;
-pub use error::Result;

@@ -3,7 +3,7 @@ use domain::account::AccountCommand;
 use domain::account::AccountId;
 use domain::account::UserId;
 
-use crate::error::Result;
+use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 
 /// Use case for deleting an account
@@ -16,7 +16,11 @@ impl<R: EventStoreRepository> DeleteAccountUseCase<R> {
         Self { repository }
     }
 
-    pub async fn execute(&self, account_id: &AccountId, _user_id: &UserId) -> Result<()> {
+    pub async fn execute(
+        &self,
+        account_id: &AccountId,
+        _user_id: &UserId,
+    ) -> Result<(), ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 

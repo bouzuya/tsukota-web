@@ -2,7 +2,6 @@ use domain::account::AccountId;
 use domain::account::UserId;
 
 use crate::error::ApplicationError;
-use crate::error::Result;
 use crate::projection::AccountProjection;
 use crate::projection::TransactionProjection;
 use crate::view::TransactionList;
@@ -27,7 +26,7 @@ impl<A: AccountProjection, T: TransactionProjection> ListTransactionsUseCase<A, 
         user_id: &UserId,
         cursor: Option<String>,
         limit: usize,
-    ) -> Result<TransactionList> {
+    ) -> Result<TransactionList, ApplicationError> {
         // Get account to verify ownership
         let account = self
             .account_projection

@@ -3,7 +3,7 @@ use domain::account::AccountCommand;
 use domain::account::AccountId;
 use domain::account::UserId;
 
-use crate::error::Result;
+use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::UpdateAccountRequest;
 
@@ -22,7 +22,7 @@ impl<R: EventStoreRepository> UpdateAccountUseCase<R> {
         account_id: &AccountId,
         _user_id: &UserId,
         request: UpdateAccountRequest,
-    ) -> Result<()> {
+    ) -> Result<(), ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 

@@ -3,7 +3,6 @@ use domain::account::UserId;
 
 use crate::authorization::verify_owner;
 use crate::error::ApplicationError;
-use crate::error::Result;
 use crate::projection::AccountProjection;
 use crate::view::AccountView;
 
@@ -17,7 +16,11 @@ impl<P: AccountProjection> GetAccountUseCase<P> {
         Self { projection }
     }
 
-    pub async fn execute(&self, account_id: &AccountId, user_id: &UserId) -> Result<AccountView> {
+    pub async fn execute(
+        &self,
+        account_id: &AccountId,
+        user_id: &UserId,
+    ) -> Result<AccountView, ApplicationError> {
         // Get account from projection
         let account = self
             .projection

@@ -2,7 +2,6 @@ use domain::account::AccountId;
 use domain::account::UserId;
 
 use crate::error::ApplicationError;
-use crate::error::Result;
 use crate::projection::AccountProjection;
 use crate::projection::CategoryProjection;
 use crate::view::CategoryView;
@@ -25,7 +24,7 @@ impl<A: AccountProjection, C: CategoryProjection> ListCategoriesUseCase<A, C> {
         &self,
         account_id: &AccountId,
         user_id: &UserId,
-    ) -> Result<Vec<CategoryView>> {
+    ) -> Result<Vec<CategoryView>, ApplicationError> {
         // Get account to verify ownership
         let account = self
             .account_projection

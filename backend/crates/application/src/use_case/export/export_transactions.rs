@@ -2,7 +2,6 @@ use domain::account::AccountId;
 use domain::account::UserId;
 
 use crate::error::ApplicationError;
-use crate::error::Result;
 use crate::projection::AccountProjection;
 use crate::projection::TransactionProjection;
 use crate::view::TransactionView;
@@ -27,7 +26,7 @@ impl<A: AccountProjection, T: TransactionProjection> ExportTransactionsUseCase<A
         user_id: &UserId,
         year: i32,
         month: u32,
-    ) -> Result<Vec<TransactionView>> {
+    ) -> Result<Vec<TransactionView>, ApplicationError> {
         // Validate month
         if !(1..=12).contains(&month) {
             return Err(ApplicationError::InvalidRequest(format!(

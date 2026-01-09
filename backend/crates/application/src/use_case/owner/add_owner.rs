@@ -4,7 +4,6 @@ use domain::account::AccountId;
 use domain::account::UserId;
 
 use crate::error::ApplicationError;
-use crate::error::Result;
 use crate::repository::EventStoreRepository;
 use crate::request::AddOwnerRequest;
 
@@ -23,7 +22,7 @@ impl<R: EventStoreRepository> AddOwnerUseCase<R> {
         account_id: &AccountId,
         _requesting_user_id: &UserId,
         request: AddOwnerRequest,
-    ) -> Result<()> {
+    ) -> Result<(), ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 

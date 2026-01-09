@@ -4,7 +4,6 @@ use domain::account::AccountId;
 use domain::account::UserId;
 
 use crate::error::ApplicationError;
-use crate::error::Result;
 use crate::repository::EventStoreRepository;
 use crate::request::CreateAccountRequest;
 
@@ -18,7 +17,10 @@ impl<R: EventStoreRepository> CreateAccountUseCase<R> {
         Self { repository }
     }
 
-    pub async fn execute(&self, request: CreateAccountRequest) -> Result<AccountId> {
+    pub async fn execute(
+        &self,
+        request: CreateAccountRequest,
+    ) -> Result<AccountId, ApplicationError> {
         // Generate new account ID
         let account_id = AccountId::new();
 

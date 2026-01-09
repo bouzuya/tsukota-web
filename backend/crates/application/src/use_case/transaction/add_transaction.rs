@@ -6,7 +6,6 @@ use domain::account::TransactionId;
 use domain::account::UserId;
 
 use crate::error::ApplicationError;
-use crate::error::Result;
 use crate::repository::EventStoreRepository;
 use crate::request::AddTransactionRequest;
 
@@ -25,7 +24,7 @@ impl<R: EventStoreRepository> AddTransactionUseCase<R> {
         account_id: &AccountId,
         _user_id: &UserId,
         request: AddTransactionRequest,
-    ) -> Result<TransactionId> {
+    ) -> Result<TransactionId, ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 

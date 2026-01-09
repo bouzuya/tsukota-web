@@ -3,7 +3,7 @@ use domain::account::AccountCommand;
 use domain::account::AccountId;
 use domain::account::UserId;
 
-use crate::error::Result;
+use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 
 /// Use case for removing an owner from an account
@@ -21,7 +21,7 @@ impl<R: EventStoreRepository> RemoveOwnerUseCase<R> {
         account_id: &AccountId,
         owner_id_to_remove: &UserId,
         _requesting_user_id: &UserId,
-    ) -> Result<()> {
+    ) -> Result<(), ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 

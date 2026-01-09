@@ -4,7 +4,7 @@ use domain::account::AccountId;
 use domain::account::CategoryId;
 use domain::account::UserId;
 
-use crate::error::Result;
+use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::UpdateCategoryRequest;
 
@@ -24,7 +24,7 @@ impl<R: EventStoreRepository> UpdateCategoryUseCase<R> {
         category_id: &CategoryId,
         _user_id: &UserId,
         request: UpdateCategoryRequest,
-    ) -> Result<()> {
+    ) -> Result<(), ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 

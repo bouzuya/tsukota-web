@@ -1,6 +1,6 @@
 use domain::account::UserId;
 
-use crate::error::Result;
+use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::view::AccountView;
 
@@ -14,7 +14,7 @@ impl<P: AccountProjection> ListAccountsUseCase<P> {
         Self { projection }
     }
 
-    pub async fn execute(&self, owner_id: &UserId) -> Result<Vec<AccountView>> {
+    pub async fn execute(&self, owner_id: &UserId) -> Result<Vec<AccountView>, ApplicationError> {
         self.projection.list_accounts(owner_id).await
     }
 }

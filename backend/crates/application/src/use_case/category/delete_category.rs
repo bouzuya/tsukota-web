@@ -4,7 +4,7 @@ use domain::account::AccountId;
 use domain::account::CategoryId;
 use domain::account::UserId;
 
-use crate::error::Result;
+use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 
 /// Use case for deleting (soft delete) a category
@@ -22,7 +22,7 @@ impl<R: EventStoreRepository> DeleteCategoryUseCase<R> {
         account_id: &AccountId,
         category_id: &CategoryId,
         _user_id: &UserId,
-    ) -> Result<()> {
+    ) -> Result<(), ApplicationError> {
         // Load events
         let events = self.repository.load_events(account_id).await?;
 
