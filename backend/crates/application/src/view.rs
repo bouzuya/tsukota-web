@@ -1,8 +1,9 @@
-pub mod account;
-pub mod category;
-pub mod transaction;
+pub mod account_view;
+pub mod category_view;
+pub mod transaction_list;
+pub mod transaction_view;
 
-pub use account::AccountView;
-pub use category::CategoryView;
-pub use transaction::TransactionList;
-pub use transaction::TransactionView;
+pub use account_view::AccountView;
+pub use category_view::CategoryView;
+pub use transaction_list::TransactionList;
+pub use transaction_view::TransactionView;
