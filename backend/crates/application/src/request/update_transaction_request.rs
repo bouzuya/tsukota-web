@@ -3,6 +3,6 @@
 pub struct UpdateTransactionRequest {
     pub amount: String,
     pub category_id: String,
-    pub date: String,
     pub comment: String,
+    pub date: String,
 }
