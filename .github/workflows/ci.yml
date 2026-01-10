@@ -20,7 +20,8 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: rustup component add --toolchain nightly rustfmt
       - run: cargo +nightly fmt -- --check
       - run: cargo clippy -- --deny warnings
-      - run: cargo test -- --no-run
+      - run: cargo test --no-run
       - run: cargo test
