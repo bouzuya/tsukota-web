@@ -7,12 +7,9 @@ version.workspace = true
 
 [dependencies]
 application.workspace = true
+axum = "0.8"
+# FIXME: 削除する
 domain.workspace = true
-axum.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-tower.workspace = true
-tower-http.workspace = true
-tracing.workspace = true
-async-trait.workspace = true
