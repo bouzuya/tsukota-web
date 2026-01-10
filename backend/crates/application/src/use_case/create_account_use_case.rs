@@ -1,8 +1,8 @@
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
-use domain::account::UserId;
 
+use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::CreateAccountRequest;
@@ -30,7 +30,7 @@ impl<R: EventStoreRepository> CreateAccountUseCase<R> {
         let command = AccountCommand::CreateAccount {
             account_id: account_id.clone(),
             name: request.name,
-            owners: vec![user_id.clone()],
+            owners: vec![user_id.to_domain()],
         };
 
         // Handle command on empty aggregate

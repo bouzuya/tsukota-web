@@ -1,6 +1,6 @@
+use application::UserId;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use domain::account::UserId;
 
 use crate::error::AuthError;
 

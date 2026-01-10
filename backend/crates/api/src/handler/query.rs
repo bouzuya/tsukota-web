@@ -1,19 +1,22 @@
 use std::sync::Arc;
 
-use application::error::ApplicationError;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
 use application::repository::EventStoreRepository;
+use application::request::ExportTransactionsRequest;
+use application::request::GetAccountRequest;
+use application::request::ListAccountsRequest;
+use application::request::ListCategoriesRequest;
+use application::request::ListTransactionsRequest;
 use application::view::AccountView;
 use application::view::CategoryView;
 use application::view::TransactionList;
 use application::view::TransactionView;
+use axum::Json;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use axum::Json;
-use domain::account::AccountId;
 use serde::Deserialize;
 
 use crate::error::ApiError;
@@ -32,7 +35,8 @@ where
     CP: CategoryProjection,
     TP: TransactionProjection,
 {
-    let accounts = state.list_accounts.execute(&user_id).await?;
+    let request = ListAccountsRequest {};
+    let accounts = state.list_accounts.execute(&user_id, request).await?;
     Ok(Json(accounts))
 }
 
@@ -47,10 +51,8 @@ where
     CP: CategoryProjection,
     TP: TransactionProjection,
 {
-    let account_id: AccountId = account_id
-        .parse()
-        .map_err(|_| ApiError(ApplicationError::InvalidRequest("Invalid account ID".into())))?;
-    let account = state.get_account.execute(&account_id, &user_id).await?;
+    let request = GetAccountRequest { account_id };
+    let account = state.get_account.execute(&user_id, request).await?;
     Ok(Json(account))
 }
 
@@ -67,13 +69,8 @@ where
     CP: CategoryProjection,
     TP: TransactionProjection,
 {
-    let account_id: AccountId = account_id
-        .parse()
-        .map_err(|_| ApiError(ApplicationError::InvalidRequest("Invalid account ID".into())))?;
-    let categories = state
-        .list_categories
-        .execute(&account_id, &user_id)
-        .await?;
+    let request = ListCategoriesRequest { account_id };
+    let categories = state.list_categories.execute(&user_id, request).await?;
     Ok(Json(categories))
 }
 
@@ -98,13 +95,12 @@ where
     CP: CategoryProjection,
     TP: TransactionProjection,
 {
-    let account_id: AccountId = account_id
-        .parse()
-        .map_err(|_| ApiError(ApplicationError::InvalidRequest("Invalid account ID".into())))?;
-    let list = state
-        .list_transactions
-        .execute(&account_id, &user_id, params.after, DEFAULT_PAGE_SIZE)
-        .await?;
+    let request = ListTransactionsRequest {
+        account_id,
+        cursor: params.after,
+        limit: DEFAULT_PAGE_SIZE,
+    };
+    let list = state.list_transactions.execute(&user_id, request).await?;
     Ok(Json(list))
 }
 
@@ -128,12 +124,11 @@ where
     CP: CategoryProjection,
     TP: TransactionProjection,
 {
-    let account_id: AccountId = account_id
-        .parse()
-        .map_err(|_| ApiError(ApplicationError::InvalidRequest("Invalid account ID".into())))?;
-    let transactions = state
-        .export_transactions
-        .execute(&account_id, &user_id, params.year, params.month)
-        .await?;
+    let request = ExportTransactionsRequest {
+        account_id,
+        year: params.year,
+        month: params.month,
+    };
+    let transactions = state.export_transactions.execute(&user_id, request).await?;
     Ok(Json(transactions))
 }

@@ -1,9 +1,10 @@
 use domain::account::AccountId;
-use domain::account::UserId;
 
+use crate::UserId;
 use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::projection::TransactionProjection;
+use crate::request::ListTransactionsRequest;
 use crate::view::TransactionList;
 
 /// Use case for listing transactions with cursor-based pagination
@@ -22,26 +23,30 @@ impl<A: AccountProjection, T: TransactionProjection> ListTransactionsUseCase<A, 
 
     pub async fn execute(
         &self,
-        account_id: &AccountId,
         user_id: &UserId,
-        cursor: Option<String>,
-        limit: usize,
+        request: ListTransactionsRequest,
     ) -> Result<TransactionList, ApplicationError> {
+        let account_id: AccountId = request
+            .account_id
+            .parse()
+            .map_err(|_| ApplicationError::InvalidRequest("Invalid account ID".into()))?;
+        let domain_user_id = user_id.to_domain();
+
         // Get account to verify ownership
         let account = self
             .account_projection
-            .get_account(account_id)
+            .get_account(&account_id)
             .await?
             .ok_or_else(|| {
                 ApplicationError::AccountNotFound(format!("Account {} not found", account_id))
             })?;
 
         // Verify user is owner
-        crate::authorization::verify_owner(&account, user_id)?;
+        crate::authorization::verify_owner(&account, &domain_user_id)?;
 
         // Get transactions
         self.transaction_projection
-            .list_transactions(account_id, cursor, limit)
+            .list_transactions(&account_id, request.cursor, request.limit)
             .await
     }
 }

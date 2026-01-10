@@ -1,8 +1,8 @@
 use application::error::ApplicationError;
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::Json;
 use serde_json::json;
 
 /// API error wrapper for ApplicationError
@@ -35,7 +35,10 @@ impl IntoResponse for ApiError {
             ApplicationError::Unauthorized(msg) => (
                 StatusCode::FORBIDDEN,
                 "unauthorized",
-                format!("You do not have permission to access this resource: {}", msg),
+                format!(
+                    "You do not have permission to access this resource: {}",
+                    msg
+                ),
             ),
             ApplicationError::Domain(err) => (
                 StatusCode::BAD_REQUEST,

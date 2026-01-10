@@ -4,9 +4,9 @@ use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
 use application::repository::EventStoreRepository;
+use axum::Router;
 use axum::routing::get;
 use axum::routing::post;
-use axum::Router;
 
 use crate::handler::command;
 use crate::handler::query;

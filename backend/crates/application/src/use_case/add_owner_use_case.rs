@@ -1,8 +1,8 @@
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
-use domain::account::UserId;
 
+use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::AddOwnerRequest;
@@ -19,7 +19,7 @@ impl<R: EventStoreRepository> AddOwnerUseCase<R> {
 
     pub async fn execute(
         &self,
-        _requesting_user_id: &UserId,
+        _user_id: &UserId,
         request: AddOwnerRequest,
     ) -> Result<(), ApplicationError> {
         // Parse account ID
@@ -34,14 +34,14 @@ impl<R: EventStoreRepository> AddOwnerUseCase<R> {
         // Reconstruct aggregate
         let aggregate = Account::from_events(events);
 
-        // Parse user ID
-        let user_id: UserId = request
+        // Parse user ID to add as owner
+        let owner_id: domain::account::UserId = request
             .user_id
             .parse()
             .map_err(|_| ApplicationError::InvalidRequest("Invalid user ID".to_string()))?;
 
         // Create command
-        let command = AccountCommand::AddOwner { owner: user_id };
+        let command = AccountCommand::AddOwner { owner: owner_id };
 
         // Handle command
         let new_events = aggregate.handle_command(command)?;

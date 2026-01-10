@@ -1,8 +1,8 @@
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
-use domain::account::UserId;
 
+use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::RemoveOwnerRequest;
@@ -19,7 +19,7 @@ impl<R: EventStoreRepository> RemoveOwnerUseCase<R> {
 
     pub async fn execute(
         &self,
-        _requesting_user_id: &UserId,
+        _user_id: &UserId,
         request: RemoveOwnerRequest,
     ) -> Result<(), ApplicationError> {
         // Parse account ID
@@ -29,7 +29,7 @@ impl<R: EventStoreRepository> RemoveOwnerUseCase<R> {
             .map_err(|_| ApplicationError::InvalidRequest("Invalid account ID".to_string()))?;
 
         // Parse user ID to remove
-        let owner_id_to_remove: UserId = request
+        let owner_id_to_remove: domain::account::UserId = request
             .user_id
             .parse()
             .map_err(|_| ApplicationError::InvalidRequest("Invalid user ID".to_string()))?;

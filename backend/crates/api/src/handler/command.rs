@@ -18,9 +18,9 @@ use application::request::UpdateTransactionRequest;
 use application::response::AddCategoryResponse;
 use application::response::AddTransactionResponse;
 use application::response::CreateAccountResponse;
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Json;
 
 use crate::error::ApiError;
 use crate::extractor::AuthUser;

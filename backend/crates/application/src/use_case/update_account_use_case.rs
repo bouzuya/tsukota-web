@@ -1,8 +1,8 @@
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
-use domain::account::UserId;
 
+use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::UpdateAccountRequest;
