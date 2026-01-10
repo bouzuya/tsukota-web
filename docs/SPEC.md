@@ -105,6 +105,11 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 
 ## API エンドポイント
 
+API は更新系と参照系で異なるパス設計を採用しています。
+
+- **更新系 (Commands)**: `POST /commands/{use_case_name}` - すべてのパラメーターをリクエストボディに含める
+- **参照系 (Queries)**: リソースベースのパス - `GET /accounts/:id/...`
+
 ### 認証
 
 - `GET /auth/google` - Google OAuth 開始
@@ -113,36 +118,60 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 - `GET /auth/me` - 現在のユーザー情報取得
 - `POST /auth/refresh` - トークンリフレッシュ
 
-### ユーザー
+### ユーザー (参照系)
 
 - `GET /users/:id` - ユーザー情報取得
-- `PATCH /users/:id` - ユーザー情報更新 (displayName)
 
-### アカウント
+### ユーザー (更新系)
+
+- `POST /commands/update_user` - ユーザー情報更新
+  - body: `{ user_id, display_name }`
+
+### アカウント (参照系)
 
 - `GET /accounts` - アカウント一覧取得 (オーナーのアカウント)
-- `POST /accounts` - アカウント作成
 - `GET /accounts/:id` - アカウント詳細取得
-- `PATCH /accounts/:id` - アカウント更新
-- `DELETE /accounts/:id` - アカウント削除
-- `POST /accounts/:id/owners` - オーナー招待
-- `DELETE /accounts/:id/owners/:userId` - オーナー削除
 
-### カテゴリ
+### アカウント (更新系)
+
+- `POST /commands/create_account` - アカウント作成
+  - body: `{ name }`
+- `POST /commands/update_account` - アカウント更新
+  - body: `{ account_id, name }`
+- `POST /commands/delete_account` - アカウント削除
+  - body: `{ account_id }`
+- `POST /commands/add_owner` - オーナー追加
+  - body: `{ account_id, user_id }`
+- `POST /commands/remove_owner` - オーナー削除
+  - body: `{ account_id, user_id }`
+
+### カテゴリ (参照系)
 
 - `GET /accounts/:id/categories` - カテゴリ一覧取得
-- `POST /accounts/:id/categories` - カテゴリ作成
-- `PATCH /accounts/:id/categories/:categoryId` - カテゴリ更新
-- `DELETE /accounts/:id/categories/:categoryId` - カテゴリ削除
 
-### 収支記録
+### カテゴリ (更新系)
+
+- `POST /commands/add_category` - カテゴリ作成
+  - body: `{ account_id, name }`
+- `POST /commands/update_category` - カテゴリ更新
+  - body: `{ account_id, category_id, name }`
+- `POST /commands/delete_category` - カテゴリ削除
+  - body: `{ account_id, category_id }`
+
+### 収支記録 (参照系)
 
 - `GET /accounts/:id/transactions` - 取引一覧取得 (20件/ページ、日付降順、cursor ベース: `?after=<id>`)
-- `POST /accounts/:id/transactions` - 取引作成
-- `PATCH /accounts/:id/transactions/:transactionId` - 取引更新
-- `DELETE /accounts/:id/transactions/:transactionId` - 取引削除
 
-### エクスポート
+### 収支記録 (更新系)
+
+- `POST /commands/add_transaction` - 取引作成
+  - body: `{ account_id, amount, category_id, comment, date }`
+- `POST /commands/update_transaction` - 取引更新
+  - body: `{ account_id, transaction_id, amount, category_id, comment, date }`
+- `POST /commands/delete_transaction` - 取引削除
+  - body: `{ account_id, transaction_id }`
+
+### エクスポート (参照系)
 
 - `GET /accounts/:id/export/json?year=YYYY&month=MM` - JSON エクスポート (月別)
 

@@ -1,7 +1,6 @@
-/// Request to update a category
+/// Request to delete a category
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub struct UpdateCategoryRequest {
+pub struct DeleteCategoryRequest {
     pub account_id: String,
     pub category_id: String,
-    pub name: String,
 }

@@ -19,22 +19,17 @@ impl<R: EventStoreRepository> CreateAccountUseCase<R> {
 
     pub async fn execute(
         &self,
+        user_id: &UserId,
         request: CreateAccountRequest,
     ) -> Result<AccountId, ApplicationError> {
         // Generate new account ID
         let account_id = AccountId::new();
 
-        // Parse owner ID
-        let owner_id: UserId = request
-            .owner_id
-            .parse()
-            .map_err(|_| ApplicationError::InvalidRequest("Invalid owner ID".to_string()))?;
-
         // Create command
         let command = AccountCommand::CreateAccount {
             account_id: account_id.clone(),
             name: request.name,
-            owners: vec![owner_id],
+            owners: vec![user_id.clone()],
         };
 
         // Handle command on empty aggregate

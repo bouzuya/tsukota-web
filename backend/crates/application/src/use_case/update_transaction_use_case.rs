@@ -21,13 +21,23 @@ impl<R: EventStoreRepository> UpdateTransactionUseCase<R> {
 
     pub async fn execute(
         &self,
-        account_id: &AccountId,
-        transaction_id: &TransactionId,
         _user_id: &UserId,
         request: UpdateTransactionRequest,
     ) -> Result<(), ApplicationError> {
+        // Parse account ID
+        let account_id: AccountId = request
+            .account_id
+            .parse()
+            .map_err(|_| ApplicationError::InvalidRequest("Invalid account ID".to_string()))?;
+
+        // Parse transaction ID
+        let transaction_id: TransactionId = request
+            .transaction_id
+            .parse()
+            .map_err(|_| ApplicationError::InvalidRequest("Invalid transaction ID".to_string()))?;
+
         // Load events
-        let events = self.repository.load_events(account_id).await?;
+        let events = self.repository.load_events(&account_id).await?;
 
         // Reconstruct aggregate
         let aggregate = Account::from_events(events);
@@ -40,7 +50,7 @@ impl<R: EventStoreRepository> UpdateTransactionUseCase<R> {
 
         // Create command
         let command = AccountCommand::UpdateTransaction {
-            transaction_id: transaction_id.clone(),
+            transaction_id,
             amount: request.amount,
             category_id,
             comment: request.comment,
@@ -51,7 +61,7 @@ impl<R: EventStoreRepository> UpdateTransactionUseCase<R> {
         let new_events = aggregate.handle_command(command)?;
 
         // Save events
-        self.repository.save_events(account_id, new_events).await?;
+        self.repository.save_events(&account_id, new_events).await?;
 
         Ok(())
     }

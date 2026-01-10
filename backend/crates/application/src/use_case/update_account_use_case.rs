@@ -19,12 +19,17 @@ impl<R: EventStoreRepository> UpdateAccountUseCase<R> {
 
     pub async fn execute(
         &self,
-        account_id: &AccountId,
         _user_id: &UserId,
         request: UpdateAccountRequest,
     ) -> Result<(), ApplicationError> {
+        // Parse account ID
+        let account_id: AccountId = request
+            .account_id
+            .parse()
+            .map_err(|_| ApplicationError::InvalidRequest("Invalid account ID".to_string()))?;
+
         // Load events
-        let events = self.repository.load_events(account_id).await?;
+        let events = self.repository.load_events(&account_id).await?;
 
         // Reconstruct aggregate
         let aggregate = Account::from_events(events);
@@ -36,7 +41,7 @@ impl<R: EventStoreRepository> UpdateAccountUseCase<R> {
         let new_events = aggregate.handle_command(command)?;
 
         // Save events
-        self.repository.save_events(account_id, new_events).await?;
+        self.repository.save_events(&account_id, new_events).await?;
 
         Ok(())
     }
