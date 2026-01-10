@@ -37,11 +37,11 @@ impl<R: EventStoreRepository> AddCategoryUseCase<R> {
         let aggregate = Account::from_events(events);
 
         // Generate new category ID
-        let category_id = CategoryId::new();
+        let category_id = CategoryId::generate();
 
         // Create command
         let command = AccountCommand::AddCategory {
-            category_id: category_id.clone(),
+            category_id,
             name: request.name,
         };
 

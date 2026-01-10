@@ -12,7 +12,7 @@ pub struct ParseTransactionIdError;
 
 impl TransactionId {
     /// 新しい TransactionId を生成する
-    pub fn new() -> Self {
+    pub fn generate() -> Self {
         Self(uuid::Uuid::new_v4())
     }
 }
@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_transaction_id_creation() -> anyhow::Result<()> {
-        let id = TransactionId::new();
+        let id = TransactionId::generate();
         // 文字列表現が有効な形式であることを確認
         let id_str = id.to_string();
         assert!(id_str.parse::<TransactionId>().is_ok());
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_transaction_id_roundtrip() -> anyhow::Result<()> {
-        let id1 = TransactionId::new();
+        let id1 = TransactionId::generate();
         let id_str = id1.to_string();
         let id2: TransactionId = id_str.parse()?;
         assert_eq!(id1, id2);

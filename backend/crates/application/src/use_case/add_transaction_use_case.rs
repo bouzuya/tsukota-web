@@ -38,7 +38,7 @@ impl<R: EventStoreRepository> AddTransactionUseCase<R> {
         let aggregate = Account::from_events(events);
 
         // Generate new transaction ID
-        let transaction_id = TransactionId::new();
+        let transaction_id = TransactionId::generate();
 
         // Parse category ID
         let category_id: CategoryId = request
@@ -48,7 +48,7 @@ impl<R: EventStoreRepository> AddTransactionUseCase<R> {
 
         // Create command
         let command = AccountCommand::AddTransaction {
-            transaction_id: transaction_id.clone(),
+            transaction_id,
             amount: request.amount,
             category_id,
             comment: request.comment,

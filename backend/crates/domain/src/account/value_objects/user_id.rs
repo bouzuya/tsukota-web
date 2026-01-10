@@ -12,7 +12,7 @@ pub struct ParseUserIdError;
 
 impl UserId {
     /// 新しい UserId を生成する
-    pub fn new() -> Self {
+    pub fn generate() -> Self {
         Self(uuid::Uuid::new_v4())
     }
 }
@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_user_id_creation() -> anyhow::Result<()> {
-        let id = UserId::new();
+        let id = UserId::generate();
         // 文字列表現が有効な形式であることを確認
         let id_str = id.to_string();
         assert!(id_str.parse::<UserId>().is_ok());
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_user_id_roundtrip() -> anyhow::Result<()> {
-        let id1 = UserId::new();
+        let id1 = UserId::generate();
         let id_str = id1.to_string();
         let id2: UserId = id_str.parse()?;
         assert_eq!(id1, id2);

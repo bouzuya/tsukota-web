@@ -1,0 +1,26 @@
+name: ci
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+jobs:
+  build:
+    defaults:
+      run:
+        working-directory: backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo +nightly fmt -- --check
+      - run: cargo clippy -- --deny warnings
+      - run: cargo test -- --no-run
+      - run: cargo test

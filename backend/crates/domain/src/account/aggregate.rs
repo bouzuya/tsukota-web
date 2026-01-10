@@ -631,8 +631,8 @@ mod tests {
     #[test]
     fn test_create_account() -> anyhow::Result<()> {
         let account = Account::new();
-        let account_id = AccountId::new();
-        let user_id = UserId::new();
+        let account_id = AccountId::generate();
+        let user_id = UserId::generate();
         let command = AccountCommand::CreateAccount {
             account_id,
             name: "My Account".to_string(),
@@ -688,7 +688,7 @@ mod tests {
     fn test_add_owner() -> anyhow::Result<()> {
         let account_uuid = "550e8400-e29b-41d4-a716-446655440000";
         let user1_uuid = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
-        let user2_id = UserId::new();
+        let user2_id = UserId::generate();
         let common = AccountEventCommonProps {
             account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),

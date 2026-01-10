@@ -12,7 +12,7 @@ pub struct ParseCategoryIdError;
 
 impl CategoryId {
     /// 新しい CategoryId を生成する
-    pub fn new() -> Self {
+    pub fn generate() -> Self {
         Self(uuid::Uuid::new_v4())
     }
 }
@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn test_category_id_creation() -> anyhow::Result<()> {
-        let id = CategoryId::new();
+        let id = CategoryId::generate();
         // 文字列表現が有効な形式であることを確認
         let id_str = id.to_string();
         assert!(id_str.parse::<CategoryId>().is_ok());
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_category_id_roundtrip() -> anyhow::Result<()> {
-        let id1 = CategoryId::new();
+        let id1 = CategoryId::generate();
         let id_str = id1.to_string();
         let id2: CategoryId = id_str.parse()?;
         assert_eq!(id1, id2);

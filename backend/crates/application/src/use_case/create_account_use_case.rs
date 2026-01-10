@@ -24,11 +24,11 @@ impl<R: EventStoreRepository> CreateAccountUseCase<R> {
         request: CreateAccountRequest,
     ) -> Result<CreateAccountResponse, ApplicationError> {
         // Generate new account ID
-        let account_id = AccountId::new();
+        let account_id = AccountId::generate();
 
         // Create command
         let command = AccountCommand::CreateAccount {
-            account_id: account_id.clone(),
+            account_id,
             name: request.name,
             owners: vec![user_id.to_domain()],
         };
