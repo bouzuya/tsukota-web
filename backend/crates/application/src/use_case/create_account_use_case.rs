@@ -6,6 +6,7 @@ use domain::account::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::CreateAccountRequest;
+use crate::response::CreateAccountResponse;
 
 /// Use case for creating a new account
 pub struct CreateAccountUseCase<R: EventStoreRepository> {
@@ -21,7 +22,7 @@ impl<R: EventStoreRepository> CreateAccountUseCase<R> {
         &self,
         user_id: &UserId,
         request: CreateAccountRequest,
-    ) -> Result<AccountId, ApplicationError> {
+    ) -> Result<CreateAccountResponse, ApplicationError> {
         // Generate new account ID
         let account_id = AccountId::new();
 
@@ -39,6 +40,8 @@ impl<R: EventStoreRepository> CreateAccountUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, events).await?;
 
-        Ok(account_id)
+        Ok(CreateAccountResponse {
+            account_id: account_id.to_string(),
+        })
     }
 }

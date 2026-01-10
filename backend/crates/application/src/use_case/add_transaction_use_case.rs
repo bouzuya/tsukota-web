@@ -8,6 +8,7 @@ use domain::account::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::AddTransactionRequest;
+use crate::response::AddTransactionResponse;
 
 /// Use case for adding a transaction to an account
 pub struct AddTransactionUseCase<R: EventStoreRepository> {
@@ -23,7 +24,7 @@ impl<R: EventStoreRepository> AddTransactionUseCase<R> {
         &self,
         _user_id: &UserId,
         request: AddTransactionRequest,
-    ) -> Result<TransactionId, ApplicationError> {
+    ) -> Result<AddTransactionResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -60,6 +61,8 @@ impl<R: EventStoreRepository> AddTransactionUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(transaction_id)
+        Ok(AddTransactionResponse {
+            transaction_id: transaction_id.to_string(),
+        })
     }
 }

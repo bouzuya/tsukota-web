@@ -3,5 +3,6 @@ pub mod error;
 pub mod projection;
 pub mod repository;
 pub mod request;
+pub mod response;
 pub mod use_case;
 pub mod view;

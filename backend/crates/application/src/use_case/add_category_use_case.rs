@@ -7,6 +7,7 @@ use domain::account::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::AddCategoryRequest;
+use crate::response::AddCategoryResponse;
 
 /// Use case for adding a category to an account
 pub struct AddCategoryUseCase<R: EventStoreRepository> {
@@ -22,7 +23,7 @@ impl<R: EventStoreRepository> AddCategoryUseCase<R> {
         &self,
         _user_id: &UserId,
         request: AddCategoryRequest,
-    ) -> Result<CategoryId, ApplicationError> {
+    ) -> Result<AddCategoryResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -50,6 +51,8 @@ impl<R: EventStoreRepository> AddCategoryUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(category_id)
+        Ok(AddCategoryResponse {
+            category_id: category_id.to_string(),
+        })
     }
 }
