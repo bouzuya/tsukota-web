@@ -110,6 +110,17 @@ API は更新系と参照系で異なるパス設計を採用しています。
 - **更新系 (Commands)**: `POST /commands/{use_case_name}` - すべてのパラメーターをリクエストボディに含める
 - **参照系 (Queries)**: リソースベースのパス - `GET /accounts/:id/...`
 
+### コマンドレスポンス形式
+
+作成系コマンドは作成されたリソースの ID を返します。更新・削除系コマンドは空のレスポンス（204 No Content）を返します。
+
+| コマンド | レスポンス |
+|----------|-----------|
+| `create_account` | `{ account_id: string }` |
+| `add_category` | `{ category_id: string }` |
+| `add_transaction` | `{ transaction_id: string }` |
+| その他 (update/delete) | 空 (204 No Content) |
+
 ### 認証
 
 - `GET /auth/google` - Google OAuth 開始
