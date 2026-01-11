@@ -21,70 +21,66 @@ where
     TP: TransactionProjection + Clone + Send + Sync + 'static,
 {
     Router::new()
-        // Commands - Account
+        .route("/accounts", get(query::list_accounts::<R, AP, CP, TP>))
         .route(
-            "/commands/create_account",
-            post(command::create_account::<R, AP, CP, TP>),
+            "/accounts/{account_id}",
+            get(query::get_account::<R, AP, CP, TP>),
         )
         .route(
-            "/commands/update_account",
-            post(command::update_account::<R, AP, CP, TP>),
+            "/accounts/{account_id}/categories",
+            get(query::list_categories::<R, AP, CP, TP>),
         )
         .route(
-            "/commands/delete_account",
-            post(command::delete_account::<R, AP, CP, TP>),
+            "/accounts/{account_id}/export/json",
+            get(query::export_transactions::<R, AP, CP, TP>),
+        )
+        .route(
+            "/accounts/{account_id}/transactions",
+            get(query::list_transactions::<R, AP, CP, TP>),
+        )
+        .route(
+            "/commands/add_category",
+            post(command::add_category::<R, AP, CP, TP>),
         )
         .route(
             "/commands/add_owner",
             post(command::add_owner::<R, AP, CP, TP>),
         )
         .route(
+            "/commands/add_transaction",
+            post(command::add_transaction::<R, AP, CP, TP>),
+        )
+        .route(
+            "/commands/create_account",
+            post(command::create_account::<R, AP, CP, TP>),
+        )
+        .route(
+            "/commands/delete_account",
+            post(command::delete_account::<R, AP, CP, TP>),
+        )
+        .route(
+            "/commands/delete_category",
+            post(command::delete_category::<R, AP, CP, TP>),
+        )
+        .route(
+            "/commands/delete_transaction",
+            post(command::delete_transaction::<R, AP, CP, TP>),
+        )
+        .route(
             "/commands/remove_owner",
             post(command::remove_owner::<R, AP, CP, TP>),
         )
-        // Commands - Category
         .route(
-            "/commands/add_category",
-            post(command::add_category::<R, AP, CP, TP>),
+            "/commands/update_account",
+            post(command::update_account::<R, AP, CP, TP>),
         )
         .route(
             "/commands/update_category",
             post(command::update_category::<R, AP, CP, TP>),
         )
         .route(
-            "/commands/delete_category",
-            post(command::delete_category::<R, AP, CP, TP>),
-        )
-        // Commands - Transaction
-        .route(
-            "/commands/add_transaction",
-            post(command::add_transaction::<R, AP, CP, TP>),
-        )
-        .route(
             "/commands/update_transaction",
             post(command::update_transaction::<R, AP, CP, TP>),
-        )
-        .route(
-            "/commands/delete_transaction",
-            post(command::delete_transaction::<R, AP, CP, TP>),
-        )
-        // Queries - Account
-        .route("/accounts", get(query::list_accounts::<R, AP, CP, TP>))
-        .route("/accounts/:id", get(query::get_account::<R, AP, CP, TP>))
-        // Queries - Category
-        .route(
-            "/accounts/:id/categories",
-            get(query::list_categories::<R, AP, CP, TP>),
-        )
-        // Queries - Transaction
-        .route(
-            "/accounts/:id/transactions",
-            get(query::list_transactions::<R, AP, CP, TP>),
-        )
-        // Queries - Export
-        .route(
-            "/accounts/:id/export/json",
-            get(query::export_transactions::<R, AP, CP, TP>),
         )
         .with_state(state)
 }
