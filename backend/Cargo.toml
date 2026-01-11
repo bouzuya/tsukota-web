@@ -12,7 +12,6 @@ version = "0.0.0"
 anyhow = "1"
 application = { path = "crates/application" }
 async-trait = "0.1"
-axum = "0.8"
 chrono = "0.4"
 domain = { path = "crates/domain" }
 mockall = "0.12"
