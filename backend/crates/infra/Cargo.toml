@@ -6,3 +6,7 @@ license.workspace = true
 version.workspace = true
 
 [dependencies]
+application.workspace = true
+async-trait.workspace = true
+domain = { path = "../domain" }
+tokio.workspace = true

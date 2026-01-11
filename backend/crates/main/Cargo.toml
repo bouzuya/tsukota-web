@@ -1,13 +1,15 @@
 [package]
-name = "api"
+name = "main"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 version.workspace = true
 
+[[bin]]
+name = "tsukota-server"
+path = "src/main.rs"
+
 [dependencies]
-application.workspace = true
-axum.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+api = { path = "../api" }
+infra = { path = "../infra" }
 tokio.workspace = true
