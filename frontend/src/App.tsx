@@ -1,35 +1,56 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAtomValue } from 'jotai';
+import { useAuth } from './hooks/useAuth';
+import { isAuthenticatedAtom, authLoadingAtom } from './atoms/auth';
+import { PageLoader } from './components/LoadingSpinner';
+import { LoginPage } from './pages/LoginPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { TransactionListPage } from './pages/TransactionListPage';
+import { TransactionFormPage } from './pages/TransactionFormPage';
+import { CategoryManagePage } from './pages/CategoryManagePage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
+import { UserSettingsPage } from './pages/UserSettingsPage';
 
-function App() {
-  const [count, setCount] = useState(0)
+function AppRoutes() {
+  const { checkAuth } = useAuth();
+  const isAuthenticated = useAtomValue(isAuthenticatedAtom);
+  const authLoading = useAtomValue(authLoadingAtom);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  if (authLoading) {
+    return <PageLoader />;
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/"
+        element={
+          isAuthenticated ? <DashboardPage /> : <Navigate to="/login" replace />
+        }
+      />
+      <Route path="/accounts/:id" element={<TransactionListPage />} />
+      <Route path="/accounts/:id/new" element={<TransactionFormPage />} />
+      <Route path="/accounts/:id/edit/:txId" element={<TransactionFormPage />} />
+      <Route path="/accounts/:id/categories" element={<CategoryManagePage />} />
+      <Route path="/accounts/:id/settings" element={<AccountSettingsPage />} />
+      <Route path="/settings" element={<UserSettingsPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }
 
-export default App
+function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
+}
+
+export default App;
