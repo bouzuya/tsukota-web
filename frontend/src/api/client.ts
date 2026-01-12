@@ -1,4 +1,5 @@
 import type { ProblemDetails } from './types';
+import { getManualUserId } from '../atoms/auth';
 
 export class ApiError extends Error {
   status: number;
@@ -13,6 +14,20 @@ export class ApiError extends Error {
 }
 
 const API_BASE = '/api';
+
+function getHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add X-User-Id header for development
+  const manualUserId = getManualUserId();
+  if (manualUserId) {
+    headers['X-User-Id'] = manualUserId;
+  }
+
+  return headers;
+}
 
 async function refreshToken(): Promise<boolean> {
   try {
@@ -53,7 +68,7 @@ export async function apiRequest<T>(
     ...options,
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...getHeaders(),
       ...options.headers,
     },
   };

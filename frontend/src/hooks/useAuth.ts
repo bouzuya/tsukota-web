@@ -1,8 +1,13 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, logout as apiLogout } from '../api/auth';
-import { currentUserAtom, authLoadingAtom, isAuthenticatedAtom } from '../atoms/auth';
+import {
+  currentUserAtom,
+  authLoadingAtom,
+  isAuthenticatedAtom,
+  getManualUserId,
+  setManualUserId,
+} from '../atoms/auth';
 
 export function useAuth() {
   const [currentUser, setCurrentUser] = useAtom(currentUserAtom);
@@ -10,25 +15,29 @@ export function useAuth() {
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
   const navigate = useNavigate();
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(() => {
     setAuthLoading(true);
-    try {
-      const user = await getCurrentUser();
-      setCurrentUser(user);
-    } catch {
+
+    // Check for manual user ID in localStorage (development mode)
+    const manualUserId = getManualUserId();
+    if (manualUserId) {
+      setCurrentUser({
+        id: manualUserId,
+        email: `${manualUserId}@example.com`,
+        displayName: `User ${manualUserId}`,
+        createdAt: new Date().toISOString(),
+      });
+    } else {
       setCurrentUser(null);
-    } finally {
-      setAuthLoading(false);
     }
+
+    setAuthLoading(false);
   }, [setCurrentUser, setAuthLoading]);
 
-  const logout = useCallback(async () => {
-    try {
-      await apiLogout();
-    } finally {
-      setCurrentUser(null);
-      navigate('/login');
-    }
+  const logout = useCallback(() => {
+    setManualUserId(null);
+    setCurrentUser(null);
+    navigate('/login');
   }, [setCurrentUser, navigate]);
 
   return {
