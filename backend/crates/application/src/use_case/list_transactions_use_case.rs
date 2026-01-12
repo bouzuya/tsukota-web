@@ -5,7 +5,8 @@ use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::projection::TransactionProjection;
 use crate::request::ListTransactionsRequest;
-use crate::view::TransactionList;
+use crate::view::PaginatedList;
+use crate::view::TransactionView;
 
 /// Use case for listing transactions with cursor-based pagination
 pub struct ListTransactionsUseCase<A: AccountProjection, T: TransactionProjection> {
@@ -25,7 +26,7 @@ impl<A: AccountProjection, T: TransactionProjection> ListTransactionsUseCase<A, 
         &self,
         user_id: &UserId,
         request: ListTransactionsRequest,
-    ) -> Result<TransactionList, ApplicationError> {
+    ) -> Result<PaginatedList<TransactionView>, ApplicationError> {
         let account_id: AccountId = request
             .account_id
             .parse()

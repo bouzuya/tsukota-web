@@ -6,7 +6,7 @@ use domain::account::UserId;
 use crate::error::ApplicationError;
 use crate::view::AccountView;
 use crate::view::CategoryView;
-use crate::view::TransactionList;
+use crate::view::PaginatedList;
 use crate::view::TransactionView;
 
 /// Projection trait for Account read models
@@ -41,7 +41,7 @@ pub trait TransactionProjection: Send + Sync {
         account_id: &AccountId,
         cursor: Option<String>,
         limit: usize,
-    ) -> Result<TransactionList, ApplicationError>;
+    ) -> Result<PaginatedList<TransactionView>, ApplicationError>;
 
     /// Get a single transaction by ID
     async fn get_transaction(

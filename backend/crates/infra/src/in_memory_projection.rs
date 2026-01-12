@@ -7,7 +7,7 @@ use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
 use application::view::AccountView;
 use application::view::CategoryView;
-use application::view::TransactionList;
+use application::view::PaginatedList;
 use application::view::TransactionView;
 use async_trait::async_trait;
 use domain::account::Account;
@@ -259,7 +259,7 @@ impl TransactionProjection for InMemoryProjection {
         account_id: &AccountId,
         cursor: Option<String>,
         limit: usize,
-    ) -> Result<TransactionList, ApplicationError> {
+    ) -> Result<PaginatedList<TransactionView>, ApplicationError> {
         let events_map = self.events.read().await;
         let account_events = events_map.get(&account_id.to_string());
 
@@ -292,17 +292,14 @@ impl TransactionProjection for InMemoryProjection {
             .collect();
 
         let has_more = paginated.len() > limit;
-        let transactions: Vec<_> = paginated.into_iter().take(limit).collect();
+        let items: Vec<_> = paginated.into_iter().take(limit).collect();
         let next_cursor = if has_more {
-            transactions.last().map(|t| t.id.clone())
+            items.last().map(|t| t.id.clone())
         } else {
             None
         };
 
-        Ok(TransactionList {
-            transactions,
-            next_cursor,
-        })
+        Ok(PaginatedList { items, next_cursor })
     }
 
     async fn get_transaction(

@@ -11,7 +11,7 @@ use application::request::ListCategoriesRequest;
 use application::request::ListTransactionsRequest;
 use application::view::AccountView;
 use application::view::CategoryView;
-use application::view::TransactionList;
+use application::view::PaginatedList;
 use application::view::TransactionView;
 use axum::Json;
 use axum::extract::Path;
@@ -88,7 +88,7 @@ pub async fn list_transactions<R, AP, CP, TP>(
     AuthUser(user_id): AuthUser,
     Path(account_id): Path<String>,
     Query(params): Query<ListTransactionsParams>,
-) -> Result<Json<TransactionList>, ApiError>
+) -> Result<Json<PaginatedList<TransactionView>>, ApiError>
 where
     R: EventStoreRepository,
     AP: AccountProjection,
