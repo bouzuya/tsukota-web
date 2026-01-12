@@ -1,32 +1,60 @@
 import { apiGet, apiPost } from './client';
 import type {
-  Account,
-  CreateAccountCommand,
-  CreateAccountResponse,
-  UpdateAccountCommand,
-  DeleteAccountCommand,
-} from './types';
+  ApiAccount,
+  ApiCreateAccountCommand,
+  ApiCreateAccountResponse,
+  ApiUpdateAccountCommand,
+  ApiDeleteAccountCommand,
+} from './apiTypes';
+import type { Account, CreateAccountResponse } from './types';
+import { toAccount, toAccounts, toCreateAccountResponse } from './converters';
 
 export async function getAccounts(): Promise<Account[]> {
-  return apiGet<Account[]>('/accounts');
+  const response = await apiGet<ApiAccount[]>('/accounts');
+  return toAccounts(response);
 }
 
 export async function getAccount(accountId: string): Promise<Account> {
-  return apiGet<Account>(`/accounts/${accountId}`);
+  const response = await apiGet<ApiAccount>(`/accounts/${accountId}`);
+  return toAccount(response);
+}
+
+export interface CreateAccountCommand {
+  name: string;
 }
 
 export async function createAccount(
   command: CreateAccountCommand
 ): Promise<CreateAccountResponse> {
-  return apiPost<CreateAccountResponse>('/commands/create_account', command);
+  const apiCommand: ApiCreateAccountCommand = {
+    name: command.name,
+  };
+  const response = await apiPost<ApiCreateAccountResponse>('/commands/create_account', apiCommand);
+  return toCreateAccountResponse(response);
+}
+
+export interface UpdateAccountCommand {
+  accountId: string;
+  name: string;
 }
 
 export async function updateAccount(command: UpdateAccountCommand): Promise<void> {
-  return apiPost<void>('/commands/update_account', command);
+  const apiCommand: ApiUpdateAccountCommand = {
+    account_id: command.accountId,
+    name: command.name,
+  };
+  return apiPost<void>('/commands/update_account', apiCommand);
+}
+
+export interface DeleteAccountCommand {
+  accountId: string;
 }
 
 export async function deleteAccount(command: DeleteAccountCommand): Promise<void> {
-  return apiPost<void>('/commands/delete_account', command);
+  const apiCommand: ApiDeleteAccountCommand = {
+    account_id: command.accountId,
+  };
+  return apiPost<void>('/commands/delete_account', apiCommand);
 }
 
 export function getExportUrl(accountId: string, year: number, month: number): string {

@@ -59,7 +59,7 @@ export function AccountSettingsPage() {
 
     setSaving(true);
     try {
-      await updateAccount({ account_id: id, name: accountName.trim() });
+      await updateAccount({ accountId: id, name: accountName.trim() });
       setAccount({ ...account, name: accountName.trim() });
     } finally {
       setSaving(false);
@@ -71,7 +71,7 @@ export function AccountSettingsPage() {
 
     setSaving(true);
     try {
-      await deleteAccount({ account_id: id });
+      await deleteAccount({ accountId: id });
       navigate('/');
     } finally {
       setSaving(false);

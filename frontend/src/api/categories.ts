@@ -1,26 +1,59 @@
 import { apiGet, apiPost } from './client';
 import type {
-  Category,
-  AddCategoryCommand,
-  AddCategoryResponse,
-  UpdateCategoryCommand,
-  DeleteCategoryCommand,
-} from './types';
+  ApiCategory,
+  ApiAddCategoryCommand,
+  ApiAddCategoryResponse,
+  ApiUpdateCategoryCommand,
+  ApiDeleteCategoryCommand,
+} from './apiTypes';
+import type { Category, AddCategoryResponse } from './types';
+import { toCategories, toAddCategoryResponse } from './converters';
 
 export async function getCategories(accountId: string): Promise<Category[]> {
-  return apiGet<Category[]>(`/accounts/${accountId}/categories`);
+  const response = await apiGet<ApiCategory[]>(`/accounts/${accountId}/categories`);
+  return toCategories(response);
+}
+
+export interface AddCategoryCommand {
+  accountId: string;
+  name: string;
 }
 
 export async function addCategory(
   command: AddCategoryCommand
 ): Promise<AddCategoryResponse> {
-  return apiPost<AddCategoryResponse>('/commands/add_category', command);
+  const apiCommand: ApiAddCategoryCommand = {
+    account_id: command.accountId,
+    name: command.name,
+  };
+  const response = await apiPost<ApiAddCategoryResponse>('/commands/add_category', apiCommand);
+  return toAddCategoryResponse(response);
+}
+
+export interface UpdateCategoryCommand {
+  accountId: string;
+  categoryId: string;
+  name: string;
 }
 
 export async function updateCategory(command: UpdateCategoryCommand): Promise<void> {
-  return apiPost<void>('/commands/update_category', command);
+  const apiCommand: ApiUpdateCategoryCommand = {
+    account_id: command.accountId,
+    category_id: command.categoryId,
+    name: command.name,
+  };
+  return apiPost<void>('/commands/update_category', apiCommand);
+}
+
+export interface DeleteCategoryCommand {
+  accountId: string;
+  categoryId: string;
 }
 
 export async function deleteCategory(command: DeleteCategoryCommand): Promise<void> {
-  return apiPost<void>('/commands/delete_category', command);
+  const apiCommand: ApiDeleteCategoryCommand = {
+    account_id: command.accountId,
+    category_id: command.categoryId,
+  };
+  return apiPost<void>('/commands/delete_category', apiCommand);
 }

@@ -23,8 +23,8 @@ export function UserSettingsPage() {
     setSaving(true);
     try {
       await updateUser({
-        user_id: currentUser.id,
-        display_name: displayName.trim(),
+        userId: currentUser.id,
+        displayName: displayName.trim(),
       });
       setCurrentUser({ ...currentUser, displayName: displayName.trim() });
     } finally {

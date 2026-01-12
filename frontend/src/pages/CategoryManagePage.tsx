@@ -52,7 +52,7 @@ export function CategoryManagePage() {
 
     setSaving(true);
     try {
-      await addCategory({ account_id: id, name: categoryName.trim() });
+      await addCategory({ accountId: id, name: categoryName.trim() });
       const cats = await getCategories(id);
       setCategories(cats);
       setShowAddModal(false);
@@ -68,8 +68,8 @@ export function CategoryManagePage() {
     setSaving(true);
     try {
       await updateCategory({
-        account_id: id,
-        category_id: selectedCategory.id,
+        accountId: id,
+        categoryId: selectedCategory.id,
         name: categoryName.trim(),
       });
       const cats = await getCategories(id);
@@ -88,8 +88,8 @@ export function CategoryManagePage() {
     setSaving(true);
     try {
       await deleteCategory({
-        account_id: id,
-        category_id: selectedCategory.id,
+        accountId: id,
+        categoryId: selectedCategory.id,
       });
       const cats = await getCategories(id);
       setCategories(cats);

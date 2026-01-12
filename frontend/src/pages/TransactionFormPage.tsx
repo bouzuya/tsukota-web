@@ -73,18 +73,18 @@ export function TransactionFormPage() {
     try {
       if (isEditMode && txId) {
         await updateTransaction({
-          account_id: id,
-          transaction_id: txId,
+          accountId: id,
+          transactionId: txId,
           amount,
-          category_id: categoryId,
+          categoryId,
           comment,
           date,
         });
       } else {
         await addTransaction({
-          account_id: id,
+          accountId: id,
           amount,
-          category_id: categoryId,
+          categoryId,
           comment,
           date,
         });
@@ -101,8 +101,8 @@ export function TransactionFormPage() {
     setSaving(true);
     try {
       await deleteTransaction({
-        account_id: id,
-        transaction_id: txId,
+        accountId: id,
+        transactionId: txId,
       });
       navigate(`/accounts/${id}`);
     } finally {

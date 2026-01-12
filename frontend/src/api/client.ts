@@ -1,11 +1,11 @@
-import type { ProblemDetails } from './types';
+import type { ApiProblemDetails } from './apiTypes';
 import { getManualUserId } from '../atoms/auth';
 
 export class ApiError extends Error {
   status: number;
-  problem?: ProblemDetails;
+  problem?: ApiProblemDetails;
 
-  constructor(status: number, problem?: ProblemDetails) {
+  constructor(status: number, problem?: ApiProblemDetails) {
     super(problem?.detail ?? problem?.title ?? `HTTP Error ${status}`);
     this.name = 'ApiError';
     this.status = status;
@@ -47,7 +47,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   if (!response.ok) {
-    let problem: ProblemDetails | undefined;
+    let problem: ApiProblemDetails | undefined;
     try {
       problem = await response.json();
     } catch {

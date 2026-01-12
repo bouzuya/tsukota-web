@@ -1,5 +1,7 @@
 import { apiGet, apiPost } from './client';
+import type { ApiUser } from './apiTypes';
 import type { User } from './types';
+import { toUser } from './converters';
 
 export function getAuthUrl(): string {
   return '/api/auth/google';
@@ -7,7 +9,8 @@ export function getAuthUrl(): string {
 
 export async function getCurrentUser(): Promise<User | null> {
   try {
-    return await apiGet<User>('/auth/me');
+    const response = await apiGet<ApiUser>('/auth/me');
+    return toUser(response);
   } catch {
     return null;
   }
