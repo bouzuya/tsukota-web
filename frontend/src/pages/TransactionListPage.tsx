@@ -42,7 +42,7 @@ export function TransactionListPage() {
       if (!id || authLoading) return;
       try {
         const cats = await getCategories(id);
-        setCategories(cats);
+        setCategories(cats.items);
         loadInitial();
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -106,11 +106,10 @@ export function TransactionListPage() {
                     )}
                   </div>
                   <p
-                    className={`text-lg font-semibold ${
-                      parseInt(tx.amount, 10) >= 0
+                    className={`text-lg font-semibold ${parseInt(tx.amount, 10) >= 0
                         ? 'text-green-600'
                         : 'text-red-600'
-                    }`}
+                      }`}
                   >
                     {formatAmount(tx.amount)}
                   </p>

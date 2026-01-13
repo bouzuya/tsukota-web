@@ -23,7 +23,7 @@ export function DashboardPage() {
       setLoading(true);
       try {
         const data = await getAccounts();
-        setAccounts(data);
+        setAccounts(data.items);
       } finally {
         setLoading(false);
       }
@@ -40,7 +40,7 @@ export function DashboardPage() {
     try {
       await createAccount({ name: newAccountName.trim() });
       const updatedAccounts = await getAccounts();
-      setAccounts(updatedAccounts);
+      setAccounts(updatedAccounts.items);
       setShowCreateModal(false);
       setNewAccountName('');
     } finally {

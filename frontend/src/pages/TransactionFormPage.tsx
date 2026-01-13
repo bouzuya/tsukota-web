@@ -45,7 +45,7 @@ export function TransactionFormPage() {
       setLoading(true);
       try {
         const cats = await getCategories(id);
-        setCategories(cats);
+        setCategories(cats.items);
 
         if (txId) {
           // Fetch transaction for editing

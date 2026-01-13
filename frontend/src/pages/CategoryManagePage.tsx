@@ -37,7 +37,7 @@ export function CategoryManagePage() {
       setLoading(true);
       try {
         const cats = await getCategories(id);
-        setCategories(cats);
+        setCategories(cats.items);
       } finally {
         setLoading(false);
       }
@@ -54,7 +54,7 @@ export function CategoryManagePage() {
     try {
       await addCategory({ accountId: id, name: categoryName.trim() });
       const cats = await getCategories(id);
-      setCategories(cats);
+      setCategories(cats.items);
       setShowAddModal(false);
       setCategoryName('');
     } finally {
@@ -73,7 +73,7 @@ export function CategoryManagePage() {
         name: categoryName.trim(),
       });
       const cats = await getCategories(id);
-      setCategories(cats);
+      setCategories(cats.items);
       setShowEditModal(false);
       setSelectedCategory(null);
       setCategoryName('');
@@ -92,7 +92,7 @@ export function CategoryManagePage() {
         categoryId: selectedCategory.id,
       });
       const cats = await getCategories(id);
-      setCategories(cats);
+      setCategories(cats.items);
       setShowDeleteModal(false);
       setSelectedCategory(null);
     } finally {

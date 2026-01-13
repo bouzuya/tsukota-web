@@ -13,7 +13,7 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE = '/api';
+const API_BASE = 'http://localhost:3000';
 
 function getHeaders(): Record<string, string> {
   const headers: Record<string, string> = {

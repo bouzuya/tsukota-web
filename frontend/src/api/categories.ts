@@ -5,13 +5,14 @@ import type {
   ApiAddCategoryResponse,
   ApiUpdateCategoryCommand,
   ApiDeleteCategoryCommand,
+  ApiPaginatedResponse,
 } from './apiTypes';
-import type { Category, AddCategoryResponse } from './types';
-import { toCategories, toAddCategoryResponse } from './converters';
+import type { Category, AddCategoryResponse, PaginatedResponse } from './types';
+import { toAddCategoryResponse, toPaginatedResponse, toCategory } from './converters';
 
-export async function getCategories(accountId: string): Promise<Category[]> {
-  const response = await apiGet<ApiCategory[]>(`/accounts/${accountId}/categories`);
-  return toCategories(response);
+export async function getCategories(accountId: string): Promise<PaginatedResponse<Category>> {
+  const response = await apiGet<ApiPaginatedResponse<ApiCategory>>(`/accounts/${accountId}/categories`);
+  return toPaginatedResponse(response, toCategory);
 }
 
 export interface AddCategoryCommand {

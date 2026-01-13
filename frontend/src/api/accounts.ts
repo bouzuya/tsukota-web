@@ -5,13 +5,14 @@ import type {
   ApiCreateAccountResponse,
   ApiUpdateAccountCommand,
   ApiDeleteAccountCommand,
+  ApiPaginatedResponse,
 } from './apiTypes';
-import type { Account, CreateAccountResponse } from './types';
-import { toAccount, toAccounts, toCreateAccountResponse } from './converters';
+import type { Account, CreateAccountResponse, PaginatedResponse } from './types';
+import { toAccount, toCreateAccountResponse, toPaginatedResponse } from './converters';
 
-export async function getAccounts(): Promise<Account[]> {
-  const response = await apiGet<ApiAccount[]>('/accounts');
-  return toAccounts(response);
+export async function getAccounts(): Promise<PaginatedResponse<Account>> {
+  const response = await apiGet<ApiPaginatedResponse<ApiAccount>>('/accounts');
+  return toPaginatedResponse(response, toAccount);
 }
 
 export async function getAccount(accountId: string): Promise<Account> {
