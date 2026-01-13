@@ -6,6 +6,7 @@ use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::RemoveOwnerRequest;
+use crate::response::RemoveOwnerResponse;
 
 /// Use case for removing an owner from an account
 pub struct RemoveOwnerUseCase<R: EventStoreRepository> {
@@ -21,7 +22,7 @@ impl<R: EventStoreRepository> RemoveOwnerUseCase<R> {
         &self,
         _user_id: &UserId,
         request: RemoveOwnerRequest,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<RemoveOwnerResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -51,6 +52,6 @@ impl<R: EventStoreRepository> RemoveOwnerUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(())
+        Ok(RemoveOwnerResponse {})
     }
 }

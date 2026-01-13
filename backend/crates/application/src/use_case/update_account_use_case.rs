@@ -6,6 +6,7 @@ use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::UpdateAccountRequest;
+use crate::response::UpdateAccountResponse;
 
 /// Use case for updating account details
 pub struct UpdateAccountUseCase<R: EventStoreRepository> {
@@ -21,7 +22,7 @@ impl<R: EventStoreRepository> UpdateAccountUseCase<R> {
         &self,
         _user_id: &UserId,
         request: UpdateAccountRequest,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<UpdateAccountResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -43,6 +44,6 @@ impl<R: EventStoreRepository> UpdateAccountUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(())
+        Ok(UpdateAccountResponse {})
     }
 }

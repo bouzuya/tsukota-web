@@ -5,7 +5,7 @@ use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::projection::TransactionProjection;
 use crate::request::ExportTransactionsRequest;
-use crate::view::TransactionView;
+use crate::response::ExportTransactionsResponse;
 
 /// Use case for exporting transactions as JSON for a specific month
 pub struct ExportTransactionsUseCase<A: AccountProjection, T: TransactionProjection> {
@@ -25,7 +25,7 @@ impl<A: AccountProjection, T: TransactionProjection> ExportTransactionsUseCase<A
         &self,
         user_id: &UserId,
         request: ExportTransactionsRequest,
-    ) -> Result<Vec<TransactionView>, ApplicationError> {
+    ) -> Result<ExportTransactionsResponse, ApplicationError> {
         let account_id: AccountId = request
             .account_id
             .parse()
@@ -53,8 +53,11 @@ impl<A: AccountProjection, T: TransactionProjection> ExportTransactionsUseCase<A
         crate::authorization::verify_owner(&account, &domain_user_id)?;
 
         // Get transactions for the specified month
-        self.transaction_projection
+        let transactions = self
+            .transaction_projection
             .list_transactions_for_month(&account_id, request.year, request.month)
-            .await
+            .await?;
+
+        Ok(ExportTransactionsResponse { transactions })
     }
 }

@@ -7,6 +7,7 @@ use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::DeleteTransactionRequest;
+use crate::response::DeleteTransactionResponse;
 
 /// Use case for deleting a transaction
 pub struct DeleteTransactionUseCase<R: EventStoreRepository> {
@@ -22,7 +23,7 @@ impl<R: EventStoreRepository> DeleteTransactionUseCase<R> {
         &self,
         _user_id: &UserId,
         request: DeleteTransactionRequest,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<DeleteTransactionResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -50,6 +51,6 @@ impl<R: EventStoreRepository> DeleteTransactionUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(())
+        Ok(DeleteTransactionResponse {})
     }
 }

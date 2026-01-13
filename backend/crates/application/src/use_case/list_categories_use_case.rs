@@ -5,7 +5,7 @@ use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::projection::CategoryProjection;
 use crate::request::ListCategoriesRequest;
-use crate::view::CategoryView;
+use crate::response::ListCategoriesResponse;
 
 /// Use case for listing all categories of an account
 pub struct ListCategoriesUseCase<A: AccountProjection, C: CategoryProjection> {
@@ -25,7 +25,7 @@ impl<A: AccountProjection, C: CategoryProjection> ListCategoriesUseCase<A, C> {
         &self,
         user_id: &UserId,
         request: ListCategoriesRequest,
-    ) -> Result<Vec<CategoryView>, ApplicationError> {
+    ) -> Result<ListCategoriesResponse, ApplicationError> {
         let account_id: AccountId = request
             .account_id
             .parse()
@@ -45,6 +45,7 @@ impl<A: AccountProjection, C: CategoryProjection> ListCategoriesUseCase<A, C> {
         crate::authorization::verify_owner(&account, &domain_user_id)?;
 
         // Get categories
-        self.category_projection.list_categories(&account_id).await
+        let categories = self.category_projection.list_categories(&account_id).await?;
+        Ok(ListCategoriesResponse { categories })
     }
 }

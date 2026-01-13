@@ -2,7 +2,7 @@ use crate::UserId;
 use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::request::ListAccountsRequest;
-use crate::view::AccountView;
+use crate::response::ListAccountsResponse;
 
 /// Use case for listing all accounts owned by a user
 pub struct ListAccountsUseCase<P: AccountProjection> {
@@ -18,8 +18,9 @@ impl<P: AccountProjection> ListAccountsUseCase<P> {
         &self,
         user_id: &UserId,
         _request: ListAccountsRequest,
-    ) -> Result<Vec<AccountView>, ApplicationError> {
+    ) -> Result<ListAccountsResponse, ApplicationError> {
         let owner_id = user_id.to_domain();
-        self.projection.list_accounts(&owner_id).await
+        let accounts = self.projection.list_accounts(&owner_id).await?;
+        Ok(ListAccountsResponse { accounts })
     }
 }

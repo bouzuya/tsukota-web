@@ -5,7 +5,7 @@ use crate::authorization::verify_owner;
 use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::request::GetAccountRequest;
-use crate::view::AccountView;
+use crate::response::GetAccountResponse;
 
 /// Use case for getting account details
 pub struct GetAccountUseCase<P: AccountProjection> {
@@ -21,7 +21,7 @@ impl<P: AccountProjection> GetAccountUseCase<P> {
         &self,
         user_id: &UserId,
         request: GetAccountRequest,
-    ) -> Result<AccountView, ApplicationError> {
+    ) -> Result<GetAccountResponse, ApplicationError> {
         let account_id: AccountId = request
             .account_id
             .parse()
@@ -40,6 +40,6 @@ impl<P: AccountProjection> GetAccountUseCase<P> {
         // Verify user is owner
         verify_owner(&account, &domain_user_id)?;
 
-        Ok(account)
+        Ok(GetAccountResponse { account })
     }
 }

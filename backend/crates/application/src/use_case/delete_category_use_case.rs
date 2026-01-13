@@ -7,6 +7,7 @@ use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::DeleteCategoryRequest;
+use crate::response::DeleteCategoryResponse;
 
 /// Use case for deleting (soft delete) a category
 pub struct DeleteCategoryUseCase<R: EventStoreRepository> {
@@ -22,7 +23,7 @@ impl<R: EventStoreRepository> DeleteCategoryUseCase<R> {
         &self,
         _user_id: &UserId,
         request: DeleteCategoryRequest,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<DeleteCategoryResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -50,6 +51,6 @@ impl<R: EventStoreRepository> DeleteCategoryUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(())
+        Ok(DeleteCategoryResponse {})
     }
 }

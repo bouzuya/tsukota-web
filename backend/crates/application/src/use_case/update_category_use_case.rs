@@ -7,6 +7,7 @@ use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::UpdateCategoryRequest;
+use crate::response::UpdateCategoryResponse;
 
 /// Use case for updating a category
 pub struct UpdateCategoryUseCase<R: EventStoreRepository> {
@@ -22,7 +23,7 @@ impl<R: EventStoreRepository> UpdateCategoryUseCase<R> {
         &self,
         _user_id: &UserId,
         request: UpdateCategoryRequest,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<UpdateCategoryResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -53,6 +54,6 @@ impl<R: EventStoreRepository> UpdateCategoryUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(())
+        Ok(UpdateCategoryResponse {})
     }
 }

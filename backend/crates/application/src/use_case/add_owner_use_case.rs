@@ -6,6 +6,7 @@ use crate::UserId;
 use crate::error::ApplicationError;
 use crate::repository::EventStoreRepository;
 use crate::request::AddOwnerRequest;
+use crate::response::AddOwnerResponse;
 
 /// Use case for adding an owner to an account
 pub struct AddOwnerUseCase<R: EventStoreRepository> {
@@ -21,7 +22,7 @@ impl<R: EventStoreRepository> AddOwnerUseCase<R> {
         &self,
         _user_id: &UserId,
         request: AddOwnerRequest,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<AddOwnerResponse, ApplicationError> {
         // Parse account ID
         let account_id: AccountId = request
             .account_id
@@ -49,6 +50,6 @@ impl<R: EventStoreRepository> AddOwnerUseCase<R> {
         // Save events
         self.repository.save_events(&account_id, new_events).await?;
 
-        Ok(())
+        Ok(AddOwnerResponse {})
     }
 }
