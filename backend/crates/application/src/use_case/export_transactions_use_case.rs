@@ -6,6 +6,7 @@ use crate::projection::AccountProjection;
 use crate::projection::TransactionProjection;
 use crate::request::ExportTransactionsRequest;
 use crate::response::ExportTransactionsResponse;
+use crate::view::PaginatedList;
 
 /// Use case for exporting transactions as JSON for a specific month
 pub struct ExportTransactionsUseCase<A: AccountProjection, T: TransactionProjection> {
@@ -58,6 +59,9 @@ impl<A: AccountProjection, T: TransactionProjection> ExportTransactionsUseCase<A
             .list_transactions_for_month(&account_id, request.year, request.month)
             .await?;
 
-        Ok(ExportTransactionsResponse { transactions })
+        Ok(ExportTransactionsResponse(PaginatedList {
+            items: transactions,
+            next_cursor: None,
+        }))
     }
 }

@@ -40,6 +40,6 @@ impl<P: AccountProjection> GetAccountUseCase<P> {
         // Verify user is owner
         verify_owner(&account, &domain_user_id)?;
 
-        Ok(GetAccountResponse { account })
+        Ok(GetAccountResponse(account))
     }
 }

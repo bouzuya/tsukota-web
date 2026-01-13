@@ -50,9 +50,6 @@ impl<A: AccountProjection, T: TransactionProjection> ListTransactionsUseCase<A, 
             .list_transactions(&account_id, request.cursor, request.limit)
             .await?;
 
-        Ok(ListTransactionsResponse {
-            transactions: result.items,
-            next_cursor: result.next_cursor,
-        })
+        Ok(ListTransactionsResponse(result))
     }
 }

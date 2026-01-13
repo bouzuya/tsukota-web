@@ -6,6 +6,7 @@ use crate::projection::AccountProjection;
 use crate::projection::CategoryProjection;
 use crate::request::ListCategoriesRequest;
 use crate::response::ListCategoriesResponse;
+use crate::view::PaginatedList;
 
 /// Use case for listing all categories of an account
 pub struct ListCategoriesUseCase<A: AccountProjection, C: CategoryProjection> {
@@ -45,7 +46,13 @@ impl<A: AccountProjection, C: CategoryProjection> ListCategoriesUseCase<A, C> {
         crate::authorization::verify_owner(&account, &domain_user_id)?;
 
         // Get categories
-        let categories = self.category_projection.list_categories(&account_id).await?;
-        Ok(ListCategoriesResponse { categories })
+        let categories = self
+            .category_projection
+            .list_categories(&account_id)
+            .await?;
+        Ok(ListCategoriesResponse(PaginatedList {
+            items: categories,
+            next_cursor: None,
+        }))
     }
 }

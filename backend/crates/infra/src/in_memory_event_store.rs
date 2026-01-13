@@ -34,7 +34,10 @@ impl EventStoreRepository for InMemoryEventStore {
         account_id: &AccountId,
     ) -> Result<Vec<AccountEvent>, ApplicationError> {
         let events = self.events.read().await;
-        let account_events = events.get(&account_id.to_string()).cloned().unwrap_or_default();
+        let account_events = events
+            .get(&account_id.to_string())
+            .cloned()
+            .unwrap_or_default();
         Ok(account_events)
     }
 
