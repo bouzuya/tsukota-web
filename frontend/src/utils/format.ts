@@ -3,7 +3,7 @@
  */
 export function formatAmount(amount: string): string {
 	const num = parseInt(amount, 10);
-	if (isNaN(num)) return amount;
+	if (Number.isNaN(num)) return amount;
 
 	const formatter = new Intl.NumberFormat("ja-JP", {
 		style: "currency",
@@ -18,7 +18,7 @@ export function formatAmount(amount: string): string {
  */
 export function formatAmountWithSign(amount: string): string {
 	const num = parseInt(amount, 10);
-	if (isNaN(num)) return amount;
+	if (Number.isNaN(num)) return amount;
 
 	const sign = num >= 0 ? "+" : "";
 	return `${sign}${formatAmount(amount)}`;

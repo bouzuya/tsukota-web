@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Header } from "./Header";
 import { Navigation } from "./Navigation";
 import { useParams } from "react-router-dom";

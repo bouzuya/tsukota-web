@@ -56,9 +56,9 @@ export function UserSettingsPage() {
 					</h2>
 					<div className="space-y-3">
 						<div>
-							<label className="block text-sm font-medium text-gray-700">
+							<div className="block text-sm font-medium text-gray-700">
 								メールアドレス
-							</label>
+							</div>
 							<p className="mt-1 text-gray-900">{currentUser.email}</p>
 						</div>
 					</div>
