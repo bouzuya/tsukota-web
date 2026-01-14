@@ -1,5 +1,5 @@
-import { atom } from 'jotai';
-import type { Transaction } from '../api/types';
+import { atom } from "jotai";
+import type { Transaction } from "../api/types";
 
 // Transactions for current account
 export const transactionsAtom = atom<Transaction[]>([]);
@@ -12,5 +12,5 @@ export const transactionsCursorAtom = atom<string | null>(null);
 
 // Whether there are more transactions to load
 export const hasMoreTransactionsAtom = atom((get) => {
-  return get(transactionsCursorAtom) !== null;
+	return get(transactionsCursorAtom) !== null;
 });

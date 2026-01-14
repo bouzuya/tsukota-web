@@ -1,5 +1,5 @@
-import { atom } from 'jotai';
-import type { Account } from '../api/types';
+import { atom } from "jotai";
+import type { Account } from "../api/types";
 
 // Accounts list
 export const accountsAtom = atom<Account[]>([]);
@@ -12,7 +12,7 @@ export const selectedAccountIdAtom = atom<string | null>(null);
 
 // Derived atom to get selected account
 export const selectedAccountAtom = atom((get) => {
-  const accounts = get(accountsAtom);
-  const selectedId = get(selectedAccountIdAtom);
-  return accounts.find((a) => a.id === selectedId) ?? null;
+	const accounts = get(accountsAtom);
+	const selectedId = get(selectedAccountIdAtom);
+	return accounts.find((a) => a.id === selectedId) ?? null;
 });
