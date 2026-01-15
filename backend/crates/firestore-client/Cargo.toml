@@ -10,9 +10,10 @@ firestore-path = "1"
 http = "1"
 firestore-structured-query = "0.26.3"
 google-cloud-auth = "1.4.0"
-googleapis-tonic-google-firestore-v1 = "0.29"
+googleapis-tonic-google-firestore-v1 = "0.27"
 prost = "0.14.3"
 prost-types = "0.14.3"
 serde.workspace = true
 serde-firestore-value = "0.24.3"
+thiserror.workspace = true
 tonic = { version = "0.14.2", features = ["tls-webpki-roots"] }
