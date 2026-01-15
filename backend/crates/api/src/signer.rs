@@ -56,8 +56,8 @@ impl Signer {
     ///
     /// # Arguments
     ///
-    /// * `service_account_email` - The service account email address (used as iss and sub)
     /// * `private_key_pem` - The RSA private key in PEM format
+    /// * `service_account_email` - The service account email address (used as iss and sub)
     pub fn new(
         private_key_pem: &str,
         service_account_email: String,
@@ -69,26 +69,29 @@ impl Signer {
         })
     }
 
+    /// Returns the current time in seconds since UNIX epoch.
+    pub fn now() -> Result<u64, SignError> {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .map_err(|_| SignError::SystemTimeError)
+    }
+
     /// Signs a Firebase custom token for the given user.
     ///
     /// # Arguments
     ///
     /// * `uid` - The unique identifier of the user (1-128 characters)
+    /// * `now` - The current time in seconds since UNIX epoch
     ///
     /// # Returns
     ///
     /// A JWT string that can be used with Firebase's `signInWithCustomToken`
-    pub fn sign(&self, uid: &str) -> Result<String, SignError> {
+    pub fn sign(&self, uid: &str, now: u64) -> Result<String, SignError> {
         // Validate UID length
         if !(1..=128).contains(&uid.len()) {
             return Err(SignError::InvalidUid);
         }
-
-        // Get current time
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| SignError::SystemTimeError)?
-            .as_secs();
 
         // Create claims
         let claims = FirebaseCustomTokenClaims {
@@ -112,6 +115,17 @@ impl Signer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Test RSA public key for testing purposes only (derived from TEST_PRIVATE_KEY_PEM)
+    const TEST_PUBLIC_KEY_PEM: &str = r#"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqYPnaQlwAJJQPUr8KtB0
+juDbXbThT+8+vVp8Aqt+iYePeabEK+Pr9cBicsR4fUcqdQmJ259OlIkJb2fpX8Bv
+0BJSbDS5JeK7Zt7uu5YLz1LBMiFbE4cEYpYDXjc2NqG7ehiBRl9auqhriFVYgMTL
+KJuKgkQuFR2ZQ1RG50fFizZQi1w4YjYc/FhYGovwCIxDOeDvIV1+ew7T6GBBH+EK
+okn7FsAtbW3+YLXlpFA3IZ+ur2ixNI/JzXC6zYzus1srsZUezpwnNzW86ChOQxLy
+0nvuiOWhXz48a4T/ntYewQ370NcA7FkpYjZXrWFOjvzLoVATEmK+1hJFK3h/+1+0
+dwIDAQAB
+-----END PUBLIC KEY-----"#;
 
     // Test RSA private key for testing purposes only
     const TEST_PRIVATE_KEY_PEM: &str = r#"-----BEGIN PRIVATE KEY-----
@@ -146,7 +160,7 @@ XHoL8lz5DpxcSiLilKDCKxo=
     #[test]
     fn test_invalid_uid_empty() -> anyhow::Result<()> {
         let signer = Signer::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
-        let result = signer.sign("");
+        let result = signer.sign("", 1000);
         assert!(matches!(result, Err(SignError::InvalidUid)));
         Ok(())
     }
@@ -155,8 +169,37 @@ XHoL8lz5DpxcSiLilKDCKxo=
     fn test_invalid_uid_too_long() -> anyhow::Result<()> {
         let signer = Signer::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
         let long_uid = "a".repeat(129);
-        let result = signer.sign(&long_uid);
+        let result = signer.sign(&long_uid, 1000);
         assert!(matches!(result, Err(SignError::InvalidUid)));
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_success() -> anyhow::Result<()> {
+        let service_account_email = "test@example.iam.gserviceaccount.com";
+        let signer = Signer::new(TEST_PRIVATE_KEY_PEM, service_account_email.to_string())?;
+        let uid = "user123";
+        let now = 1700000000_u64;
+
+        let token = signer.sign(uid, now)?;
+
+        // Decode and verify the token claims
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.validate_exp = false;
+        validation.set_required_spec_claims::<&str>(&[]);
+        validation.set_audience(&["https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"]);
+        validation.set_issuer(&[service_account_email]);
+
+        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(TEST_PUBLIC_KEY_PEM.as_bytes())?;
+        let token_data = jsonwebtoken::decode::<FirebaseCustomTokenClaims>(&token, &decoding_key, &validation)?;
+
+        assert_eq!(token_data.claims.iss, service_account_email);
+        assert_eq!(token_data.claims.sub, service_account_email);
+        assert_eq!(token_data.claims.aud, "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit");
+        assert_eq!(token_data.claims.iat, now);
+        assert_eq!(token_data.claims.exp, now + 3600);
+        assert_eq!(token_data.claims.uid, uid);
+
         Ok(())
     }
 }
