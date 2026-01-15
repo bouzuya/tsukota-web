@@ -1,0 +1,17 @@
+[package]
+name = "firestore-client"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+firestore-path = "1"
+firestore-structured-query = "0.26.3"
+google-cloud-auth = "1.4.0"
+googleapis-tonic-google-firestore-v1 = "0.29"
+prost = "0.14.3"
+prost-types = "0.14.3"
+serde.workspace = true
+serde-firestore-value = "0.24.3"
+tonic = "0.14.2"
