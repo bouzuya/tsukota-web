@@ -1,8 +1,11 @@
+mod create_custom_token;
 mod error;
 mod extractor;
 mod handler;
 mod router;
 mod state;
+
+pub use create_custom_token::{create_custom_token, CreateCustomTokenError};
 
 use std::sync::Arc;
 
