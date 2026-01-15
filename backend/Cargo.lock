@@ -477,6 +477,7 @@ dependencies = [
  "firestore-structured-query",
  "google-cloud-auth",
  "googleapis-tonic-google-firestore-v1 0.29.0",
+ "http",
  "prost",
  "prost-types",
  "serde",
@@ -2319,11 +2320,13 @@ dependencies = [
  "socket2",
  "sync_wrapper",
  "tokio",
+ "tokio-rustls",
  "tokio-stream",
  "tower",
  "tower-layer",
  "tower-service",
  "tracing",
+ "webpki-roots",
 ]
 
 [[package]]
