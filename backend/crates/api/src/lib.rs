@@ -1,11 +1,11 @@
-mod create_custom_token;
 mod error;
 mod extractor;
 mod handler;
 mod router;
+mod signer;
 mod state;
 
-pub use create_custom_token::{create_custom_token, CreateCustomTokenError};
+pub use signer::{SignError, Signer};
 
 use std::sync::Arc;
 
