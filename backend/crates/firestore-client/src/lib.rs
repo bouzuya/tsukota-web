@@ -26,10 +26,11 @@ pub enum Error {
 pub struct FirestoreClient {
     channel: tonic::transport::Channel,
     credentials: google_cloud_auth::credentials::Credentials,
+    database_name: path::DatabaseName,
 }
 
 impl FirestoreClient {
-    pub async fn connect() -> Result<Self, Error> {
+    pub async fn connect(database_name: path::DatabaseName) -> Result<Self, Error> {
         let channel = tonic::transport::Channel::from_static("https://firestore.googleapis.com")
             .tls_config(tonic::transport::ClientTlsConfig::new().with_webpki_roots())?
             .connect()
@@ -38,6 +39,7 @@ impl FirestoreClient {
         Ok(Self {
             channel,
             credentials,
+            database_name,
         })
     }
 
@@ -60,6 +62,10 @@ impl FirestoreClient {
         &self,
         document_path: &path::DocumentPath,
     ) -> Result<Option<google::firestore::v1::Document>, Error> {
+        let document_name = self
+            .database_name
+            .doc(document_path.clone())
+            .expect("DatabaseName::doc(DocumentPath) to be valid");
         let mut client = self.client().await?;
         let google::firestore::v1::GetDocumentRequest {
             consistency_selector,
@@ -69,7 +75,7 @@ impl FirestoreClient {
         let request = google::firestore::v1::GetDocumentRequest {
             consistency_selector,
             mask,
-            name: document_path.to_string(),
+            name: document_name.to_string(),
         };
         let result = client.get_document(request).await;
         match result {
@@ -77,6 +83,42 @@ impl FirestoreClient {
             Err(status) if status.code() == tonic::Code::NotFound => Ok(None),
             Err(status) => Err(Error::Status(status)),
         }
+    }
+
+    pub async fn list_documents(
+        &self,
+        collection_path: &path::CollectionPath,
+        page_token: Option<String>,
+    ) -> Result<google::firestore::v1::ListDocumentsResponse, Error> {
+        let collection_name = self
+            .database_name
+            .collection(collection_path.clone())
+            .expect("DatabaseName::collection(CollectionPath) to be valid");
+        let mut client = self.client().await?;
+        let google::firestore::v1::ListDocumentsRequest {
+            collection_id: _,
+            consistency_selector,
+            mask,
+            order_by,
+            page_size,
+            page_token: _,
+            parent: _,
+            show_missing,
+        } = Default::default();
+        let request = google::firestore::v1::ListDocumentsRequest {
+            collection_id: collection_path.collection_id().to_string(),
+            consistency_selector,
+            mask,
+            order_by,
+            page_size,
+            page_token: page_token.unwrap_or_default(),
+            parent: collection_name
+                .parent()
+                .map(|parent| parent.to_string())
+                .unwrap_or_else(|| self.database_name.root_document_name().to_string()),
+            show_missing,
+        };
+        Ok(client.list_documents(request).await?.into_inner())
     }
 
     async fn client(
