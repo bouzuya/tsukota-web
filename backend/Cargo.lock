@@ -474,12 +474,9 @@ name = "firestore-client"
 version = "0.0.0"
 dependencies = [
  "firestore-path",
- "firestore-structured-query",
  "google-cloud-auth",
  "googleapis-tonic-google-firestore-v1",
  "http",
- "prost",
- "prost-types",
  "serde",
  "serde-firestore-value",
  "thiserror",
@@ -493,16 +490,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4678265af6b85ec0dafce70e538c317149275b9523c35aa999e01df850d91ba3"
 dependencies = [
  "thiserror",
-]
-
-[[package]]
-name = "firestore-structured-query"
-version = "0.26.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eceae919d37fb01e9fa4ca40fbbbaf1eb3bffb14e5a72d9f89b7e809b4e333c0"
-dependencies = [
- "googleapis-tonic-google-firestore-v1",
- "serde-firestore-value",
 ]
 
 [[package]]
@@ -1783,9 +1770,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-pki-types"
-version = "1.13.2"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21e6f2ab2928ca4291b86736a8bd920a277a399bba1589409d72154ff87c1282"
+checksum = "be040f8b0a225e40375822a563fa9524378b9d63112f53e19ffff34df5d33fdd"
 dependencies = [
  "web-time",
  "zeroize",
@@ -1793,9 +1780,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.8"
+version = "0.103.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ffdfa2f5286e2247234e03f680868ac2815974dc39e00ea15adc445d0aafe52"
+checksum = "d7df23109aa6c1567d1c575b9952556388da57401e4ace1d15f79eedad0d8f53"
 dependencies = [
  "ring",
  "rustls-pki-types",
