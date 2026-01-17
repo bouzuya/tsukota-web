@@ -1,0 +1,15 @@
+services:
+  workspace:
+    image: debian:trixie
+    volumes:
+      - .:/workspaces/tsukota-web:cached
+    command: sleep infinity
+    environment:
+      - FIRESTORE_EMULATOR_HOST=firebase:8080
+
+  firebase:
+    build: ./firebase
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./firebase:/firebase
