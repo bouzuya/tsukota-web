@@ -473,14 +473,18 @@ checksum = "645cbb3a84e60b7531617d5ae4e57f7e27308f6445f5abf653209ea76dec8dff"
 name = "firestore-client"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "firestore-path",
  "google-cloud-auth",
  "googleapis-tonic-google-firestore-v1",
  "http",
  "serde",
  "serde-firestore-value",
+ "serde_json",
  "thiserror",
+ "tokio",
  "tonic",
+ "uuid",
 ]
 
 [[package]]

@@ -50,7 +50,7 @@ enum E {
 #[derive(Clone)]
 pub struct FirestoreClient {
     channel: tonic::transport::Channel,
-    credentials: google_cloud_auth::credentials::Credentials,
+    credentials: Option<google_cloud_auth::credentials::Credentials>,
     database_name: path::DatabaseName,
 }
 
@@ -63,11 +63,25 @@ impl FirestoreClient {
             .await
             .map_err(E::Connect)?;
         let credentials = google_cloud_auth::credentials::Builder::default()
+            .with_scopes(["https://www.googleapis.com/auth/datastore"])
             .build()
             .map_err(E::BuildCredentials)?;
         Ok(Self {
             channel,
-            credentials,
+            credentials: Some(credentials),
+            database_name,
+        })
+    }
+
+    pub async fn connect_with_emulator() -> Result<Self, Error> {
+        let database_name = path::DatabaseName::from_project_id("demo-project").unwrap();
+        let channel = tonic::transport::Channel::from_static("http://firebase:8080")
+            .connect()
+            .await
+            .map_err(E::Connect)?;
+        Ok(Self {
+            channel,
+            credentials: None,
             database_name,
         })
     }
@@ -117,7 +131,7 @@ impl FirestoreClient {
             .into_inner())
     }
 
-    pub async fn deserialize<T>(
+    pub fn deserialize<T>(
         &self,
         fields: std::collections::HashMap<String, google::firestore::v1::Value>,
     ) -> Result<T, Error>
@@ -301,18 +315,22 @@ impl FirestoreClient {
         >,
         Error,
     > {
-        let cacheable_headers = self
-            .credentials
-            .headers(http::Extensions::new())
-            .await
-            .map_err(E::Credentials)?;
-        let header_map = match cacheable_headers {
-            google_cloud_auth::credentials::CacheableResource::New { data, .. } => data,
-            google_cloud_auth::credentials::CacheableResource::NotModified => {
-                return Err(E::CredentialsNotModified)?;
+        let metadata = match &self.credentials {
+            Some(credentials) => {
+                let cacheable_headers = credentials
+                    .headers(http::Extensions::new())
+                    .await
+                    .map_err(E::Credentials)?;
+                let header_map = match cacheable_headers {
+                    google_cloud_auth::credentials::CacheableResource::New { data, .. } => data,
+                    google_cloud_auth::credentials::CacheableResource::NotModified => {
+                        return Err(E::CredentialsNotModified)?;
+                    }
+                };
+                tonic::metadata::MetadataMap::from_headers(header_map)
             }
+            None => tonic::metadata::MetadataMap::new(),
         };
-        let metadata = tonic::metadata::MetadataMap::from_headers(header_map);
 
         let firestore_client =
             google::firestore::v1::firestore_client::FirestoreClient::with_interceptor(
@@ -333,5 +351,79 @@ impl FirestoreClient {
             );
 
         Ok(firestore_client)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_crud() -> anyhow::Result<()> {
+        let client = FirestoreClient::connect_with_emulator().await?;
+
+        let document_id =
+            <path::DocumentId as std::str::FromStr>::from_str(&uuid::Uuid::new_v4().to_string())?;
+        let document_path =
+            <path::CollectionPath as std::str::FromStr>::from_str("test_collection")?
+                .doc(document_id.clone())?;
+
+        assert!(client.get_document(document_path.clone()).await?.is_none());
+
+        // create_document
+        #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+        struct TestDocumentData {
+            n: i64,
+            s: String,
+        }
+        let document_data1 = TestDocumentData {
+            n: 123,
+            s: "abc".to_owned(),
+        };
+        let serialized = client.serialize(&document_data1)?;
+        let created = client
+            .create_document(document_path.clone(), serialized.clone())
+            .await?;
+        assert_eq!(
+            <path::DocumentName as std::str::FromStr>::from_str(&created.name)?.document_id(),
+            &document_id
+        );
+        let deserialized = client.deserialize::<TestDocumentData>(created.fields)?;
+        assert_eq!(deserialized, document_data1);
+
+        // get_document (created)
+        let fetched = client.get_document(document_path.clone()).await?;
+        let fetched = fetched.context("document not found")?;
+        assert_eq!(fetched.name, created.name);
+        let deserialized = client.deserialize::<TestDocumentData>(fetched.fields)?;
+        assert_eq!(deserialized, document_data1);
+
+        let document_data2 = TestDocumentData {
+            n: 456,
+            s: "def".to_owned(),
+        };
+        let serialized = client.serialize(&document_data2)?;
+        let updated = client
+            .update_document(document_path.clone(), serialized.clone())
+            .await?;
+        assert_eq!(
+            <path::DocumentName as std::str::FromStr>::from_str(&updated.name)?.document_id(),
+            &document_id
+        );
+        let deserialized = client.deserialize::<TestDocumentData>(updated.fields)?;
+        assert_eq!(deserialized, document_data2);
+
+        // get_document (updated)
+        let fetched = client.get_document(document_path.clone()).await?;
+        let fetched = fetched.context("document not found")?;
+        assert_eq!(fetched.name, updated.name);
+        let deserialized = client.deserialize::<TestDocumentData>(fetched.fields)?;
+        assert_eq!(deserialized, document_data2);
+
+        // TODO: delete
+
+        Ok(())
     }
 }

@@ -1,8 +1,8 @@
 {
-  "firestore": {
-    "database": "(default)",
-    "indexes": "firestore.indexes.json",
-    "location": "asia-northeast2",
-    "rules": "firestore.rules"
+  "emulators": {
+    "firestore": {
+      "host": "0.0.0.0",
+      "port": 8080
+    }
   }
 }
