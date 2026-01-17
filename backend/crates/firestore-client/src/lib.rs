@@ -1,6 +1,8 @@
 pub use firestore_path as path;
 pub use googleapis_tonic_google_firestore_v1::google;
 
+pub struct Transaction(pub(crate) Vec<u8>);
+
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
 pub struct Error(#[from] E);
@@ -99,7 +101,7 @@ impl FirestoreClient {
 
 /// Methods
 impl FirestoreClient {
-    pub async fn begin_transaction(&self) -> Result<Vec<u8>, Error> {
+    pub async fn begin_transaction(&self) -> Result<Transaction, Error> {
         let mut client = self.client().await?;
         let google::firestore::v1::BeginTransactionRequest {
             database: _,
@@ -109,24 +111,26 @@ impl FirestoreClient {
             database: self.database_name.to_string(),
             options,
         };
-        Ok(client
-            .begin_transaction(request)
-            .await
-            .map_err(E::BeginTransaction)?
-            .into_inner()
-            .transaction)
+        Ok(Transaction(
+            client
+                .begin_transaction(request)
+                .await
+                .map_err(E::BeginTransaction)?
+                .into_inner()
+                .transaction,
+        ))
     }
 
     pub async fn commit(
         &self,
-        transaction: Vec<u8>,
+        Transaction(transaction): &Transaction,
         writes: Vec<google::firestore::v1::Write>,
     ) -> Result<google::firestore::v1::CommitResponse, Error> {
         let mut client = self.client().await?;
         let request = google::firestore::v1::CommitRequest {
             database: self.database_name.to_string(),
             writes,
-            transaction,
+            transaction: transaction.to_owned(),
         };
         Ok(client
             .commit(request)
@@ -262,11 +266,11 @@ impl FirestoreClient {
             .into_inner())
     }
 
-    pub async fn rollback(&self, transaction: Vec<u8>) -> Result<(), Error> {
+    pub async fn rollback(&self, Transaction(transaction): &Transaction) -> Result<(), Error> {
         let mut client = self.client().await?;
         let request = google::firestore::v1::RollbackRequest {
             database: self.database_name.to_string(),
-            transaction,
+            transaction: transaction.to_owned(),
         };
         client.rollback(request).await.map_err(E::Rollback)?;
         Ok(())
@@ -495,14 +499,11 @@ mod tests {
         let document_path =
             <path::CollectionPath as std::str::FromStr>::from_str("test_collection")?
                 .doc(document_id.clone())?;
-        let document_name = path::DatabaseName::from_project_id("demo-project")
-            .unwrap()
-            .doc(document_path.clone())
-            .unwrap();
+        let document_name =
+            path::DatabaseName::from_project_id("demo-project")?.doc(document_path.clone())?;
 
         // Begin transaction
         let transaction = client.begin_transaction().await?;
-        assert!(!transaction.is_empty());
 
         // Create a document via commit
         #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -536,7 +537,7 @@ mod tests {
             current_document: None,
         }];
 
-        let commit_response = client.commit(transaction, writes).await?;
+        let commit_response = client.commit(&transaction, writes).await?;
         assert!(commit_response.commit_time.is_some());
 
         // Verify document was created
@@ -554,10 +555,9 @@ mod tests {
 
         // Begin transaction
         let transaction = client.begin_transaction().await?;
-        assert!(!transaction.is_empty());
 
         // Rollback transaction (no writes)
-        client.rollback(transaction).await?;
+        client.rollback(&transaction).await?;
 
         Ok(())
     }
