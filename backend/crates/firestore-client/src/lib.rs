@@ -7,8 +7,14 @@ pub struct Error(#[from] E);
 
 #[derive(Debug, thiserror::Error)]
 enum E {
+    #[error("begin transaction")]
+    BeginTransaction(#[source] tonic::Status),
+
     #[error("build credentials")]
     BuildCredentials(#[source] google_cloud_auth::build_errors::Error),
+
+    #[error("commit")]
+    Commit(#[source] tonic::Status),
 
     #[error("connect")]
     Connect(#[source] tonic::transport::Error),
@@ -34,6 +40,9 @@ enum E {
     #[error("list documents")]
     ListDocuments(#[source] tonic::Status),
 
+    #[error("rollback")]
+    Rollback(#[source] tonic::Status),
+
     #[error("serialize")]
     Serialize(#[source] serde_firestore_value::Error),
 
@@ -54,6 +63,7 @@ pub struct FirestoreClient {
     database_name: path::DatabaseName,
 }
 
+/// Functions
 impl FirestoreClient {
     pub async fn connect(database_name: path::DatabaseName) -> Result<Self, Error> {
         let channel = tonic::transport::Channel::from_static("https://firestore.googleapis.com")
@@ -84,6 +94,45 @@ impl FirestoreClient {
             credentials: None,
             database_name,
         })
+    }
+}
+
+/// Methods
+impl FirestoreClient {
+    pub async fn begin_transaction(&self) -> Result<Vec<u8>, Error> {
+        let mut client = self.client().await?;
+        let google::firestore::v1::BeginTransactionRequest {
+            database: _,
+            options,
+        } = Default::default();
+        let request = google::firestore::v1::BeginTransactionRequest {
+            database: self.database_name.to_string(),
+            options,
+        };
+        Ok(client
+            .begin_transaction(request)
+            .await
+            .map_err(E::BeginTransaction)?
+            .into_inner()
+            .transaction)
+    }
+
+    pub async fn commit(
+        &self,
+        transaction: Vec<u8>,
+        writes: Vec<google::firestore::v1::Write>,
+    ) -> Result<google::firestore::v1::CommitResponse, Error> {
+        let mut client = self.client().await?;
+        let request = google::firestore::v1::CommitRequest {
+            database: self.database_name.to_string(),
+            writes,
+            transaction,
+        };
+        Ok(client
+            .commit(request)
+            .await
+            .map_err(E::Commit)?
+            .into_inner())
     }
 
     pub async fn create_document(
@@ -211,6 +260,16 @@ impl FirestoreClient {
             .await
             .map_err(E::ListDocuments)?
             .into_inner())
+    }
+
+    pub async fn rollback(&self, transaction: Vec<u8>) -> Result<(), Error> {
+        let mut client = self.client().await?;
+        let request = google::firestore::v1::RollbackRequest {
+            database: self.database_name.to_string(),
+            transaction,
+        };
+        client.rollback(request).await.map_err(E::Rollback)?;
+        Ok(())
     }
 
     pub fn serialize<T>(&self, value: &T) -> Result<google::firestore::v1::Value, Error>
@@ -423,6 +482,82 @@ mod tests {
         assert_eq!(deserialized, document_data2);
 
         // TODO: delete
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_begin_transaction_and_commit() -> anyhow::Result<()> {
+        let client = FirestoreClient::connect_with_emulator().await?;
+
+        let document_id =
+            <path::DocumentId as std::str::FromStr>::from_str(&uuid::Uuid::new_v4().to_string())?;
+        let document_path =
+            <path::CollectionPath as std::str::FromStr>::from_str("test_collection")?
+                .doc(document_id.clone())?;
+        let document_name = path::DatabaseName::from_project_id("demo-project")
+            .unwrap()
+            .doc(document_path.clone())
+            .unwrap();
+
+        // Begin transaction
+        let transaction = client.begin_transaction().await?;
+        assert!(!transaction.is_empty());
+
+        // Create a document via commit
+        #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+        struct TestDocumentData {
+            n: i64,
+            s: String,
+        }
+        let document_data = TestDocumentData {
+            n: 789,
+            s: "xyz".to_owned(),
+        };
+        let serialized = client.serialize(&document_data)?;
+        let fields = match serialized {
+            google::firestore::v1::Value {
+                value_type: Some(google::firestore::v1::value::ValueType::MapValue(map_value)),
+            } => map_value.fields,
+            _ => anyhow::bail!("invalid value"),
+        };
+
+        let writes = vec![google::firestore::v1::Write {
+            operation: Some(google::firestore::v1::write::Operation::Update(
+                google::firestore::v1::Document {
+                    name: document_name.to_string(),
+                    fields,
+                    create_time: None,
+                    update_time: None,
+                },
+            )),
+            update_mask: None,
+            update_transforms: vec![],
+            current_document: None,
+        }];
+
+        let commit_response = client.commit(transaction, writes).await?;
+        assert!(commit_response.commit_time.is_some());
+
+        // Verify document was created
+        let fetched = client.get_document(document_path).await?;
+        let fetched = fetched.context("document not found after commit")?;
+        let deserialized = client.deserialize::<TestDocumentData>(fetched.fields)?;
+        assert_eq!(deserialized, document_data);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_begin_transaction_and_rollback() -> anyhow::Result<()> {
+        let client = FirestoreClient::connect_with_emulator().await?;
+
+        // Begin transaction
+        let transaction = client.begin_transaction().await?;
+        assert!(!transaction.is_empty());
+
+        // Rollback transaction (no writes)
+        client.rollback(transaction).await?;
 
         Ok(())
     }
