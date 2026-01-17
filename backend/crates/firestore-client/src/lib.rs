@@ -203,27 +203,15 @@ impl FirestoreClient {
         &self,
         document_path: path::DocumentPath,
     ) -> Result<Option<google::firestore::v1::Document>, Error> {
-        let document_name = self
-            .database_name
-            .doc(document_path)
-            .expect("DatabaseName::doc(DocumentPath) to be valid");
-        let mut client = self.client().await?;
-        let google::firestore::v1::GetDocumentRequest {
-            consistency_selector,
-            mask,
-            name: _,
-        } = Default::default();
-        let request = google::firestore::v1::GetDocumentRequest {
-            consistency_selector,
-            mask,
-            name: document_name.to_string(),
-        };
-        let result = client.get_document(request).await;
-        match result {
-            Ok(response) => Ok(Some(response.into_inner())),
-            Err(status) if status.code() == tonic::Code::NotFound => Ok(None),
-            Err(status) => Err(E::GetDocument(status))?,
-        }
+        self.get_document_impl(document_path, None).await
+    }
+
+    pub async fn get_document_with_tx(
+        &self,
+        document_path: path::DocumentPath,
+        transaction: &Transaction,
+    ) -> Result<Option<google::firestore::v1::Document>, Error> {
+        self.get_document_impl(document_path, Some(transaction)).await
     }
 
     pub async fn list_documents(
@@ -415,6 +403,40 @@ impl FirestoreClient {
 
         Ok(firestore_client)
     }
+
+    async fn get_document_impl(
+        &self,
+        document_path: path::DocumentPath,
+        transaction: Option<&Transaction>,
+    ) -> Result<Option<google::firestore::v1::Document>, Error> {
+        let document_name = self
+            .database_name
+            .doc(document_path)
+            .expect("DatabaseName::doc(DocumentPath) to be valid");
+        let mut client = self.client().await?;
+        let google::firestore::v1::GetDocumentRequest {
+            consistency_selector: _,
+            mask,
+            name: _,
+        } = Default::default();
+        let consistency_selector = transaction.map(|Transaction(tx)| {
+            google::firestore::v1::get_document_request::ConsistencySelector::Transaction(
+                tx.to_owned(),
+            )
+        });
+        let request = google::firestore::v1::GetDocumentRequest {
+            consistency_selector,
+            mask,
+            name: document_name.to_string(),
+        };
+        let result = client.get_document(request).await;
+        match result {
+            Ok(response) => Ok(Some(response.into_inner())),
+            Err(status) if status.code() == tonic::Code::NotFound => Ok(None),
+            Err(status) => Err(E::GetDocument(status))?,
+        }
+    }
+
 }
 
 #[cfg(test)]
