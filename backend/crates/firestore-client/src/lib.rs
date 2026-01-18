@@ -211,7 +211,8 @@ impl FirestoreClient {
         document_path: path::DocumentPath,
         transaction: &Transaction,
     ) -> Result<Option<google::firestore::v1::Document>, Error> {
-        self.get_document_impl(document_path, Some(transaction)).await
+        self.get_document_impl(document_path, Some(transaction))
+            .await
     }
 
     pub async fn list_documents(
@@ -269,6 +270,108 @@ impl FirestoreClient {
         T: serde::Serialize,
     {
         Ok(serde_firestore_value::to_value(value).map_err(E::Serialize)?)
+    }
+
+    pub fn build_create_write(
+        &self,
+        document_path: path::DocumentPath,
+        value: google::firestore::v1::Value,
+    ) -> google::firestore::v1::Write {
+        let document_name = self
+            .database_name
+            .doc(document_path)
+            .expect("DatabaseName::doc(DocumentPath) to be valid");
+        google::firestore::v1::Write {
+            current_document: Some(google::firestore::v1::Precondition {
+                condition_type: Some(google::firestore::v1::precondition::ConditionType::Exists(
+                    false,
+                )),
+            }),
+            operation: Some(google::firestore::v1::write::Operation::Update(
+                google::firestore::v1::Document {
+                    create_time: None,
+                    fields: Self::extract_fields(value),
+                    name: document_name.to_string(),
+                    update_time: None,
+                },
+            )),
+            update_mask: None,
+            update_transforms: vec![],
+        }
+    }
+
+    pub fn build_delete_write(
+        &self,
+        document_path: path::DocumentPath,
+    ) -> google::firestore::v1::Write {
+        let document_name = self
+            .database_name
+            .doc(document_path)
+            .expect("DatabaseName::doc(DocumentPath) to be valid");
+        google::firestore::v1::Write {
+            current_document: Some(google::firestore::v1::Precondition {
+                condition_type: Some(google::firestore::v1::precondition::ConditionType::Exists(
+                    true,
+                )),
+            }),
+            operation: Some(google::firestore::v1::write::Operation::Delete(
+                document_name.to_string(),
+            )),
+            update_mask: None,
+            update_transforms: vec![],
+        }
+    }
+
+    pub fn build_set_write(
+        &self,
+        document_path: path::DocumentPath,
+        value: google::firestore::v1::Value,
+    ) -> google::firestore::v1::Write {
+        let document_name = self
+            .database_name
+            .doc(document_path)
+            .expect("DatabaseName::doc(DocumentPath) to be valid");
+        google::firestore::v1::Write {
+            current_document: None,
+            operation: Some(google::firestore::v1::write::Operation::Update(
+                google::firestore::v1::Document {
+                    create_time: None,
+                    fields: Self::extract_fields(value),
+                    name: document_name.to_string(),
+                    update_time: None,
+                },
+            )),
+            update_mask: None,
+            update_transforms: vec![],
+        }
+    }
+
+    pub fn build_update_write(
+        &self,
+        document_path: path::DocumentPath,
+        value: google::firestore::v1::Value,
+    ) -> google::firestore::v1::Write {
+        let document_name = self
+            .database_name
+            .doc(document_path)
+            .expect("DatabaseName::doc(DocumentPath) to be valid");
+        google::firestore::v1::Write {
+            current_document: Some(google::firestore::v1::Precondition {
+                condition_type: Some(google::firestore::v1::precondition::ConditionType::Exists(
+                    true,
+                )),
+            }),
+            operation: Some(google::firestore::v1::write::Operation::Update(
+                google::firestore::v1::Document {
+                    create_time: None,
+                    fields: Self::extract_fields(value),
+                    name: document_name.to_string(),
+                    update_time: None,
+                },
+            )),
+            update_mask: None,
+            update_transforms: vec![],
+        }
     }
 
     pub async fn set_document(
@@ -404,6 +507,17 @@ impl FirestoreClient {
         Ok(firestore_client)
     }
 
+    fn extract_fields(
+        value: google::firestore::v1::Value,
+    ) -> std::collections::HashMap<String, google::firestore::v1::Value> {
+        match value {
+            google::firestore::v1::Value {
+                value_type: Some(google::firestore::v1::value::ValueType::MapValue(map_value)),
+            } => map_value.fields,
+            _ => panic!("value must be a MapValue"),
+        }
+    }
+
     async fn get_document_impl(
         &self,
         document_path: path::DocumentPath,
@@ -436,7 +550,6 @@ impl FirestoreClient {
             Err(status) => Err(E::GetDocument(status))?,
         }
     }
-
 }
 
 #[cfg(test)]
@@ -521,8 +634,6 @@ mod tests {
         let document_path =
             <path::CollectionPath as std::str::FromStr>::from_str("test_collection")?
                 .doc(document_id.clone())?;
-        let document_name =
-            path::DatabaseName::from_project_id("demo-project")?.doc(document_path.clone())?;
 
         // Begin transaction
         let transaction = client.begin_transaction().await?;
@@ -538,26 +649,7 @@ mod tests {
             s: "xyz".to_owned(),
         };
         let serialized = client.serialize(&document_data)?;
-        let fields = match serialized {
-            google::firestore::v1::Value {
-                value_type: Some(google::firestore::v1::value::ValueType::MapValue(map_value)),
-            } => map_value.fields,
-            _ => anyhow::bail!("invalid value"),
-        };
-
-        let writes = vec![google::firestore::v1::Write {
-            operation: Some(google::firestore::v1::write::Operation::Update(
-                google::firestore::v1::Document {
-                    name: document_name.to_string(),
-                    fields,
-                    create_time: None,
-                    update_time: None,
-                },
-            )),
-            update_mask: None,
-            update_transforms: vec![],
-            current_document: None,
-        }];
+        let writes = vec![client.build_set_write(document_path.clone(), serialized)];
 
         let commit_response = client.commit(&transaction, writes).await?;
         assert!(commit_response.commit_time.is_some());
