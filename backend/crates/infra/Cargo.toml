@@ -9,4 +9,6 @@ version.workspace = true
 application.workspace = true
 async-trait.workspace = true
 domain = { path = "../domain" }
+firestore-client = { path = "../firestore-client" }
+serde.workspace = true
 tokio.workspace = true

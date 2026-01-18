@@ -1082,6 +1082,8 @@ dependencies = [
  "application",
  "async-trait",
  "domain",
+ "firestore-client",
+ "serde",
  "tokio",
 ]
 
