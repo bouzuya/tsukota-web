@@ -36,9 +36,6 @@ enum E {
     #[error("get document")]
     GetDocument(#[source] tonic::Status),
 
-    #[error("invalid value for document fields")]
-    InvalidValueForDocumentFields,
-
     #[error("list documents")]
     ListDocuments(#[source] tonic::Status),
 
@@ -166,13 +163,7 @@ impl FirestoreClient {
                 .unwrap_or_else(|| document_name.root_document_name().to_string()),
             document: Some(google::firestore::v1::Document {
                 name: String::new(),
-                fields: match value {
-                    google::firestore::v1::Value {
-                        value_type:
-                            Some(google::firestore::v1::value::ValueType::MapValue(map_value)),
-                    } => Ok(map_value.fields),
-                    _ => Err(E::InvalidValueForDocumentFields),
-                }?,
+                fields: Self::extract_fields(value),
                 create_time: None,
                 update_time: None,
             }),
@@ -396,13 +387,7 @@ impl FirestoreClient {
             update_mask,
             document: Some(google::firestore::v1::Document {
                 create_time: None,
-                fields: match value {
-                    google::firestore::v1::Value {
-                        value_type:
-                            Some(google::firestore::v1::value::ValueType::MapValue(map_value)),
-                    } => Ok(map_value.fields),
-                    _ => Err(E::InvalidValueForDocumentFields),
-                }?,
+                fields: Self::extract_fields(value),
                 name: document_name.to_string(),
                 update_time: None,
             }),
@@ -440,13 +425,7 @@ impl FirestoreClient {
             update_mask,
             document: Some(google::firestore::v1::Document {
                 create_time: None,
-                fields: match value {
-                    google::firestore::v1::Value {
-                        value_type:
-                            Some(google::firestore::v1::value::ValueType::MapValue(map_value)),
-                    } => Ok(map_value.fields),
-                    _ => Err(E::InvalidValueForDocumentFields),
-                }?,
+                fields: Self::extract_fields(value),
                 name: document_name.to_string(),
                 update_time: None,
             }),
