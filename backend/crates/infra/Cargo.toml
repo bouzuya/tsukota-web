@@ -11,4 +11,5 @@ async-trait.workspace = true
 domain = { path = "../domain" }
 firestore-client = { path = "../firestore-client" }
 serde.workspace = true
+thiserror.workspace = true
 tokio.workspace = true

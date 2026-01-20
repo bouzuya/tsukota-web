@@ -6,6 +6,22 @@ use domain::account::AccountId;
 use firestore_client::path::{CollectionPath, DocumentPath};
 use firestore_client::FirestoreClient;
 
+/// Internal error type for FirestoreEventStore operations
+#[derive(Debug, thiserror::Error)]
+enum E {
+    #[error("invalid path: {0}")]
+    InvalidPath(String),
+
+    #[error("firestore client: {0}")]
+    FirestoreClient(#[from] firestore_client::Error),
+}
+
+impl From<E> for ApplicationError {
+    fn from(e: E) -> Self {
+        ApplicationError::Repository(e.to_string())
+    }
+}
+
 /// Firestore-based event store implementation
 #[derive(Clone)]
 pub struct FirestoreEventStore {
@@ -19,46 +35,46 @@ impl FirestoreEventStore {
     }
 
     /// Get the path to an event stream document: `accounts/{accountId}`
-    fn event_stream_path(account_id: &AccountId) -> Result<DocumentPath, ApplicationError> {
+    fn event_stream_path(account_id: &AccountId) -> Result<DocumentPath, E> {
         let path_str = format!("accounts/{}", account_id);
         path_str
             .parse()
-            .map_err(|_| ApplicationError::Repository(format!("Invalid path: {}", path_str)))
+            .map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to the events collection: `accounts/{accountId}/events`
-    fn events_collection_path(account_id: &AccountId) -> Result<CollectionPath, ApplicationError> {
+    fn events_collection_path(account_id: &AccountId) -> Result<CollectionPath, E> {
         let path_str = format!("accounts/{}/events", account_id);
         path_str
             .parse()
-            .map_err(|_| ApplicationError::Repository(format!("Invalid path: {}", path_str)))
+            .map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to an event document: `accounts/{accountId}/events/{eventId}`
-    fn event_path(account_id: &AccountId, event_id: &str) -> Result<DocumentPath, ApplicationError> {
+    fn event_path(account_id: &AccountId, event_id: &str) -> Result<DocumentPath, E> {
         let path_str = format!("accounts/{}/events/{}", account_id, event_id);
         path_str
             .parse()
-            .map_err(|_| ApplicationError::Repository(format!("Invalid path: {}", path_str)))
+            .map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to a query event document: `accountsForQuery/{accountId}/events/{eventId}`
     fn query_event_path(
         account_id: &AccountId,
         event_id: &str,
-    ) -> Result<DocumentPath, ApplicationError> {
+    ) -> Result<DocumentPath, E> {
         let path_str = format!("accountsForQuery/{}/events/{}", account_id, event_id);
         path_str
             .parse()
-            .map_err(|_| ApplicationError::Repository(format!("Invalid path: {}", path_str)))
+            .map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to a user document: `users/{uid}`
-    fn user_path(uid: &str) -> Result<DocumentPath, ApplicationError> {
+    fn user_path(uid: &str) -> Result<DocumentPath, E> {
         let path_str = format!("users/{}", uid);
         path_str
             .parse()
-            .map_err(|_| ApplicationError::Repository(format!("Invalid path: {}", path_str)))
+            .map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Extract event ID from an AccountEvent
@@ -123,6 +139,22 @@ impl EventStoreRepository for FirestoreEventStore {
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<AccountEvent>, ApplicationError> {
+        self.load_events_impl(account_id).await.map_err(Into::into)
+    }
+
+    async fn save_events(
+        &self,
+        account_id: &AccountId,
+        events: Vec<AccountEvent>,
+    ) -> Result<(), ApplicationError> {
+        self.save_events_impl(account_id, events)
+            .await
+            .map_err(Into::into)
+    }
+}
+
+impl FirestoreEventStore {
+    async fn load_events_impl(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
         let collection_path = Self::events_collection_path(account_id)?;
 
         let mut all_events = Vec::new();
@@ -132,14 +164,10 @@ impl EventStoreRepository for FirestoreEventStore {
             let response = self
                 .client
                 .list_documents(collection_path.clone(), page_token)
-                .await
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+                .await?;
 
             for doc in response.documents {
-                let event: AccountEvent = self
-                    .client
-                    .deserialize(doc.fields)
-                    .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+                let event: AccountEvent = self.client.deserialize(doc.fields)?;
                 all_events.push(event);
             }
 
@@ -155,32 +183,24 @@ impl EventStoreRepository for FirestoreEventStore {
         Ok(all_events)
     }
 
-    async fn save_events(
+    async fn save_events_impl(
         &self,
         account_id: &AccountId,
         events: Vec<AccountEvent>,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<(), E> {
         if events.is_empty() {
             return Ok(());
         }
 
         // Begin transaction
-        let transaction = self
-            .client
-            .begin_transaction()
-            .await
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+        let transaction = self.client.begin_transaction().await?;
 
         // Read current event stream document (for optimistic locking)
         let event_stream_path = Self::event_stream_path(account_id)?;
         let existing_stream = self
             .client
             .get_document_with_tx(event_stream_path.clone(), &transaction)
-            .await
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-
-        // Determine if this is a new account or an existing one
-        let is_new_account = existing_stream.is_none();
+            .await?;
 
         // Get the last event to update the event stream
         let last_event = events.last().expect("events is non-empty");
@@ -190,7 +210,10 @@ impl EventStoreRepository for FirestoreEventStore {
         // Build writes for all events
         let mut writes = Vec::new();
 
-        // Collect user updates (owner changes)
+        // Collect user updates (owner changes).
+        // Since we use a HashMap keyed by owner UID, each owner will have at most one
+        // UserUpdateAction. This is sufficient because within a single save_events call,
+        // the final state of each owner's relationship to this account is what matters.
         let mut user_updates: std::collections::HashMap<String, UserUpdateAction> =
             std::collections::HashMap::new();
 
@@ -199,18 +222,12 @@ impl EventStoreRepository for FirestoreEventStore {
 
             // Write to accounts/{accountId}/events/{eventId}
             let event_path = Self::event_path(account_id, event_id)?;
-            let event_value = self
-                .client
-                .serialize(event)
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+            let event_value = self.client.serialize(event)?;
             writes.push(self.client.build_create_write(event_path, event_value));
 
             // Write to accountsForQuery/{accountId}/events/{eventId}
             let query_event_path = Self::query_event_path(account_id, event_id)?;
-            let query_event_value = self
-                .client
-                .serialize(event)
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+            let query_event_value = self.client.serialize(event)?;
             writes.push(
                 self.client
                     .build_create_write(query_event_path, query_event_value),
@@ -223,68 +240,86 @@ impl EventStoreRepository for FirestoreEventStore {
                         user_updates.insert(owner.clone(), UserUpdateAction::AddAccount);
                     }
                 }
+                AccountEvent::AccountDeleted { .. } => {}
+                AccountEvent::AccountUpdated { .. } => {}
+                AccountEvent::CategoryAdded { .. } => {}
+                AccountEvent::CategoryDeleted { .. } => {}
+                AccountEvent::CategoryUpdated { .. } => {}
                 AccountEvent::OwnerAdded { owner, .. } => {
                     user_updates.insert(owner.clone(), UserUpdateAction::AddAccount);
                 }
                 AccountEvent::OwnerRemoved { owner, .. } => {
                     user_updates.insert(owner.clone(), UserUpdateAction::RemoveAccount);
                 }
-                _ => {}
+                AccountEvent::TransactionAdded { .. } => {}
+                AccountEvent::TransactionDeleted { .. } => {}
+                AccountEvent::TransactionUpdated { .. } => {}
             }
         }
 
-        // Build event stream document write
-        if is_new_account {
-            // Get owners from the first event (should be AccountCreated)
-            let owners = match &events[0] {
-                AccountEvent::AccountCreated { owners, .. } => owners.clone(),
-                _ => vec![],
-            };
+        // Build event stream document write based on whether this is a new or existing account
+        match existing_stream {
+            None => {
+                // New account - get owners from the first event (should be AccountCreated)
+                let owners = match &events[0] {
+                    AccountEvent::AccountCreated { owners, .. } => owners.clone(),
+                    AccountEvent::AccountDeleted { .. } => vec![],
+                    AccountEvent::AccountUpdated { .. } => vec![],
+                    AccountEvent::CategoryAdded { .. } => vec![],
+                    AccountEvent::CategoryDeleted { .. } => vec![],
+                    AccountEvent::CategoryUpdated { .. } => vec![],
+                    AccountEvent::OwnerAdded { .. } => vec![],
+                    AccountEvent::OwnerRemoved { .. } => vec![],
+                    AccountEvent::TransactionAdded { .. } => vec![],
+                    AccountEvent::TransactionDeleted { .. } => vec![],
+                    AccountEvent::TransactionUpdated { .. } => vec![],
+                };
 
-            let event_stream = EventStreamDocument {
-                id: account_id.to_string(),
-                last_event_id: last_event_id.to_string(),
-                owners,
-                protocol_version: PROTOCOL_VERSION,
-                updated_at: last_event_at.to_string(),
-            };
+                let event_stream = EventStreamDocument {
+                    id: account_id.to_string(),
+                    last_event_id: last_event_id.to_string(),
+                    owners,
+                    protocol_version: PROTOCOL_VERSION,
+                    updated_at: last_event_at.to_string(),
+                };
 
-            let value = self
-                .client
-                .serialize(&event_stream)
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-            writes.push(self.client.build_create_write(event_stream_path, value));
-        } else {
-            // Update existing event stream
-            let existing_doc = existing_stream.expect("checked above");
-            let mut event_stream: EventStreamDocument = self
-                .client
-                .deserialize(existing_doc.fields)
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-
-            // Update owners based on events
-            for event in &events {
-                match event {
-                    AccountEvent::OwnerAdded { owner, .. } => {
-                        if !event_stream.owners.contains(owner) {
-                            event_stream.owners.push(owner.clone());
-                        }
-                    }
-                    AccountEvent::OwnerRemoved { owner, .. } => {
-                        event_stream.owners.retain(|o| o != owner);
-                    }
-                    _ => {}
-                }
+                let value = self.client.serialize(&event_stream)?;
+                writes.push(self.client.build_create_write(event_stream_path, value));
             }
+            Some(existing_doc) => {
+                // Existing account - update the event stream
+                let mut event_stream: EventStreamDocument =
+                    self.client.deserialize(existing_doc.fields)?;
 
-            event_stream.last_event_id = last_event_id.to_string();
-            event_stream.updated_at = last_event_at.to_string();
+                // Update owners based on events
+                for event in &events {
+                    match event {
+                        AccountEvent::AccountCreated { .. } => {}
+                        AccountEvent::AccountDeleted { .. } => {}
+                        AccountEvent::AccountUpdated { .. } => {}
+                        AccountEvent::CategoryAdded { .. } => {}
+                        AccountEvent::CategoryDeleted { .. } => {}
+                        AccountEvent::CategoryUpdated { .. } => {}
+                        AccountEvent::OwnerAdded { owner, .. } => {
+                            if !event_stream.owners.contains(owner) {
+                                event_stream.owners.push(owner.clone());
+                            }
+                        }
+                        AccountEvent::OwnerRemoved { owner, .. } => {
+                            event_stream.owners.retain(|o| o != owner);
+                        }
+                        AccountEvent::TransactionAdded { .. } => {}
+                        AccountEvent::TransactionDeleted { .. } => {}
+                        AccountEvent::TransactionUpdated { .. } => {}
+                    }
+                }
 
-            let value = self
-                .client
-                .serialize(&event_stream)
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-            writes.push(self.client.build_update_write(event_stream_path, value));
+                event_stream.last_event_id = last_event_id.to_string();
+                event_stream.updated_at = last_event_at.to_string();
+
+                let value = self.client.serialize(&event_stream)?;
+                writes.push(self.client.build_update_write(event_stream_path, value));
+            }
         }
 
         // Build user document writes
@@ -295,14 +330,10 @@ impl EventStoreRepository for FirestoreEventStore {
             let existing_user = self
                 .client
                 .get_document_with_tx(user_path.clone(), &transaction)
-                .await
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+                .await?;
 
             let mut user_doc = match existing_user {
-                Some(doc) => self
-                    .client
-                    .deserialize::<UserDocument>(doc.fields)
-                    .map_err(|e| ApplicationError::Repository(e.to_string()))?,
+                Some(doc) => self.client.deserialize::<UserDocument>(doc.fields)?,
                 None => UserDocument {
                     id: uid.clone(),
                     account_ids: vec![],
@@ -321,18 +352,12 @@ impl EventStoreRepository for FirestoreEventStore {
                 }
             }
 
-            let value = self
-                .client
-                .serialize(&user_doc)
-                .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+            let value = self.client.serialize(&user_doc)?;
             writes.push(self.client.build_set_write(user_path, value));
         }
 
         // Commit transaction
-        self.client
-            .commit(&transaction, writes)
-            .await
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+        self.client.commit(&transaction, writes).await?;
 
         Ok(())
     }
