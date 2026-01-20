@@ -3,8 +3,8 @@ use application::repository::EventStoreRepository;
 use async_trait::async_trait;
 use domain::account::AccountEvent;
 use domain::account::AccountId;
-use firestore_client::path::{CollectionPath, DocumentPath};
 use firestore_client::FirestoreClient;
+use firestore_client::path::{CollectionPath, DocumentPath};
 
 /// Internal error type for FirestoreEventStore operations
 #[derive(Debug, thiserror::Error)]
@@ -37,77 +37,64 @@ impl FirestoreEventStore {
     /// Get the path to an event stream document: `accounts/{accountId}`
     fn event_stream_path(account_id: &AccountId) -> Result<DocumentPath, E> {
         let path_str = format!("accounts/{}", account_id);
-        path_str
-            .parse()
-            .map_err(|_| E::InvalidPath(path_str))
+        path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to the events collection: `accounts/{accountId}/events`
     fn events_collection_path(account_id: &AccountId) -> Result<CollectionPath, E> {
         let path_str = format!("accounts/{}/events", account_id);
-        path_str
-            .parse()
-            .map_err(|_| E::InvalidPath(path_str))
+        path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to an event document: `accounts/{accountId}/events/{eventId}`
     fn event_path(account_id: &AccountId, event_id: &str) -> Result<DocumentPath, E> {
         let path_str = format!("accounts/{}/events/{}", account_id, event_id);
-        path_str
-            .parse()
-            .map_err(|_| E::InvalidPath(path_str))
+        path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to a query event document: `accountsForQuery/{accountId}/events/{eventId}`
-    fn query_event_path(
-        account_id: &AccountId,
-        event_id: &str,
-    ) -> Result<DocumentPath, E> {
+    fn query_event_path(account_id: &AccountId, event_id: &str) -> Result<DocumentPath, E> {
         let path_str = format!("accountsForQuery/{}/events/{}", account_id, event_id);
-        path_str
-            .parse()
-            .map_err(|_| E::InvalidPath(path_str))
+        path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to a user document: `users/{uid}`
     fn user_path(uid: &str) -> Result<DocumentPath, E> {
         let path_str = format!("users/{}", uid);
-        path_str
-            .parse()
-            .map_err(|_| E::InvalidPath(path_str))
+        path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Extract event ID from an AccountEvent
     fn get_event_id(event: &AccountEvent) -> &str {
         match event {
-            AccountEvent::AccountCreated { common, .. } => &common.id,
-            AccountEvent::AccountDeleted { common, .. } => &common.id,
-            AccountEvent::AccountUpdated { common, .. } => &common.id,
-            AccountEvent::CategoryAdded { common, .. } => &common.id,
-            AccountEvent::CategoryDeleted { common, .. } => &common.id,
-            AccountEvent::CategoryUpdated { common, .. } => &common.id,
-            AccountEvent::OwnerAdded { common, .. } => &common.id,
-            AccountEvent::OwnerRemoved { common, .. } => &common.id,
-            AccountEvent::TransactionAdded { common, .. } => &common.id,
-            AccountEvent::TransactionDeleted { common, .. } => &common.id,
-            AccountEvent::TransactionUpdated { common, .. } => &common.id,
+            AccountEvent::AccountCreated { common, .. }
+            | AccountEvent::AccountDeleted { common, .. }
+            | AccountEvent::AccountUpdated { common, .. }
+            | AccountEvent::CategoryAdded { common, .. }
+            | AccountEvent::CategoryDeleted { common, .. }
+            | AccountEvent::CategoryUpdated { common, .. }
+            | AccountEvent::OwnerAdded { common, .. }
+            | AccountEvent::OwnerRemoved { common, .. }
+            | AccountEvent::TransactionAdded { common, .. }
+            | AccountEvent::TransactionDeleted { common, .. }
+            | AccountEvent::TransactionUpdated { common, .. } => &common.id,
         }
     }
 
     /// Extract the `at` timestamp from an AccountEvent
     fn get_event_at(event: &AccountEvent) -> &str {
         match event {
-            AccountEvent::AccountCreated { common, .. } => &common.at,
-            AccountEvent::AccountDeleted { common, .. } => &common.at,
-            AccountEvent::AccountUpdated { common, .. } => &common.at,
-            AccountEvent::CategoryAdded { common, .. } => &common.at,
-            AccountEvent::CategoryDeleted { common, .. } => &common.at,
-            AccountEvent::CategoryUpdated { common, .. } => &common.at,
-            AccountEvent::OwnerAdded { common, .. } => &common.at,
-            AccountEvent::OwnerRemoved { common, .. } => &common.at,
-            AccountEvent::TransactionAdded { common, .. } => &common.at,
-            AccountEvent::TransactionDeleted { common, .. } => &common.at,
-            AccountEvent::TransactionUpdated { common, .. } => &common.at,
+            AccountEvent::AccountCreated { common, .. }
+            | AccountEvent::AccountDeleted { common, .. }
+            | AccountEvent::AccountUpdated { common, .. }
+            | AccountEvent::CategoryAdded { common, .. }
+            | AccountEvent::CategoryDeleted { common, .. }
+            | AccountEvent::CategoryUpdated { common, .. }
+            | AccountEvent::OwnerAdded { common, .. }
+            | AccountEvent::OwnerRemoved { common, .. }
+            | AccountEvent::TransactionAdded { common, .. }
+            | AccountEvent::TransactionDeleted { common, .. }
+            | AccountEvent::TransactionUpdated { common, .. } => &common.at,
         }
     }
 }
@@ -240,20 +227,22 @@ impl FirestoreEventStore {
                         user_updates.insert(owner.clone(), UserUpdateAction::AddAccount);
                     }
                 }
-                AccountEvent::AccountDeleted { .. } => {}
-                AccountEvent::AccountUpdated { .. } => {}
-                AccountEvent::CategoryAdded { .. } => {}
-                AccountEvent::CategoryDeleted { .. } => {}
-                AccountEvent::CategoryUpdated { .. } => {}
                 AccountEvent::OwnerAdded { owner, .. } => {
                     user_updates.insert(owner.clone(), UserUpdateAction::AddAccount);
                 }
                 AccountEvent::OwnerRemoved { owner, .. } => {
                     user_updates.insert(owner.clone(), UserUpdateAction::RemoveAccount);
                 }
-                AccountEvent::TransactionAdded { .. } => {}
-                AccountEvent::TransactionDeleted { .. } => {}
-                AccountEvent::TransactionUpdated { .. } => {}
+                AccountEvent::AccountDeleted { .. }
+                | AccountEvent::AccountUpdated { .. }
+                | AccountEvent::CategoryAdded { .. }
+                | AccountEvent::CategoryDeleted { .. }
+                | AccountEvent::CategoryUpdated { .. }
+                | AccountEvent::TransactionAdded { .. }
+                | AccountEvent::TransactionDeleted { .. }
+                | AccountEvent::TransactionUpdated { .. } => {
+                    // do nothing
+                }
             }
         }
 
@@ -263,16 +252,16 @@ impl FirestoreEventStore {
                 // New account - get owners from the first event (should be AccountCreated)
                 let owners = match &events[0] {
                     AccountEvent::AccountCreated { owners, .. } => owners.clone(),
-                    AccountEvent::AccountDeleted { .. } => vec![],
-                    AccountEvent::AccountUpdated { .. } => vec![],
-                    AccountEvent::CategoryAdded { .. } => vec![],
-                    AccountEvent::CategoryDeleted { .. } => vec![],
-                    AccountEvent::CategoryUpdated { .. } => vec![],
-                    AccountEvent::OwnerAdded { .. } => vec![],
-                    AccountEvent::OwnerRemoved { .. } => vec![],
-                    AccountEvent::TransactionAdded { .. } => vec![],
-                    AccountEvent::TransactionDeleted { .. } => vec![],
-                    AccountEvent::TransactionUpdated { .. } => vec![],
+                    AccountEvent::AccountDeleted { .. }
+                    | AccountEvent::AccountUpdated { .. }
+                    | AccountEvent::CategoryAdded { .. }
+                    | AccountEvent::CategoryDeleted { .. }
+                    | AccountEvent::CategoryUpdated { .. }
+                    | AccountEvent::OwnerAdded { .. }
+                    | AccountEvent::OwnerRemoved { .. }
+                    | AccountEvent::TransactionAdded { .. }
+                    | AccountEvent::TransactionDeleted { .. }
+                    | AccountEvent::TransactionUpdated { .. } => vec![],
                 };
 
                 let event_stream = EventStreamDocument {
@@ -294,12 +283,6 @@ impl FirestoreEventStore {
                 // Update owners based on events
                 for event in &events {
                     match event {
-                        AccountEvent::AccountCreated { .. } => {}
-                        AccountEvent::AccountDeleted { .. } => {}
-                        AccountEvent::AccountUpdated { .. } => {}
-                        AccountEvent::CategoryAdded { .. } => {}
-                        AccountEvent::CategoryDeleted { .. } => {}
-                        AccountEvent::CategoryUpdated { .. } => {}
                         AccountEvent::OwnerAdded { owner, .. } => {
                             if !event_stream.owners.contains(owner) {
                                 event_stream.owners.push(owner.clone());
@@ -308,9 +291,15 @@ impl FirestoreEventStore {
                         AccountEvent::OwnerRemoved { owner, .. } => {
                             event_stream.owners.retain(|o| o != owner);
                         }
-                        AccountEvent::TransactionAdded { .. } => {}
-                        AccountEvent::TransactionDeleted { .. } => {}
-                        AccountEvent::TransactionUpdated { .. } => {}
+                        AccountEvent::AccountCreated { .. }
+                        | AccountEvent::AccountDeleted { .. }
+                        | AccountEvent::AccountUpdated { .. }
+                        | AccountEvent::CategoryAdded { .. }
+                        | AccountEvent::CategoryDeleted { .. }
+                        | AccountEvent::CategoryUpdated { .. }
+                        | AccountEvent::TransactionAdded { .. }
+                        | AccountEvent::TransactionDeleted { .. }
+                        | AccountEvent::TransactionUpdated { .. } => {}
                     }
                 }
 
