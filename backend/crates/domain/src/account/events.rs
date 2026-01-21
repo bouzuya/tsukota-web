@@ -126,7 +126,7 @@ mod tests {
             account_id: "550e8400-e29b-41d4-a716-446655440000".to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
             id: "evt-123".to_string(),
-            protocol_version: 1,
+            protocol_version: 3,
         }
     }
 

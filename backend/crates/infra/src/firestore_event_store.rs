@@ -118,8 +118,6 @@ struct UserDocument {
     account_ids: Vec<String>,
 }
 
-const PROTOCOL_VERSION: u32 = 2;
-
 #[async_trait]
 impl EventStoreRepository for FirestoreEventStore {
     async fn load_events(
@@ -268,7 +266,7 @@ impl FirestoreEventStore {
                     id: account_id.to_string(),
                     last_event_id: last_event_id.to_string(),
                     owners,
-                    protocol_version: PROTOCOL_VERSION,
+                    protocol_version: domain::Account::PROTOCOL_VERSION,
                     updated_at: last_event_at.to_string(),
                 };
 

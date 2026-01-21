@@ -94,6 +94,8 @@ impl Default for Account {
 }
 
 impl Account {
+    pub const PROTOCOL_VERSION: u32 = 3;
+
     /// 新しい空の集約を作成
     pub fn new() -> Self {
         Self::Empty
@@ -600,7 +602,7 @@ impl Account {
             account_id: account_id.to_string(),
             at: chrono::Utc::now().to_rfc3339(),
             id: uuid::Uuid::new_v4().to_string(),
-            protocol_version: 1,
+            protocol_version: Self::PROTOCOL_VERSION,
         }
     }
 }
@@ -660,7 +662,7 @@ mod tests {
             account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
             id: "evt-1".to_string(),
-            protocol_version: 1,
+            protocol_version: Account::PROTOCOL_VERSION,
         };
 
         let events = vec![AccountEvent::AccountCreated {
@@ -693,7 +695,7 @@ mod tests {
             account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
             id: "evt-1".to_string(),
-            protocol_version: 1,
+            protocol_version: Account::PROTOCOL_VERSION,
         };
 
         let mut account = Account::new();
@@ -727,7 +729,7 @@ mod tests {
             account_id: account_uuid.to_string(),
             at: "2024-01-01T00:00:00Z".to_string(),
             id: "evt-1".to_string(),
-            protocol_version: 1,
+            protocol_version: Account::PROTOCOL_VERSION,
         };
 
         let mut account = Account::new();
