@@ -34,27 +34,30 @@ impl FirestoreEventStore {
         Self { client }
     }
 
-    /// Get the path to an event stream document: `accounts/{accountId}`
+    /// Get the path to an event stream document: `aggregates/account/event_streams/{account_id}`
     fn event_stream_path(account_id: &AccountId) -> Result<DocumentPath, E> {
-        let path_str = format!("accounts/{}", account_id);
+        let path_str = format!("aggregates/account/event_streams/{}", account_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
-    /// Get the path to the events collection: `accounts/{accountId}/events`
+    /// Get the path to the events collection: `aggregates/account/event_streams/{account_id}/events`
     fn events_collection_path(account_id: &AccountId) -> Result<CollectionPath, E> {
-        let path_str = format!("accounts/{}/events", account_id);
+        let path_str = format!("aggregates/account/event_streams/{}/events", account_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
-    /// Get the path to an event document: `accounts/{accountId}/events/{eventId}`
+    /// Get the path to an event document: `aggregates/account/event_streams/{account_id}/events/{eventId}`
     fn event_path(account_id: &AccountId, event_id: &str) -> Result<DocumentPath, E> {
-        let path_str = format!("accounts/{}/events/{}", account_id, event_id);
+        let path_str = format!(
+            "aggregates/account/event_streams/{}/events/{}",
+            account_id, event_id
+        );
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
-    /// Get the path to a query event document: `accountsForQuery/{accountId}/events/{eventId}`
+    /// Get the path to a query event document: `accounts/{accountId}/events/{eventId}`
     fn query_event_path(account_id: &AccountId, event_id: &str) -> Result<DocumentPath, E> {
-        let path_str = format!("accountsForQuery/{}/events/{}", account_id, event_id);
+        let path_str = format!("accounts/{}/events/{}", account_id, event_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
