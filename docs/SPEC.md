@@ -61,67 +61,74 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 以下のデータモデルは API レスポンスおよび読み取りモデル (Projection) を表します。
 アカウント、カテゴリ、取引の実体はイベントソーシングにより管理されます（詳細は [ARCHITECTURE.md](./ARCHITECTURE.md) 参照）。
 
-### User
+### User (※未実装)
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | id | string | ユーザー ID (Firebase Auth UID) |
 | email | string | メールアドレス |
-| displayName | string | 表示名 |
-| createdAt | timestamp | 作成日時 |
+| display_name | string | 表示名 |
+| created_at | string | 作成日時 (ISO 8601) |
 
 ### Account (アカウント)
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | アカウント ID |
+| id | string | アカウント ID (UUID) |
 | name | string | アカウント名 |
-| ownerIds | string[] | オーナーのユーザー ID 一覧 |
-| createdAt | timestamp | 作成日時 |
-| updatedAt | timestamp | 更新日時 |
+| owner_ids | string[] | オーナーのユーザー ID 一覧 |
+| created_at | string | 作成日時 (ISO 8601) |
+| updated_at | string | 更新日時 (ISO 8601) |
 
 ### Category
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | カテゴリ ID |
-| accountId | string | 所属するアカウント ID |
+| id | string | カテゴリ ID (UUID) |
+| account_id | string | 所属するアカウント ID |
 | name | string | カテゴリ名 |
-| createdAt | timestamp | 作成日時 |
-| deletedAt | timestamp? | 削除日時 (論理削除) |
+| created_at | string | 作成日時 (ISO 8601) |
+| deleted_at | string? | 削除日時 (論理削除、ISO 8601) |
 
 ### Transaction (収支記録)
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | 取引 ID |
-| accountId | string | 所属するアカウント ID |
+| id | string | 取引 ID (UUID) |
+| account_id | string | 所属するアカウント ID |
 | amount | string | 金額 (文字列形式) |
-| categoryId | string | カテゴリ ID |
-| date | string | 取引日 (ISO 8601 format: YYYY-MM-DD) |
+| category_id | string | カテゴリ ID |
+| date | string | 取引日 (YYYY-MM-DD) |
 | comment | string | コメント |
-| createdAt | timestamp | 作成日時 |
-| updatedAt | timestamp | 更新日時 |
+| created_at | string | 作成日時 (ISO 8601) |
+| updated_at | string | 更新日時 (ISO 8601) |
+
+### PaginatedList (ページネーション)
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| items | T[] | データの配列 |
+| next_cursor | string? | 次ページのカーソル (null の場合は最終ページ) |
 
 ## API エンドポイント
 
 API は更新系と参照系で異なるパス設計を採用しています。
 
 - **更新系 (Commands)**: `POST /commands/{use_case_name}` - すべてのパラメーターをリクエストボディに含める
-- **参照系 (Queries)**: リソースベースのパス - `GET /accounts/:id/...`
+- **参照系 (Queries)**: リソースベースのパス - `GET /accounts/{id}/...`
 
 ### コマンドレスポンス形式
 
-作成系コマンドは作成されたリソースの ID を返します。更新・削除系コマンドは空のレスポンス（204 No Content）を返します。
+作成系コマンドは作成されたリソースの ID を返します (201 Created)。更新・削除系コマンドは空のレスポンス (204 No Content) を返します。
 
-| コマンド | レスポンス |
-|----------|-----------|
-| `create_account` | `{ account_id: string }` |
-| `add_category` | `{ category_id: string }` |
-| `add_transaction` | `{ transaction_id: string }` |
-| その他 (update/delete) | 空 (204 No Content) |
+| コマンド | ステータス | レスポンス |
+|----------|-----------|-----------|
+| `create_account` | 201 | `{ "account_id": string }` |
+| `add_category` | 201 | `{ "category_id": string }` |
+| `add_transaction` | 201 | `{ "transaction_id": string }` |
+| その他 (update/delete) | 204 | 空 |
 
-### 認証
+### 認証 (※未実装)
 
 - `GET /auth/google` - Google OAuth 開始
 - `GET /auth/callback` - OAuth コールバック
@@ -129,62 +136,70 @@ API は更新系と参照系で異なるパス設計を採用しています。
 - `GET /auth/me` - 現在のユーザー情報取得
 - `POST /auth/refresh` - トークンリフレッシュ
 
-### ユーザー (参照系)
+### ユーザー (※未実装)
 
-- `GET /users/:id` - ユーザー情報取得
-
-### ユーザー (更新系)
-
+- `GET /users/{id}` - ユーザー情報取得
 - `POST /commands/update_user` - ユーザー情報更新
-  - body: `{ user_id, display_name }`
+  - body: `{ "user_id": string, "display_name": string }`
 
 ### アカウント (参照系)
 
 - `GET /accounts` - アカウント一覧取得 (オーナーのアカウント)
-- `GET /accounts/:id` - アカウント詳細取得
+  - response: `PaginatedList<Account>`
+- `GET /accounts/{account_id}` - アカウント詳細取得
+  - response: `Account`
 
 ### アカウント (更新系)
 
 - `POST /commands/create_account` - アカウント作成
-  - body: `{ name }`
+  - body: `{ "name": string }`
+  - response: `{ "account_id": string }`
 - `POST /commands/update_account` - アカウント更新
-  - body: `{ account_id, name }`
+  - body: `{ "account_id": string, "name": string }`
 - `POST /commands/delete_account` - アカウント削除
-  - body: `{ account_id }`
+  - body: `{ "account_id": string }`
 - `POST /commands/add_owner` - オーナー追加
-  - body: `{ account_id, user_id }`
+  - body: `{ "account_id": string, "user_id": string }`
 - `POST /commands/remove_owner` - オーナー削除
-  - body: `{ account_id, user_id }`
+  - body: `{ "account_id": string, "user_id": string }`
 
 ### カテゴリ (参照系)
 
-- `GET /accounts/:id/categories` - カテゴリ一覧取得
+- `GET /accounts/{account_id}/categories` - カテゴリ一覧取得
+  - response: `PaginatedList<Category>`
 
 ### カテゴリ (更新系)
 
 - `POST /commands/add_category` - カテゴリ作成
-  - body: `{ account_id, name }`
+  - body: `{ "account_id": string, "name": string }`
+  - response: `{ "category_id": string }`
 - `POST /commands/update_category` - カテゴリ更新
-  - body: `{ account_id, category_id, name }`
+  - body: `{ "account_id": string, "category_id": string, "name": string }`
 - `POST /commands/delete_category` - カテゴリ削除
-  - body: `{ account_id, category_id }`
+  - body: `{ "account_id": string, "category_id": string }`
 
 ### 収支記録 (参照系)
 
-- `GET /accounts/:id/transactions` - 取引一覧取得 (20件/ページ、日付降順、cursor ベース: `?after=<id>`)
+- `GET /accounts/{account_id}/transactions` - 取引一覧取得
+  - query: `?after=<cursor>` (オプション)
+  - ページサイズ: 20件、日付降順
+  - response: `PaginatedList<Transaction>`
 
 ### 収支記録 (更新系)
 
 - `POST /commands/add_transaction` - 取引作成
-  - body: `{ account_id, amount, category_id, comment, date }`
+  - body: `{ "account_id": string, "amount": string, "category_id": string, "comment": string, "date": string }`
+  - response: `{ "transaction_id": string }`
 - `POST /commands/update_transaction` - 取引更新
-  - body: `{ account_id, transaction_id, amount, category_id, comment, date }`
+  - body: `{ "account_id": string, "transaction_id": string, "amount": string, "category_id": string, "comment": string, "date": string }`
 - `POST /commands/delete_transaction` - 取引削除
-  - body: `{ account_id, transaction_id }`
+  - body: `{ "account_id": string, "transaction_id": string }`
 
 ### エクスポート (参照系)
 
-- `GET /accounts/:id/export/json?year=YYYY&month=MM` - JSON エクスポート (月別)
+- `GET /accounts/{account_id}/export/json` - JSON エクスポート (月別)
+  - query: `?year=YYYY&month=MM` (必須)
+  - response: `PaginatedList<Transaction>`
 
 ## 画面一覧
 
