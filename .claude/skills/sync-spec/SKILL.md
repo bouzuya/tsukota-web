@@ -1,6 +1,9 @@
-# 実装→仕様同期コマンド
+---
+name: sync-spec
+description: docs/SPEC.md を実装と同期します。実装に合わせて SPEC.md を更新します。
+---
 
-docs/SPEC.md を実装と同期します。
+# 実装→仕様同期コマンド
 
 ## 手順
 
