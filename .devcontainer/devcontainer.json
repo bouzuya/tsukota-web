@@ -21,6 +21,7 @@
 		"ghcr.io/devcontainers/features/rust:1": {}
 	},
 	"name": "tsukota-web",
+	"remoteUser": "vscode",
 	"service": "workspace",
 	"workspaceFolder": "/workspaces/tsukota-web"
 }
