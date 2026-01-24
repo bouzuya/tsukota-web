@@ -1,22 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAtomValue } from "jotai";
-import {
-	getAccount,
-	updateAccount,
-	deleteAccount,
-	getExportUrl,
-} from "../api/accounts";
+import { getAccount, updateAccount, deleteAccount } from "../api/accounts";
 import { getUser } from "../api/users";
 import { currentUserAtom } from "../atoms/auth";
 import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
-import { Select } from "../components/Select";
 import { ConfirmModal } from "../components/Modal";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useRequireAuth } from "../hooks/useAuth";
-import { getYearMonthOptions } from "../utils/date";
 import type { Account, User } from "../api/types";
 
 export function AccountSettingsPage() {
@@ -31,7 +24,6 @@ export function AccountSettingsPage() {
 	const [accountName, setAccountName] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
-	const [exportMonth, setExportMonth] = useState("");
 
 	useEffect(() => {
 		async function fetchData() {
@@ -79,14 +71,6 @@ export function AccountSettingsPage() {
 		}
 	};
 
-	const handleExport = () => {
-		if (!id || !exportMonth) return;
-
-		const [year, month] = exportMonth.split("-").map(Number);
-		const url = getExportUrl(id, year, month);
-		window.open(url, "_blank");
-	};
-
 	if (authLoading || loading) {
 		return (
 			<Layout>
@@ -106,8 +90,6 @@ export function AccountSettingsPage() {
 			</Layout>
 		);
 	}
-
-	const yearMonthOptions = getYearMonthOptions();
 
 	return (
 		<Layout>
@@ -164,29 +146,6 @@ export function AccountSettingsPage() {
 					<p className="mt-4 text-sm text-gray-500">
 						オーナーの追加・削除は現在準備中です。
 					</p>
-				</div>
-
-				{/* Export */}
-				<div className="bg-white rounded-lg shadow p-6">
-					<h2 className="text-lg font-semibold text-gray-900 mb-4">
-						データエクスポート
-					</h2>
-					<div className="flex gap-3">
-						<Select
-							options={yearMonthOptions}
-							value={exportMonth}
-							onChange={(e) => setExportMonth(e.target.value)}
-							placeholder="月を選択"
-							className="flex-1"
-						/>
-						<Button
-							variant="secondary"
-							onClick={handleExport}
-							disabled={!exportMonth}
-						>
-							JSONエクスポート
-						</Button>
-					</div>
 				</div>
 
 				{/* Delete Account */}

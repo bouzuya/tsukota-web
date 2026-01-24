@@ -72,11 +72,3 @@ export async function deleteAccount(
 	};
 	return apiPost<void>("/commands/delete_account", apiCommand);
 }
-
-export function getExportUrl(
-	accountId: string,
-	year: number,
-	month: number,
-): string {
-	return `/api/accounts/${accountId}/export/json?year=${year}&month=${month}`;
-}
