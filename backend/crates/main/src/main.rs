@@ -1,7 +1,7 @@
 use api::AppState;
 // use infra::DatabaseName;
 use infra::FirestoreClient;
-use infra::FirestoreEventStore;
+use infra::FirestoreAccountRepository;
 use infra::FirestoreProjection;
 // use infra::InMemoryEventStore;
 // use infra::InMemoryProjection;
@@ -12,7 +12,7 @@ async fn main() {
     // let event_store = InMemoryEventStore::new();
     // let projection = InMemoryProjection::with_events(event_store.events());
     let client = FirestoreClient::connect_with_emulator().await.unwrap();
-    let event_store = FirestoreEventStore::new(client.clone());
+    let event_store = FirestoreAccountRepository::new(client.clone());
     let projection = FirestoreProjection::new(client);
 
     // Create application state with DI

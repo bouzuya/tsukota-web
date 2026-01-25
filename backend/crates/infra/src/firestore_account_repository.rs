@@ -7,7 +7,7 @@ use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;
 
-/// Internal error type for FirestoreEventStore operations
+/// Internal error type for FirestoreAccountRepository operations
 #[derive(Debug, thiserror::Error)]
 enum E {
     #[error("invalid path: {0}")]
@@ -25,12 +25,12 @@ impl From<E> for ApplicationError {
 
 /// Firestore-based event store implementation
 #[derive(Clone)]
-pub struct FirestoreEventStore {
+pub struct FirestoreAccountRepository {
     client: FirestoreClient,
 }
 
-impl FirestoreEventStore {
-    /// Create a new FirestoreEventStore with the given client
+impl FirestoreAccountRepository {
+    /// Create a new FirestoreAccountRepository with the given client
     pub fn new(client: FirestoreClient) -> Self {
         Self { client }
     }
@@ -123,7 +123,7 @@ struct UserDocument {
 }
 
 #[async_trait]
-impl AccountRepository for FirestoreEventStore {
+impl AccountRepository for FirestoreAccountRepository {
     async fn load_events(
         &self,
         account_id: &AccountId,
@@ -142,7 +142,7 @@ impl AccountRepository for FirestoreEventStore {
     }
 }
 
-impl FirestoreEventStore {
+impl FirestoreAccountRepository {
     async fn load_events_impl(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
         let collection_path = Self::events_collection_path(account_id)?;
 
