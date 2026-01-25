@@ -1,6 +1,7 @@
 mod account_id;
 mod category_id;
 mod device_id;
+mod device_secret;
 mod transaction_id;
 mod user_id;
 
@@ -10,6 +11,8 @@ pub use category_id::CategoryId;
 pub use category_id::ParseCategoryIdError;
 pub use device_id::DeviceId;
 pub use device_id::ParseDeviceIdError;
+pub use device_secret::DeviceSecret;
+pub use device_secret::ParseDeviceSecretError;
 pub use transaction_id::ParseTransactionIdError;
 pub use transaction_id::TransactionId;
 pub use user_id::ParseUserIdError;
