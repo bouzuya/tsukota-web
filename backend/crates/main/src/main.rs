@@ -3,7 +3,9 @@ use std::sync::Arc;
 use api::AppState;
 use api::ServiceAccountCredentials;
 use api::Signer;
+use api::Verifier;
 use application::TokenSigner;
+use application::TokenVerifier;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
@@ -35,26 +37,30 @@ async fn main() {
     let category_projection: Arc<dyn CategoryProjection> = Arc::new(projection.clone());
     let transaction_projection: Arc<dyn TransactionProjection> = Arc::new(projection);
 
-    // Create token signer
-    let signer: Arc<dyn TokenSigner> = match ServiceAccountCredentials::load() {
-        Ok(Some(credentials)) => {
-            let signer = Signer::new(&credentials.private_key, credentials.client_email)
-                .expect("Failed to create signer");
-            Arc::new(signer)
-        }
-        Ok(None) => {
-            eprintln!(
-                "WARNING: GOOGLE_APPLICATION_CREDENTIALS not set. \
-                 create_custom_token endpoint will not work."
-            );
-            // ダミー signer を作成（本番では使用不可）
-            Arc::new(DummySigner)
-        }
-        Err(e) => {
-            eprintln!("ERROR: Failed to load credentials: {}", e);
-            std::process::exit(1);
-        }
-    };
+    // Create token signer and verifier
+    let (signer, verifier): (Arc<dyn TokenSigner>, Arc<dyn TokenVerifier>) =
+        match ServiceAccountCredentials::load() {
+            Ok(Some(credentials)) => {
+                let signer =
+                    Signer::new(&credentials.private_key, credentials.client_email.clone())
+                        .expect("Failed to create signer");
+                let verifier = Verifier::new(&credentials.private_key, credentials.client_email)
+                    .expect("Failed to create verifier");
+                (Arc::new(signer), Arc::new(verifier))
+            }
+            Ok(None) => {
+                eprintln!(
+                    "WARNING: GOOGLE_APPLICATION_CREDENTIALS not set. \
+                     Authentication will not work."
+                );
+                // ダミー signer/verifier を作成（本番では使用不可）
+                (Arc::new(DummySigner), Arc::new(DummyVerifier))
+            }
+            Err(e) => {
+                eprintln!("ERROR: Failed to load credentials: {}", e);
+                std::process::exit(1);
+            }
+        };
 
     // Create application state
     let state = AppState::new(
@@ -64,6 +70,7 @@ async fn main() {
         transaction_projection,
         device_repository,
         signer,
+        verifier,
         user_repository,
     );
 
@@ -85,5 +92,14 @@ impl TokenSigner for DummySigner {
         _now: u64,
     ) -> Result<String, application::token_signer::SignerError> {
         Err(Box::new(std::io::Error::other("Signer not configured")))
+    }
+}
+
+/// ダミー TokenVerifier（認証情報がない場合のフォールバック）
+struct DummyVerifier;
+
+impl TokenVerifier for DummyVerifier {
+    fn verify(&self, _token: &str) -> Result<String, application::token_signer::VerifierError> {
+        Err(Box::new(std::io::Error::other("Verifier not configured")))
     }
 }

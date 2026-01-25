@@ -1,4 +1,5 @@
 use application::TokenSigner;
+use application::TokenVerifier;
 
 /// Claims for Firebase custom token
 /// <https://firebase.google.com/docs/auth/admin/create-custom-tokens#create_custom_tokens_using_a_third-party_jwt_library> に従って JWT を発行します
@@ -123,6 +124,105 @@ impl TokenSigner for Signer {
     fn sign(&self, uid: &str, now: u64) -> Result<String, application::token_signer::SignerError> {
         self.sign(uid, now)
             .map_err(|e| Box::new(e) as application::token_signer::SignerError)
+    }
+}
+
+/// トークン検証エラー
+#[derive(Debug)]
+pub enum VerifyError {
+    /// JWT デコードに失敗
+    JwtDecodeError(jsonwebtoken::errors::Error),
+    /// トークンが期限切れ
+    TokenExpired,
+    /// システム時刻エラー
+    SystemTimeError,
+}
+
+impl std::fmt::Display for VerifyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VerifyError::JwtDecodeError(e) => {
+                write!(f, "JWT decode error: {}", e)
+            }
+            VerifyError::TokenExpired => {
+                write!(f, "Token has expired")
+            }
+            VerifyError::SystemTimeError => {
+                write!(f, "Failed to get system time")
+            }
+        }
+    }
+}
+
+impl std::error::Error for VerifyError {}
+
+/// JWT トークンの検証器
+#[derive(Clone)]
+pub struct Verifier {
+    decoding_key: jsonwebtoken::DecodingKey,
+    service_account_email: String,
+}
+
+impl Verifier {
+    /// 新しい Verifier インスタンスを作成する
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key_pem` - RSA 秘密鍵 (PEM 形式)
+    /// * `service_account_email` - サービスアカウントのメールアドレス
+    pub fn new(
+        private_key_pem: &str,
+        service_account_email: String,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        // 秘密鍵から公開鍵コンポーネントを抽出してデコード用キーを作成
+        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(
+            Self::extract_public_key(private_key_pem)?.as_bytes(),
+        )?;
+        Ok(Self {
+            decoding_key,
+            service_account_email,
+        })
+    }
+
+    /// 秘密鍵から公開鍵を抽出する
+    fn extract_public_key(private_key_pem: &str) -> Result<String, jsonwebtoken::errors::Error> {
+        use rsa::pkcs8::DecodePrivateKey;
+        use rsa::pkcs8::EncodePublicKey;
+
+        let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(private_key_pem)
+            .map_err(|e| jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidRsaKey(e.to_string())))?;
+
+        let public_key = rsa::RsaPublicKey::from(&private_key);
+        let public_key_pem = public_key
+            .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
+            .map_err(|e| jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidRsaKey(e.to_string())))?;
+
+        Ok(public_key_pem)
+    }
+
+    /// トークンを検証して UID を取得する
+    pub fn verify(&self, token: &str) -> Result<String, VerifyError> {
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+        validation.set_audience(&["https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"]);
+        validation.set_issuer(&[&self.service_account_email]);
+        // 標準クレームの検証を無効化（uid は標準クレームではない）
+        validation.set_required_spec_claims::<&str>(&[]);
+
+        let token_data = jsonwebtoken::decode::<FirebaseCustomTokenClaims>(
+            token,
+            &self.decoding_key,
+            &validation,
+        )
+        .map_err(VerifyError::JwtDecodeError)?;
+
+        Ok(token_data.claims.uid)
+    }
+}
+
+impl TokenVerifier for Verifier {
+    fn verify(&self, token: &str) -> Result<String, application::token_signer::VerifierError> {
+        self.verify(token)
+            .map_err(|e| Box::new(e) as application::token_signer::VerifierError)
     }
 }
 

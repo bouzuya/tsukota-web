@@ -7,6 +7,7 @@ use application::repository::AccountRepository;
 use application::repository::DeviceRepository;
 use application::repository::UserRepository;
 use application::token_signer::TokenSigner;
+use application::token_signer::TokenVerifier;
 use application::use_case::AddCategoryUseCase;
 use application::use_case::AddOwnerUseCase;
 use application::use_case::AddTransactionUseCase;
@@ -29,6 +30,9 @@ use axum::extract::FromRef;
 /// Application state holding all use cases
 #[derive(Clone)]
 pub struct AppState {
+    // Token verifier for authentication
+    pub token_verifier: Arc<dyn TokenVerifier>,
+
     // Command use cases
     pub create_account: CreateAccountUseCase,
     pub update_account: UpdateAccountUseCase,
@@ -60,9 +64,13 @@ impl AppState {
         transaction_projection: Arc<dyn TransactionProjection>,
         device_repository: Arc<dyn DeviceRepository>,
         signer: Arc<dyn TokenSigner>,
+        verifier: Arc<dyn TokenVerifier>,
         user_repository: Arc<dyn UserRepository>,
     ) -> Self {
         Self {
+            // Token verifier
+            token_verifier: verifier,
+
             // Command use cases
             create_account: CreateAccountUseCase::new(account_repository.clone()),
             update_account: UpdateAccountUseCase::new(account_repository.clone()),
@@ -201,5 +209,11 @@ impl FromRef<AppState> for ListTransactionsUseCase {
 impl FromRef<AppState> for ExportTransactionsUseCase {
     fn from_ref(state: &AppState) -> Self {
         state.export_transactions.clone()
+    }
+}
+
+impl FromRef<AppState> for Arc<dyn TokenVerifier> {
+    fn from_ref(state: &AppState) -> Self {
+        state.token_verifier.clone()
     }
 }

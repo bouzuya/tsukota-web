@@ -11,4 +11,6 @@ pub mod view;
 
 pub use token_signer::SignerError;
 pub use token_signer::TokenSigner;
+pub use token_signer::TokenVerifier;
+pub use token_signer::VerifierError;
 pub use user_id::UserId;

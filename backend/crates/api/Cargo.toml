@@ -10,6 +10,7 @@ application.workspace = true
 axum = "0.8"
 infra = { path = "../infra" }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+rsa = { version = "0.9", features = ["pem"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

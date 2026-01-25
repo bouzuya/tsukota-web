@@ -1,5 +1,5 @@
 import type { ApiProblemDetails } from "./apiTypes";
-import { getAuthToken, getManualUserId } from "../atoms/auth";
+import { getAuthToken } from "../atoms/auth";
 
 export class ApiError extends Error {
 	status: number;
@@ -20,17 +20,9 @@ function getHeaders(): Record<string, string> {
 		"Content-Type": "application/json",
 	};
 
-	// 優先: Bearer トークン認証
 	const authToken = getAuthToken();
 	if (authToken) {
 		headers.Authorization = `Bearer ${authToken}`;
-		return headers;
-	}
-
-	// フォールバック: 開発モードの X-User-Id ヘッダー
-	const manualUserId = getManualUserId();
-	if (manualUserId) {
-		headers["X-User-Id"] = manualUserId;
 	}
 
 	return headers;
