@@ -158,7 +158,7 @@ mod tests {
             "id": "evt-123",
             "name": "Test Account",
             "owners": ["user-1", "user-2"],
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "accountCreated"
         });
 
@@ -183,7 +183,7 @@ mod tests {
             "accountId": "550e8400-e29b-41d4-a716-446655440000",
             "at": "2024-01-01T00:00:00Z",
             "id": "evt-123",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "accountDeleted"
         });
 
@@ -210,7 +210,7 @@ mod tests {
             "at": "2024-01-01T00:00:00Z",
             "id": "evt-123",
             "name": "Updated Account",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "accountUpdated"
         });
 
@@ -237,7 +237,7 @@ mod tests {
             "at": "2024-01-01T00:00:00Z",
             "id": "evt-123",
             "owner": "user-3",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "ownerAdded"
         });
 
@@ -264,7 +264,7 @@ mod tests {
             "at": "2024-01-01T00:00:00Z",
             "id": "evt-123",
             "owner": "user-1",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "ownerRemoved"
         });
 
@@ -293,7 +293,7 @@ mod tests {
             "categoryId": "cat-456",
             "id": "evt-123",
             "name": "Food",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "categoryAdded"
         });
 
@@ -322,7 +322,7 @@ mod tests {
             "categoryId": "cat-456",
             "id": "evt-123",
             "name": "Groceries",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "categoryUpdated"
         });
 
@@ -349,7 +349,7 @@ mod tests {
             "at": "2024-01-01T00:00:00Z",
             "categoryId": "cat-456",
             "id": "evt-123",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "categoryDeleted"
         });
 
@@ -380,7 +380,7 @@ mod tests {
             "comment": "Test transaction",
             "date": "2024-01-01",
             "id": "evt-123",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "transactionId": "txn-789",
             "type": "transactionAdded"
         });
@@ -417,7 +417,7 @@ mod tests {
             "comment": "Updated transaction",
             "date": "2024-01-02",
             "id": "evt-123",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "transactionId": "txn-789",
             "type": "transactionUpdated"
         });
@@ -444,7 +444,7 @@ mod tests {
             "accountId": "550e8400-e29b-41d4-a716-446655440000",
             "at": "2024-01-01T00:00:00Z",
             "id": "evt-123",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "transactionId": "txn-789",
             "type": "transactionDeleted"
         });
@@ -472,7 +472,7 @@ mod tests {
             "accountId": "550e8400-e29b-41d4-a716-446655440000",
             "at": "2024-01-01T00:00:00Z",
             "id": "evt-123",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "type": "accountDeleted"
         });
 
@@ -504,7 +504,7 @@ mod tests {
             "comment": "Test transaction",
             "date": "2024-01-01",
             "id": "evt-123",
-            "protocolVersion": 1,
+            "protocolVersion": 3,
             "transactionId": "txn-789",
             "type": "transactionAdded"
         });
