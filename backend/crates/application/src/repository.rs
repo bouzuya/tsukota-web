@@ -1,10 +1,12 @@
 use async_trait::async_trait;
 use domain::account::AccountEvent;
 use domain::account::AccountId;
+use domain::DeviceEvent;
+use domain::DeviceId;
 
 use crate::error::ApplicationError;
 
-/// Event store repository trait for persisting and loading events
+/// Account repository trait for persisting and loading events
 #[async_trait]
 pub trait AccountRepository: Send + Sync {
     /// Load all events for a given account
@@ -18,5 +20,22 @@ pub trait AccountRepository: Send + Sync {
         &self,
         account_id: &AccountId,
         events: Vec<AccountEvent>,
+    ) -> Result<(), ApplicationError>;
+}
+
+/// Device repository trait for persisting and loading events
+#[async_trait]
+pub trait DeviceRepository: Send + Sync {
+    /// Load all events for a given device
+    async fn load_events(
+        &self,
+        device_id: &DeviceId,
+    ) -> Result<Vec<DeviceEvent>, ApplicationError>;
+
+    /// Save new events for a given device
+    async fn save_events(
+        &self,
+        device_id: &DeviceId,
+        events: Vec<DeviceEvent>,
     ) -> Result<(), ApplicationError>;
 }
