@@ -1,5 +1,5 @@
-use crate::value_objects::DeviceId;
-use crate::value_objects::UserId;
+use crate::DeviceId;
+use crate::DeviceSecret;
 
 /// デバイス集約に対するコマンド
 #[derive(Clone, Debug, PartialEq)]
@@ -7,7 +7,6 @@ pub enum DeviceCommand {
     /// デバイスを作成する
     CreateDevice {
         device_id: DeviceId,
-        encrypted_secret: String,
-        user_id: UserId,
+        device_secret: DeviceSecret,
     },
 }

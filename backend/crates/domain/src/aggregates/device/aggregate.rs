@@ -1,8 +1,9 @@
-use super::commands::DeviceCommand;
-use super::events::DeviceEvent;
-use super::events::DeviceEventCommonProps;
-use crate::value_objects::DeviceId;
-use crate::value_objects::UserId;
+use crate::DeviceCommand;
+use crate::DeviceEvent;
+use crate::DeviceEventCommonProps;
+use crate::DeviceId;
+use crate::DeviceSecret;
+use crate::UserId;
 
 /// デバイス集約のエラー
 #[derive(Debug, thiserror::Error)]
@@ -17,14 +18,31 @@ pub enum Device {
     /// デバイス作成前の空の状態
     Empty,
     /// デバイス作成後のアクティブな状態
-    Active {
-        /// デバイス ID
-        id: DeviceId,
-        /// 暗号化されたシークレット
-        encrypted_secret: String,
-        /// ユーザー ID
-        user_id: UserId,
-    },
+    Active(ActiveDevice),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ActiveDevice {
+    /// デバイス ID
+    id: DeviceId,
+    /// 暗号化されたシークレット (cost, salt を含む bcrypt ハッシュ)
+    encrypted_secret: String,
+    /// ユーザー ID
+    user_id: UserId,
+}
+
+impl ActiveDevice {
+    pub fn id(&self) -> DeviceId {
+        self.id
+    }
+
+    pub fn user_id(&self) -> UserId {
+        self.user_id
+    }
+
+    pub fn verify(&self, device_secret: DeviceSecret) -> bool {
+        bcrypt::verify(device_secret.to_string(), &self.encrypted_secret).unwrap_or(false)
+    }
 }
 
 impl Default for Device {
@@ -53,9 +71,8 @@ impl Device {
         match command {
             DeviceCommand::CreateDevice {
                 device_id,
-                encrypted_secret,
-                user_id,
-            } => self.handle_create_device(device_id, encrypted_secret, user_id),
+                device_secret,
+            } => self.handle_create_device(device_id, device_secret),
         }
     }
 
@@ -67,16 +84,14 @@ impl Device {
                 encrypted_secret,
                 user_id,
             } => {
-                *self = Device::Active {
+                *self = Device::Active(ActiveDevice {
                     id: common
                         .device_id
                         .parse()
                         .expect("Failed to parse device_id from event"),
                     encrypted_secret: encrypted_secret.clone(),
-                    user_id: user_id
-                        .parse()
-                        .expect("Failed to parse user_id from event"),
-                };
+                    user_id: user_id.parse().expect("Failed to parse user_id from event"),
+                });
             }
         }
     }
@@ -86,17 +101,22 @@ impl Device {
     fn handle_create_device(
         &self,
         device_id: DeviceId,
-        encrypted_secret: String,
-        user_id: UserId,
+        device_secret: DeviceSecret,
     ) -> Result<Vec<DeviceEvent>, DeviceError> {
         if !matches!(self, Device::Empty) {
             return Err(DeviceError::DeviceAlreadyExists);
         }
 
+        // FIXME: unwrap
+        let encrypted_secret =
+            bcrypt::hash(&device_secret.to_string(), bcrypt::DEFAULT_COST).unwrap();
+
+        let user_id = UserId::generate();
+
         let common = Self::create_common_props(&device_id);
         Ok(vec![DeviceEvent::DeviceCreated {
             common,
-            encrypted_secret,
+            encrypted_secret: encrypted_secret.to_string(),
             user_id: user_id.to_string(),
         }])
     }
@@ -129,11 +149,10 @@ mod tests {
     fn test_create_device() -> anyhow::Result<()> {
         let device = Device::new();
         let device_id = DeviceId::generate();
-        let user_id = UserId::generate();
+        let device_secret: DeviceSecret = "test-secret".parse()?;
         let command = DeviceCommand::CreateDevice {
             device_id,
-            encrypted_secret: "$2b$12$...".to_string(),
-            user_id,
+            device_secret: device_secret.clone(),
         };
 
         let events = device.handle_command(command)?;
@@ -142,11 +161,13 @@ mod tests {
         match &events[0] {
             DeviceEvent::DeviceCreated {
                 encrypted_secret,
-                user_id: event_user_id,
+                user_id,
                 ..
             } => {
-                assert_eq!(encrypted_secret, "$2b$12$...");
-                assert_eq!(event_user_id, &user_id.to_string());
+                // encrypted_secret は bcrypt ハッシュであることを確認
+                assert!(bcrypt::verify("test-secret", encrypted_secret)?);
+                // user_id は有効な UUID であることを確認
+                assert!(user_id.parse::<UserId>().is_ok());
                 Ok(())
             }
         }
@@ -170,11 +191,11 @@ mod tests {
 
         let device = Device::from_events(events);
         match device {
-            Device::Active {
+            Device::Active(ActiveDevice {
                 id,
                 encrypted_secret,
                 user_id,
-            } => {
+            }) => {
                 assert_eq!(id.to_string(), device_uuid);
                 assert_eq!(encrypted_secret, "$2b$12$...");
                 assert_eq!(user_id.to_string(), user_uuid);
@@ -202,11 +223,10 @@ mod tests {
         });
 
         let new_device_id = DeviceId::generate();
-        let new_user_id = UserId::generate();
+        let new_device_secret: DeviceSecret = "new-secret".parse()?;
         let command = DeviceCommand::CreateDevice {
             device_id: new_device_id,
-            encrypted_secret: "$2b$12$new...".to_string(),
-            user_id: new_user_id,
+            device_secret: new_device_secret,
         };
 
         let result = device.handle_command(command);
