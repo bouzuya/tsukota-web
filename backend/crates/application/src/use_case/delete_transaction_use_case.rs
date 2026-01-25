@@ -5,16 +5,16 @@ use domain::account::TransactionId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
-use crate::repository::EventStoreRepository;
+use crate::repository::AccountRepository;
 use crate::request::DeleteTransactionRequest;
 use crate::response::DeleteTransactionResponse;
 
 /// Use case for deleting a transaction
-pub struct DeleteTransactionUseCase<R: EventStoreRepository> {
+pub struct DeleteTransactionUseCase<R: AccountRepository> {
     repository: R,
 }
 
-impl<R: EventStoreRepository> DeleteTransactionUseCase<R> {
+impl<R: AccountRepository> DeleteTransactionUseCase<R> {
     pub fn new(repository: R) -> Self {
         Self { repository }
     }

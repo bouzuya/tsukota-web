@@ -5,21 +5,22 @@ mod router;
 mod signer;
 mod state;
 
-pub use signer::{SignError, Signer};
+pub use signer::SignError;
+pub use signer::Signer;
 
 use std::sync::Arc;
 
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
-use application::repository::EventStoreRepository;
+use application::repository::AccountRepository;
 
 pub use state::AppState;
 
 /// Run the API server with the given state
 pub async fn run<R, AP, CP, TP>(state: Arc<AppState<R, AP, CP, TP>>)
 where
-    R: EventStoreRepository + Clone + Send + Sync + 'static,
+    R: AccountRepository + Clone + Send + Sync + 'static,
     AP: AccountProjection + Clone + Send + Sync + 'static,
     CP: CategoryProjection + Clone + Send + Sync + 'static,
     TP: TransactionProjection + Clone + Send + Sync + 'static,

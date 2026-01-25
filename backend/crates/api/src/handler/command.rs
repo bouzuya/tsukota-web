@@ -3,7 +3,7 @@ use std::sync::Arc;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
-use application::repository::EventStoreRepository;
+use application::repository::AccountRepository;
 use application::request::AddCategoryRequest;
 use application::request::AddOwnerRequest;
 use application::request::AddTransactionRequest;
@@ -34,7 +34,7 @@ pub async fn create_account<R, AP, CP, TP>(
     Json(request): Json<CreateAccountRequest>,
 ) -> Result<(StatusCode, Json<CreateAccountResponse>), ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -49,7 +49,7 @@ pub async fn update_account<R, AP, CP, TP>(
     Json(request): Json<UpdateAccountRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -64,7 +64,7 @@ pub async fn delete_account<R, AP, CP, TP>(
     Json(request): Json<DeleteAccountRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -79,7 +79,7 @@ pub async fn add_owner<R, AP, CP, TP>(
     Json(request): Json<AddOwnerRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -94,7 +94,7 @@ pub async fn remove_owner<R, AP, CP, TP>(
     Json(request): Json<RemoveOwnerRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -111,7 +111,7 @@ pub async fn add_category<R, AP, CP, TP>(
     Json(request): Json<AddCategoryRequest>,
 ) -> Result<(StatusCode, Json<AddCategoryResponse>), ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -126,7 +126,7 @@ pub async fn update_category<R, AP, CP, TP>(
     Json(request): Json<UpdateCategoryRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -141,7 +141,7 @@ pub async fn delete_category<R, AP, CP, TP>(
     Json(request): Json<DeleteCategoryRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -158,7 +158,7 @@ pub async fn add_transaction<R, AP, CP, TP>(
     Json(request): Json<AddTransactionRequest>,
 ) -> Result<(StatusCode, Json<AddTransactionResponse>), ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -173,7 +173,7 @@ pub async fn update_transaction<R, AP, CP, TP>(
     Json(request): Json<UpdateTransactionRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -188,7 +188,7 @@ pub async fn delete_transaction<R, AP, CP, TP>(
     Json(request): Json<DeleteTransactionRequest>,
 ) -> Result<StatusCode, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,

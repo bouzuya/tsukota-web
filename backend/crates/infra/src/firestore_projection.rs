@@ -12,8 +12,9 @@ use domain::account::AccountEvent;
 use domain::account::AccountId;
 use domain::account::TransactionId;
 use domain::account::UserId;
-use firestore_client::path::{CollectionPath, DocumentPath};
 use firestore_client::FirestoreClient;
+use firestore_client::path::CollectionPath;
+use firestore_client::path::DocumentPath;
 
 /// Internal error type for FirestoreProjection operations
 #[derive(Debug, thiserror::Error)]

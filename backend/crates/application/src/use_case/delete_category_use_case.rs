@@ -5,16 +5,16 @@ use domain::account::CategoryId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
-use crate::repository::EventStoreRepository;
+use crate::repository::AccountRepository;
 use crate::request::DeleteCategoryRequest;
 use crate::response::DeleteCategoryResponse;
 
 /// Use case for deleting (soft delete) a category
-pub struct DeleteCategoryUseCase<R: EventStoreRepository> {
+pub struct DeleteCategoryUseCase<R: AccountRepository> {
     repository: R,
 }
 
-impl<R: EventStoreRepository> DeleteCategoryUseCase<R> {
+impl<R: AccountRepository> DeleteCategoryUseCase<R> {
     pub fn new(repository: R) -> Self {
         Self { repository }
     }

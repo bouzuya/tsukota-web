@@ -5,16 +5,16 @@ use domain::account::CategoryId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
-use crate::repository::EventStoreRepository;
+use crate::repository::AccountRepository;
 use crate::request::UpdateCategoryRequest;
 use crate::response::UpdateCategoryResponse;
 
 /// Use case for updating a category
-pub struct UpdateCategoryUseCase<R: EventStoreRepository> {
+pub struct UpdateCategoryUseCase<R: AccountRepository> {
     repository: R,
 }
 
-impl<R: EventStoreRepository> UpdateCategoryUseCase<R> {
+impl<R: AccountRepository> UpdateCategoryUseCase<R> {
     pub fn new(repository: R) -> Self {
         Self { repository }
     }

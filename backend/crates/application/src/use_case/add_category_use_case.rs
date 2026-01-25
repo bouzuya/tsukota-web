@@ -5,16 +5,16 @@ use domain::account::CategoryId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
-use crate::repository::EventStoreRepository;
+use crate::repository::AccountRepository;
 use crate::request::AddCategoryRequest;
 use crate::response::AddCategoryResponse;
 
 /// Use case for adding a category to an account
-pub struct AddCategoryUseCase<R: EventStoreRepository> {
+pub struct AddCategoryUseCase<R: AccountRepository> {
     repository: R,
 }
 
-impl<R: EventStoreRepository> AddCategoryUseCase<R> {
+impl<R: AccountRepository> AddCategoryUseCase<R> {
     pub fn new(repository: R) -> Self {
         Self { repository }
     }

@@ -4,16 +4,16 @@ use domain::account::AccountId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
-use crate::repository::EventStoreRepository;
+use crate::repository::AccountRepository;
 use crate::request::AddOwnerRequest;
 use crate::response::AddOwnerResponse;
 
 /// Use case for adding an owner to an account
-pub struct AddOwnerUseCase<R: EventStoreRepository> {
+pub struct AddOwnerUseCase<R: AccountRepository> {
     repository: R,
 }
 
-impl<R: EventStoreRepository> AddOwnerUseCase<R> {
+impl<R: AccountRepository> AddOwnerUseCase<R> {
     pub fn new(repository: R) -> Self {
         Self { repository }
     }

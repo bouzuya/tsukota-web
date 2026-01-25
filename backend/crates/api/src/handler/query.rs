@@ -3,7 +3,7 @@ use std::sync::Arc;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
-use application::repository::EventStoreRepository;
+use application::repository::AccountRepository;
 use application::request::ExportTransactionsRequest;
 use application::request::GetAccountRequest;
 use application::request::ListAccountsRequest;
@@ -31,7 +31,7 @@ pub async fn list_accounts<R, AP, CP, TP>(
     AuthUser(user_id): AuthUser,
 ) -> Result<Json<ListAccountsResponse>, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -47,7 +47,7 @@ pub async fn get_account<R, AP, CP, TP>(
     Path(account_id): Path<String>,
 ) -> Result<Json<GetAccountResponse>, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -65,7 +65,7 @@ pub async fn list_categories<R, AP, CP, TP>(
     Path(account_id): Path<String>,
 ) -> Result<Json<ListCategoriesResponse>, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -91,7 +91,7 @@ pub async fn list_transactions<R, AP, CP, TP>(
     Query(params): Query<ListTransactionsParams>,
 ) -> Result<Json<ListTransactionsResponse>, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -120,7 +120,7 @@ pub async fn export_transactions<R, AP, CP, TP>(
     Query(params): Query<ExportTransactionsParams>,
 ) -> Result<Json<ExportTransactionsResponse>, ApiError>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,

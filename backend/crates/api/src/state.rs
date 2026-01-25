@@ -3,7 +3,7 @@ use std::sync::Arc;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
-use application::repository::EventStoreRepository;
+use application::repository::AccountRepository;
 use application::use_case::AddCategoryUseCase;
 use application::use_case::AddOwnerUseCase;
 use application::use_case::AddTransactionUseCase;
@@ -24,7 +24,7 @@ use application::use_case::UpdateTransactionUseCase;
 /// Application state holding all use cases
 pub struct AppState<R, AP, CP, TP>
 where
-    R: EventStoreRepository,
+    R: AccountRepository,
     AP: AccountProjection,
     CP: CategoryProjection,
     TP: TransactionProjection,
@@ -52,7 +52,7 @@ where
 
 impl<R, AP, CP, TP> AppState<R, AP, CP, TP>
 where
-    R: EventStoreRepository + Clone,
+    R: AccountRepository + Clone,
     AP: AccountProjection + Clone,
     CP: CategoryProjection + Clone,
     TP: TransactionProjection + Clone,

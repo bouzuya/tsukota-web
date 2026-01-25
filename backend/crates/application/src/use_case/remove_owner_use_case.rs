@@ -4,16 +4,16 @@ use domain::account::AccountId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
-use crate::repository::EventStoreRepository;
+use crate::repository::AccountRepository;
 use crate::request::RemoveOwnerRequest;
 use crate::response::RemoveOwnerResponse;
 
 /// Use case for removing an owner from an account
-pub struct RemoveOwnerUseCase<R: EventStoreRepository> {
+pub struct RemoveOwnerUseCase<R: AccountRepository> {
     repository: R,
 }
 
-impl<R: EventStoreRepository> RemoveOwnerUseCase<R> {
+impl<R: AccountRepository> RemoveOwnerUseCase<R> {
     pub fn new(repository: R) -> Self {
         Self { repository }
     }

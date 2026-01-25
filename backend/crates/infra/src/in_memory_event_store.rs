@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use application::error::ApplicationError;
-use application::repository::EventStoreRepository;
+use application::repository::AccountRepository;
 use async_trait::async_trait;
 use domain::account::AccountEvent;
 use domain::account::AccountId;
@@ -28,7 +28,7 @@ impl InMemoryEventStore {
 }
 
 #[async_trait]
-impl EventStoreRepository for InMemoryEventStore {
+impl AccountRepository for InMemoryEventStore {
     async fn load_events(
         &self,
         account_id: &AccountId,

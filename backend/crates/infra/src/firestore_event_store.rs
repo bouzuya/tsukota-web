@@ -1,10 +1,11 @@
 use application::error::ApplicationError;
-use application::repository::EventStoreRepository;
+use application::repository::AccountRepository;
 use async_trait::async_trait;
 use domain::account::AccountEvent;
 use domain::account::AccountId;
 use firestore_client::FirestoreClient;
-use firestore_client::path::{CollectionPath, DocumentPath};
+use firestore_client::path::CollectionPath;
+use firestore_client::path::DocumentPath;
 
 /// Internal error type for FirestoreEventStore operations
 #[derive(Debug, thiserror::Error)]
@@ -122,7 +123,7 @@ struct UserDocument {
 }
 
 #[async_trait]
-impl EventStoreRepository for FirestoreEventStore {
+impl AccountRepository for FirestoreEventStore {
     async fn load_events(
         &self,
         account_id: &AccountId,

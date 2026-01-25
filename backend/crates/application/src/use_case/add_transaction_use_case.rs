@@ -6,16 +6,16 @@ use domain::account::TransactionId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
-use crate::repository::EventStoreRepository;
+use crate::repository::AccountRepository;
 use crate::request::AddTransactionRequest;
 use crate::response::AddTransactionResponse;
 
 /// Use case for adding a transaction to an account
-pub struct AddTransactionUseCase<R: EventStoreRepository> {
+pub struct AddTransactionUseCase<R: AccountRepository> {
     repository: R,
 }
 
-impl<R: EventStoreRepository> AddTransactionUseCase<R> {
+impl<R: AccountRepository> AddTransactionUseCase<R> {
     pub fn new(repository: R) -> Self {
         Self { repository }
     }

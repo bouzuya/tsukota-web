@@ -3,7 +3,7 @@ use std::sync::Arc;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
-use application::repository::EventStoreRepository;
+use application::repository::AccountRepository;
 use axum::Router;
 use axum::routing::get;
 use axum::routing::post;
@@ -15,7 +15,7 @@ use crate::state::AppState;
 /// Create the API router with all routes
 pub fn create_router<R, AP, CP, TP>(state: Arc<AppState<R, AP, CP, TP>>) -> Router
 where
-    R: EventStoreRepository + Clone + Send + Sync + 'static,
+    R: AccountRepository + Clone + Send + Sync + 'static,
     AP: AccountProjection + Clone + Send + Sync + 'static,
     CP: CategoryProjection + Clone + Send + Sync + 'static,
     TP: TransactionProjection + Clone + Send + Sync + 'static,

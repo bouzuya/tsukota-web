@@ -6,7 +6,7 @@ use crate::error::ApplicationError;
 
 /// Event store repository trait for persisting and loading events
 #[async_trait]
-pub trait EventStoreRepository: Send + Sync {
+pub trait AccountRepository: Send + Sync {
     /// Load all events for a given account
     async fn load_events(
         &self,
