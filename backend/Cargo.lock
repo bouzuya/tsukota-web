@@ -1259,6 +1259,7 @@ name = "main"
 version = "0.0.0"
 dependencies = [
  "api",
+ "application",
  "infra",
  "tokio",
 ]

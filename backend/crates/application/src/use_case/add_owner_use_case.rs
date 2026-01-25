@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -9,12 +11,13 @@ use crate::request::AddOwnerRequest;
 use crate::response::AddOwnerResponse;
 
 /// Use case for adding an owner to an account
-pub struct AddOwnerUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct AddOwnerUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> AddOwnerUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl AddOwnerUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 

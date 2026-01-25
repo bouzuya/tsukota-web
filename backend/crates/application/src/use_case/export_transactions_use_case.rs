@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::AccountId;
 
 use crate::UserId;
@@ -9,13 +11,17 @@ use crate::response::ExportTransactionsResponse;
 use crate::view::PaginatedList;
 
 /// Use case for exporting transactions as JSON for a specific month
-pub struct ExportTransactionsUseCase<A: AccountProjection, T: TransactionProjection> {
-    account_projection: A,
-    transaction_projection: T,
+#[derive(Clone)]
+pub struct ExportTransactionsUseCase {
+    account_projection: Arc<dyn AccountProjection>,
+    transaction_projection: Arc<dyn TransactionProjection>,
 }
 
-impl<A: AccountProjection, T: TransactionProjection> ExportTransactionsUseCase<A, T> {
-    pub fn new(account_projection: A, transaction_projection: T) -> Self {
+impl ExportTransactionsUseCase {
+    pub fn new(
+        account_projection: Arc<dyn AccountProjection>,
+        transaction_projection: Arc<dyn TransactionProjection>,
+    ) -> Self {
         Self {
             account_projection,
             transaction_projection,

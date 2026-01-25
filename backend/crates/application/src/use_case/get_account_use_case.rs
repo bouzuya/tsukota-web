@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::AccountId;
 
 use crate::UserId;
@@ -8,12 +10,13 @@ use crate::request::GetAccountRequest;
 use crate::response::GetAccountResponse;
 
 /// Use case for getting account details
-pub struct GetAccountUseCase<P: AccountProjection> {
-    projection: P,
+#[derive(Clone)]
+pub struct GetAccountUseCase {
+    projection: Arc<dyn AccountProjection>,
 }
 
-impl<P: AccountProjection> GetAccountUseCase<P> {
-    pub fn new(projection: P) -> Self {
+impl GetAccountUseCase {
+    pub fn new(projection: Arc<dyn AccountProjection>) -> Self {
         Self { projection }
     }
 

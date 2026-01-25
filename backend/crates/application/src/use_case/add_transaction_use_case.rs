@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -11,12 +13,13 @@ use crate::request::AddTransactionRequest;
 use crate::response::AddTransactionResponse;
 
 /// Use case for adding a transaction to an account
-pub struct AddTransactionUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct AddTransactionUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> AddTransactionUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl AddTransactionUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 

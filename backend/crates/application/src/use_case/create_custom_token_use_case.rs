@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::Device;
 
 use crate::error::ApplicationError;
@@ -10,15 +12,20 @@ use crate::token_signer::TokenSigner;
 /// カスタムトークン作成ユースケース
 ///
 /// デバイス認証を行い、Firebase カスタムトークンを発行する
-pub struct CreateCustomTokenUseCase<DR, S: TokenSigner, UR: UserRepository> {
-    device_repository: DR,
-    signer: S,
-    user_repository: UR,
+#[derive(Clone)]
+pub struct CreateCustomTokenUseCase {
+    device_repository: Arc<dyn DeviceRepository>,
+    signer: Arc<dyn TokenSigner>,
+    user_repository: Arc<dyn UserRepository>,
 }
 
-impl<DR: DeviceRepository, S: TokenSigner, UR: UserRepository> CreateCustomTokenUseCase<DR, S, UR> {
+impl CreateCustomTokenUseCase {
     /// 新しいユースケースインスタンスを作成する
-    pub fn new(device_repository: DR, signer: S, user_repository: UR) -> Self {
+    pub fn new(
+        device_repository: Arc<dyn DeviceRepository>,
+        signer: Arc<dyn TokenSigner>,
+        user_repository: Arc<dyn UserRepository>,
+    ) -> Self {
         Self {
             device_repository,
             signer,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -10,12 +12,13 @@ use crate::request::AddCategoryRequest;
 use crate::response::AddCategoryResponse;
 
 /// Use case for adding a category to an account
-pub struct AddCategoryUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct AddCategoryUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> AddCategoryUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl AddCategoryUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 

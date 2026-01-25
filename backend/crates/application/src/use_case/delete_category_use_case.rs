@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -10,12 +12,13 @@ use crate::request::DeleteCategoryRequest;
 use crate::response::DeleteCategoryResponse;
 
 /// Use case for deleting (soft delete) a category
-pub struct DeleteCategoryUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct DeleteCategoryUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> DeleteCategoryUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl DeleteCategoryUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 

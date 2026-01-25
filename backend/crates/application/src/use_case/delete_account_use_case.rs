@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -9,12 +11,13 @@ use crate::request::DeleteAccountRequest;
 use crate::response::DeleteAccountResponse;
 
 /// Use case for deleting an account
-pub struct DeleteAccountUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct DeleteAccountUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> DeleteAccountUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl DeleteAccountUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -9,12 +11,13 @@ use crate::request::RemoveOwnerRequest;
 use crate::response::RemoveOwnerResponse;
 
 /// Use case for removing an owner from an account
-pub struct RemoveOwnerUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct RemoveOwnerUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> RemoveOwnerUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl RemoveOwnerUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 

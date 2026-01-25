@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -10,12 +12,13 @@ use crate::request::UpdateCategoryRequest;
 use crate::response::UpdateCategoryResponse;
 
 /// Use case for updating a category
-pub struct UpdateCategoryUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct UpdateCategoryUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> UpdateCategoryUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl UpdateCategoryUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 

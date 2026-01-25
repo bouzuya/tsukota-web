@@ -109,7 +109,7 @@ impl Device {
 
         // FIXME: unwrap
         let encrypted_secret =
-            bcrypt::hash(&device_secret.to_string(), bcrypt::DEFAULT_COST).unwrap();
+            bcrypt::hash(device_secret.to_string(), bcrypt::DEFAULT_COST).unwrap();
 
         let user_id = UserId::generate();
 

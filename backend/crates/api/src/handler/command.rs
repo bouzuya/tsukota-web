@@ -1,11 +1,3 @@
-use std::sync::Arc;
-
-use application::CreateCustomTokenIo;
-use application::TokenSigner;
-use application::projection::AccountProjection;
-use application::projection::CategoryProjection;
-use application::projection::TransactionProjection;
-use application::repository::AccountRepository;
 use application::request::AddCategoryRequest;
 use application::request::AddOwnerRequest;
 use application::request::AddTransactionRequest;
@@ -22,196 +14,136 @@ use application::response::AddCategoryResponse;
 use application::response::AddTransactionResponse;
 use application::response::CreateAccountResponse;
 use application::response::CreateCustomTokenResponse;
+use application::use_case::AddCategoryUseCase;
+use application::use_case::AddOwnerUseCase;
+use application::use_case::AddTransactionUseCase;
+use application::use_case::CreateAccountUseCase;
+use application::use_case::CreateCustomTokenUseCase;
+use application::use_case::DeleteAccountUseCase;
+use application::use_case::DeleteCategoryUseCase;
+use application::use_case::DeleteTransactionUseCase;
+use application::use_case::RemoveOwnerUseCase;
+use application::use_case::UpdateAccountUseCase;
+use application::use_case::UpdateCategoryUseCase;
+use application::use_case::UpdateTransactionUseCase;
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
 
 use crate::error::ApiError;
 use crate::extractor::AuthUser;
-use crate::state::AppState;
-use crate::state::AuthState;
 
 // Account commands
 
-pub async fn create_account<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn create_account(
+    State(use_case): State<CreateAccountUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<CreateAccountRequest>,
-) -> Result<(StatusCode, Json<CreateAccountResponse>), ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    let response = state.create_account.execute(&user_id, request).await?;
+) -> Result<(StatusCode, Json<CreateAccountResponse>), ApiError> {
+    let response = use_case.execute(&user_id, request).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-pub async fn update_account<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn update_account(
+    State(use_case): State<UpdateAccountUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<UpdateAccountRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.update_account.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn delete_account<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn delete_account(
+    State(use_case): State<DeleteAccountUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<DeleteAccountRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.delete_account.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn add_owner<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn add_owner(
+    State(use_case): State<AddOwnerUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<AddOwnerRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.add_owner.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn remove_owner<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn remove_owner(
+    State(use_case): State<RemoveOwnerUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<RemoveOwnerRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.remove_owner.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 // Category commands
 
-pub async fn add_category<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn add_category(
+    State(use_case): State<AddCategoryUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<AddCategoryRequest>,
-) -> Result<(StatusCode, Json<AddCategoryResponse>), ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    let response = state.add_category.execute(&user_id, request).await?;
+) -> Result<(StatusCode, Json<AddCategoryResponse>), ApiError> {
+    let response = use_case.execute(&user_id, request).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-pub async fn update_category<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn update_category(
+    State(use_case): State<UpdateCategoryUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<UpdateCategoryRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.update_category.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn delete_category<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn delete_category(
+    State(use_case): State<DeleteCategoryUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<DeleteCategoryRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.delete_category.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 // Transaction commands
 
-pub async fn add_transaction<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn add_transaction(
+    State(use_case): State<AddTransactionUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<AddTransactionRequest>,
-) -> Result<(StatusCode, Json<AddTransactionResponse>), ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    let response = state.add_transaction.execute(&user_id, request).await?;
+) -> Result<(StatusCode, Json<AddTransactionResponse>), ApiError> {
+    let response = use_case.execute(&user_id, request).await?;
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-pub async fn update_transaction<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn update_transaction(
+    State(use_case): State<UpdateTransactionUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<UpdateTransactionRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.update_transaction.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn delete_transaction<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn delete_transaction(
+    State(use_case): State<DeleteTransactionUseCase>,
     AuthUser(user_id): AuthUser,
     Json(request): Json<DeleteTransactionRequest>,
-) -> Result<StatusCode, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
-    state.delete_transaction.execute(&user_id, request).await?;
+) -> Result<StatusCode, ApiError> {
+    use_case.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 // Auth commands
 
-pub async fn create_custom_token<S, I>(
-    State(state): State<Arc<AuthState<S, I>>>,
+pub async fn create_custom_token(
+    State(use_case): State<CreateCustomTokenUseCase>,
     Json(request): Json<CreateCustomTokenRequest>,
-) -> Result<Json<CreateCustomTokenResponse>, ApiError>
-where
-    S: TokenSigner,
-    I: CreateCustomTokenIo,
-{
-    let response = state.create_custom_token.execute(request).await?;
+) -> Result<Json<CreateCustomTokenResponse>, ApiError> {
+    let response = use_case.execute(request).await?;
     Ok(Json(response))
 }

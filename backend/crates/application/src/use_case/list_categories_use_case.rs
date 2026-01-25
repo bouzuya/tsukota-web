@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::AccountId;
 
 use crate::UserId;
@@ -9,13 +11,17 @@ use crate::response::ListCategoriesResponse;
 use crate::view::PaginatedList;
 
 /// Use case for listing all categories of an account
-pub struct ListCategoriesUseCase<A: AccountProjection, C: CategoryProjection> {
-    account_projection: A,
-    category_projection: C,
+#[derive(Clone)]
+pub struct ListCategoriesUseCase {
+    account_projection: Arc<dyn AccountProjection>,
+    category_projection: Arc<dyn CategoryProjection>,
 }
 
-impl<A: AccountProjection, C: CategoryProjection> ListCategoriesUseCase<A, C> {
-    pub fn new(account_projection: A, category_projection: C) -> Self {
+impl ListCategoriesUseCase {
+    pub fn new(
+        account_projection: Arc<dyn AccountProjection>,
+        category_projection: Arc<dyn CategoryProjection>,
+    ) -> Self {
         Self {
             account_projection,
             category_projection,

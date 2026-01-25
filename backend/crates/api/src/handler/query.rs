@@ -1,9 +1,3 @@
-use std::sync::Arc;
-
-use application::projection::AccountProjection;
-use application::projection::CategoryProjection;
-use application::projection::TransactionProjection;
-use application::repository::AccountRepository;
 use application::request::ExportTransactionsRequest;
 use application::request::GetAccountRequest;
 use application::request::ListAccountsRequest;
@@ -14,6 +8,11 @@ use application::response::GetAccountResponse;
 use application::response::ListAccountsResponse;
 use application::response::ListCategoriesResponse;
 use application::response::ListTransactionsResponse;
+use application::use_case::ExportTransactionsUseCase;
+use application::use_case::GetAccountUseCase;
+use application::use_case::ListAccountsUseCase;
+use application::use_case::ListCategoriesUseCase;
+use application::use_case::ListTransactionsUseCase;
 use axum::Json;
 use axum::extract::Path;
 use axum::extract::Query;
@@ -22,56 +21,37 @@ use serde::Deserialize;
 
 use crate::error::ApiError;
 use crate::extractor::AuthUser;
-use crate::state::AppState;
 
 // Account queries
 
-pub async fn list_accounts<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn list_accounts(
+    State(use_case): State<ListAccountsUseCase>,
     AuthUser(user_id): AuthUser,
-) -> Result<Json<ListAccountsResponse>, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
+) -> Result<Json<ListAccountsResponse>, ApiError> {
     let request = ListAccountsRequest {};
-    let response = state.list_accounts.execute(&user_id, request).await?;
+    let response = use_case.execute(&user_id, request).await?;
     Ok(Json(response))
 }
 
-pub async fn get_account<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn get_account(
+    State(use_case): State<GetAccountUseCase>,
     AuthUser(user_id): AuthUser,
     Path(account_id): Path<String>,
-) -> Result<Json<GetAccountResponse>, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
+) -> Result<Json<GetAccountResponse>, ApiError> {
     let request = GetAccountRequest { account_id };
-    let response = state.get_account.execute(&user_id, request).await?;
+    let response = use_case.execute(&user_id, request).await?;
     Ok(Json(response))
 }
 
 // Category queries
 
-pub async fn list_categories<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn list_categories(
+    State(use_case): State<ListCategoriesUseCase>,
     AuthUser(user_id): AuthUser,
     Path(account_id): Path<String>,
-) -> Result<Json<ListCategoriesResponse>, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
+) -> Result<Json<ListCategoriesResponse>, ApiError> {
     let request = ListCategoriesRequest { account_id };
-    let response = state.list_categories.execute(&user_id, request).await?;
+    let response = use_case.execute(&user_id, request).await?;
     Ok(Json(response))
 }
 
@@ -84,24 +64,18 @@ pub struct ListTransactionsParams {
 
 const DEFAULT_PAGE_SIZE: usize = 20;
 
-pub async fn list_transactions<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn list_transactions(
+    State(use_case): State<ListTransactionsUseCase>,
     AuthUser(user_id): AuthUser,
     Path(account_id): Path<String>,
     Query(params): Query<ListTransactionsParams>,
-) -> Result<Json<ListTransactionsResponse>, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
+) -> Result<Json<ListTransactionsResponse>, ApiError> {
     let request = ListTransactionsRequest {
         account_id,
         cursor: params.after,
         limit: DEFAULT_PAGE_SIZE,
     };
-    let response = state.list_transactions.execute(&user_id, request).await?;
+    let response = use_case.execute(&user_id, request).await?;
     Ok(Json(response))
 }
 
@@ -113,23 +87,17 @@ pub struct ExportTransactionsParams {
     pub month: u32,
 }
 
-pub async fn export_transactions<R, AP, CP, TP>(
-    State(state): State<Arc<AppState<R, AP, CP, TP>>>,
+pub async fn export_transactions(
+    State(use_case): State<ExportTransactionsUseCase>,
     AuthUser(user_id): AuthUser,
     Path(account_id): Path<String>,
     Query(params): Query<ExportTransactionsParams>,
-) -> Result<Json<ExportTransactionsResponse>, ApiError>
-where
-    R: AccountRepository,
-    AP: AccountProjection,
-    CP: CategoryProjection,
-    TP: TransactionProjection,
-{
+) -> Result<Json<ExportTransactionsResponse>, ApiError> {
     let request = ExportTransactionsRequest {
         account_id,
         year: params.year,
         month: params.month,
     };
-    let response = state.export_transactions.execute(&user_id, request).await?;
+    let response = use_case.execute(&user_id, request).await?;
     Ok(Json(response))
 }

@@ -27,6 +27,11 @@ impl IntoResponse for ApiError {
                 "category_not_found",
                 format!("The specified category was not found: {}", id),
             ),
+            ApplicationError::Device(_err) => (
+                StatusCode::UNAUTHORIZED,
+                "device_authentication_failed",
+                "Device authentication failed".to_owned(),
+            ),
             ApplicationError::TransactionNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "transaction_not_found",
@@ -54,6 +59,11 @@ impl IntoResponse for ApiError {
                 StatusCode::BAD_REQUEST,
                 "invalid_request",
                 format!("Invalid request: {}", msg),
+            ),
+            ApplicationError::User(_err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "user_error",
+                "An internal user error occurred".to_owned(),
             ),
         };
 

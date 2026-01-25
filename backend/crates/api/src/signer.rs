@@ -116,14 +116,13 @@ impl Signer {
 }
 
 impl TokenSigner for Signer {
-    type Error = SignError;
-
-    fn now(&self) -> Result<u64, Self::Error> {
-        Self::now()
+    fn now(&self) -> Result<u64, application::token_signer::SignerError> {
+        Self::now().map_err(|e| Box::new(e) as application::token_signer::SignerError)
     }
 
-    fn sign(&self, uid: &str, now: u64) -> Result<String, Self::Error> {
+    fn sign(&self, uid: &str, now: u64) -> Result<String, application::token_signer::SignerError> {
         self.sign(uid, now)
+            .map_err(|e| Box::new(e) as application::token_signer::SignerError)
     }
 }
 

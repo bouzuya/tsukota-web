@@ -1,10 +1,10 @@
-/// Firebase カスタムトークンを署名するための trait
-pub trait TokenSigner: Clone + Send + Sync {
-    /// 署名エラー型
-    type Error: std::error::Error + Send + Sync + 'static;
+/// 署名エラー型（object-safe のための Box 化）
+pub type SignerError = Box<dyn std::error::Error + Send + Sync>;
 
+/// Firebase カスタムトークンを署名するための trait
+pub trait TokenSigner: Send + Sync {
     /// 現在時刻を UNIX エポックからの秒数で返す
-    fn now(&self) -> Result<u64, Self::Error>;
+    fn now(&self) -> Result<u64, SignerError>;
 
     /// 指定された UID に対する Firebase カスタムトークンを署名する
     ///
@@ -12,5 +12,5 @@ pub trait TokenSigner: Clone + Send + Sync {
     ///
     /// * `uid` - ユーザー識別子 (1-128 文字)
     /// * `now` - 現在時刻 (UNIX エポックからの秒数)
-    fn sign(&self, uid: &str, now: u64) -> Result<String, Self::Error>;
+    fn sign(&self, uid: &str, now: u64) -> Result<String, SignerError>;
 }

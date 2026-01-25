@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::UserId;
 use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
@@ -6,12 +8,13 @@ use crate::response::ListAccountsResponse;
 use crate::view::PaginatedList;
 
 /// Use case for listing all accounts owned by a user
-pub struct ListAccountsUseCase<P: AccountProjection> {
-    projection: P,
+#[derive(Clone)]
+pub struct ListAccountsUseCase {
+    projection: Arc<dyn AccountProjection>,
 }
 
-impl<P: AccountProjection> ListAccountsUseCase<P> {
-    pub fn new(projection: P) -> Self {
+impl ListAccountsUseCase {
+    pub fn new(projection: Arc<dyn AccountProjection>) -> Self {
         Self { projection }
     }
 

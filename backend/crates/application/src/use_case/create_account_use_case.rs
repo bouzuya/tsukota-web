@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use domain::account::Account;
 use domain::account::AccountCommand;
 use domain::account::AccountId;
@@ -9,12 +11,13 @@ use crate::request::CreateAccountRequest;
 use crate::response::CreateAccountResponse;
 
 /// Use case for creating a new account
-pub struct CreateAccountUseCase<R: AccountRepository> {
-    repository: R,
+#[derive(Clone)]
+pub struct CreateAccountUseCase {
+    repository: Arc<dyn AccountRepository>,
 }
 
-impl<R: AccountRepository> CreateAccountUseCase<R> {
-    pub fn new(repository: R) -> Self {
+impl CreateAccountUseCase {
+    pub fn new(repository: Arc<dyn AccountRepository>) -> Self {
         Self { repository }
     }
 
