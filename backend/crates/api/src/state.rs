@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use application::CreateCustomTokenIo;
+use application::TokenSigner;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
@@ -8,6 +10,7 @@ use application::use_case::AddCategoryUseCase;
 use application::use_case::AddOwnerUseCase;
 use application::use_case::AddTransactionUseCase;
 use application::use_case::CreateAccountUseCase;
+use application::use_case::CreateCustomTokenUseCase;
 use application::use_case::DeleteAccountUseCase;
 use application::use_case::DeleteCategoryUseCase;
 use application::use_case::DeleteTransactionUseCase;
@@ -92,6 +95,31 @@ where
                 account_projection,
                 transaction_projection,
             ),
+        })
+    }
+}
+
+/// 認証関連の機能を保持する状態
+///
+/// デバイス認証とカスタムトークン発行を行う
+pub struct AuthState<S, I>
+where
+    S: TokenSigner,
+    I: CreateCustomTokenIo,
+{
+    /// カスタムトークン作成ユースケース
+    pub create_custom_token: CreateCustomTokenUseCase<S, I>,
+}
+
+impl<S, I> AuthState<S, I>
+where
+    S: TokenSigner,
+    I: CreateCustomTokenIo,
+{
+    /// 新しい AuthState を作成する
+    pub fn new(signer: S, io: I) -> Arc<Self> {
+        Arc::new(Self {
+            create_custom_token: CreateCustomTokenUseCase::new(signer, io),
         })
     }
 }

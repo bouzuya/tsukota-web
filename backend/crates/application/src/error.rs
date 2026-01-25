@@ -9,6 +9,9 @@ pub enum ApplicationError {
     #[error("Category not found: {0}")]
     CategoryNotFound(String),
 
+    #[error("Device error: {0}")]
+    Device(#[source] domain::DeviceError),
+
     #[error("Transaction not found: {0}")]
     TransactionNotFound(String),
 
@@ -20,6 +23,9 @@ pub enum ApplicationError {
 
     #[error("Repository error: {0}")]
     Repository(String),
+
+    #[error("User error: {0}")]
+    User(#[source] domain::UserError),
 
     #[error("Invalid request: {0}")]
     InvalidRequest(String),

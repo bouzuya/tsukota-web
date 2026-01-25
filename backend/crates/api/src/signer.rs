@@ -1,3 +1,5 @@
+use application::TokenSigner;
+
 /// Claims for Firebase custom token
 /// <https://firebase.google.com/docs/auth/admin/create-custom-tokens#create_custom_tokens_using_a_third-party_jwt_library> に従って JWT を発行します
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -46,6 +48,7 @@ impl std::fmt::Display for SignError {
 impl std::error::Error for SignError {}
 
 /// Signer for creating Firebase custom tokens
+#[derive(Clone)]
 pub struct Signer {
     encoding_key: jsonwebtoken::EncodingKey,
     service_account_email: String,
@@ -109,6 +112,18 @@ impl Signer {
         // Encode the token
         jsonwebtoken::encode(&header, &claims, &self.encoding_key)
             .map_err(SignError::JwtEncodingError)
+    }
+}
+
+impl TokenSigner for Signer {
+    type Error = SignError;
+
+    fn now(&self) -> Result<u64, Self::Error> {
+        Self::now()
+    }
+
+    fn sign(&self, uid: &str, now: u64) -> Result<String, Self::Error> {
+        self.sign(uid, now)
     }
 }
 
@@ -191,11 +206,15 @@ XHoL8lz5DpxcSiLilKDCKxo=
         validation.set_issuer(&[service_account_email]);
 
         let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(TEST_PUBLIC_KEY_PEM.as_bytes())?;
-        let token_data = jsonwebtoken::decode::<FirebaseCustomTokenClaims>(&token, &decoding_key, &validation)?;
+        let token_data =
+            jsonwebtoken::decode::<FirebaseCustomTokenClaims>(&token, &decoding_key, &validation)?;
 
         assert_eq!(token_data.claims.iss, service_account_email);
         assert_eq!(token_data.claims.sub, service_account_email);
-        assert_eq!(token_data.claims.aud, "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit");
+        assert_eq!(
+            token_data.claims.aud,
+            "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+        );
         assert_eq!(token_data.claims.iat, now);
         assert_eq!(token_data.claims.exp, now + 3600);
         assert_eq!(token_data.claims.uid, uid);

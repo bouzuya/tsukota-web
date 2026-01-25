@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use application::CreateCustomTokenIo;
+use application::TokenSigner;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
@@ -8,6 +10,7 @@ use application::request::AddCategoryRequest;
 use application::request::AddOwnerRequest;
 use application::request::AddTransactionRequest;
 use application::request::CreateAccountRequest;
+use application::request::CreateCustomTokenRequest;
 use application::request::DeleteAccountRequest;
 use application::request::DeleteCategoryRequest;
 use application::request::DeleteTransactionRequest;
@@ -18,6 +21,7 @@ use application::request::UpdateTransactionRequest;
 use application::response::AddCategoryResponse;
 use application::response::AddTransactionResponse;
 use application::response::CreateAccountResponse;
+use application::response::CreateCustomTokenResponse;
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -25,6 +29,7 @@ use axum::http::StatusCode;
 use crate::error::ApiError;
 use crate::extractor::AuthUser;
 use crate::state::AppState;
+use crate::state::AuthState;
 
 // Account commands
 
@@ -195,4 +200,18 @@ where
 {
     state.delete_transaction.execute(&user_id, request).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// Auth commands
+
+pub async fn create_custom_token<S, I>(
+    State(state): State<Arc<AuthState<S, I>>>,
+    Json(request): Json<CreateCustomTokenRequest>,
+) -> Result<Json<CreateCustomTokenResponse>, ApiError>
+where
+    S: TokenSigner,
+    I: CreateCustomTokenIo,
+{
+    let response = state.create_custom_token.execute(request).await?;
+    Ok(Json(response))
 }

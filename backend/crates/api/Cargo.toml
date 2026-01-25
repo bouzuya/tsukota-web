@@ -8,9 +8,11 @@ version.workspace = true
 [dependencies]
 application.workspace = true
 axum = "0.8"
+infra = { path = "../infra" }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
