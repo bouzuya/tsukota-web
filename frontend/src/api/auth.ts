@@ -1,28 +1,28 @@
 import { apiGet, apiPost } from "./client";
 import type {
-	ApiCreateCustomTokenCommand,
-	ApiCreateCustomTokenResponse,
+	ApiCreateSessionTokenCommand,
+	ApiCreateSessionTokenResponse,
 	ApiUser,
 } from "./apiTypes";
 import type { User } from "./types";
 import { toUser } from "./converters";
 
-export interface CreateCustomTokenParams {
+export interface CreateSessionTokenParams {
 	deviceId: string;
 	deviceSecret: string;
 }
 
-export async function createCustomToken(
-	params: CreateCustomTokenParams,
+export async function createSessionToken(
+	params: CreateSessionTokenParams,
 ): Promise<string> {
 	const response = await apiPost<
-		ApiCreateCustomTokenResponse,
-		ApiCreateCustomTokenCommand
-	>("/commands/create_custom_token", {
+		ApiCreateSessionTokenResponse,
+		ApiCreateSessionTokenCommand
+	>("/commands/create_session_token", {
 		device_id: params.deviceId,
 		device_secret: params.deviceSecret,
 	});
-	return response.custom_token;
+	return response.session_token;
 }
 
 export function getAuthUrl(): string {

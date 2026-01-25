@@ -8,8 +8,8 @@ mod state;
 
 pub use credentials::CredentialsError;
 pub use credentials::ServiceAccountCredentials;
-pub use signer::SignError;
-pub use signer::Signer;
+pub use signer::CreateError;
+pub use signer::Creator;
 pub use signer::Verifier;
 pub use signer::VerifyError;
 pub use state::AppState;

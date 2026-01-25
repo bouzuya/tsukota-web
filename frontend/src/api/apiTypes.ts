@@ -134,11 +134,11 @@ export interface ApiUpdateUserCommand {
 }
 
 // Authentication
-export interface ApiCreateCustomTokenCommand {
+export interface ApiCreateSessionTokenCommand {
 	device_id: string;
 	device_secret: string;
 }
 
-export interface ApiCreateCustomTokenResponse {
-	custom_token: string;
+export interface ApiCreateSessionTokenResponse {
+	session_token: string;
 }

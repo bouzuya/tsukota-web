@@ -2,7 +2,7 @@ use application::request::AddCategoryRequest;
 use application::request::AddOwnerRequest;
 use application::request::AddTransactionRequest;
 use application::request::CreateAccountRequest;
-use application::request::CreateCustomTokenRequest;
+use application::request::CreateSessionTokenRequest;
 use application::request::DeleteAccountRequest;
 use application::request::DeleteCategoryRequest;
 use application::request::DeleteTransactionRequest;
@@ -13,12 +13,12 @@ use application::request::UpdateTransactionRequest;
 use application::response::AddCategoryResponse;
 use application::response::AddTransactionResponse;
 use application::response::CreateAccountResponse;
-use application::response::CreateCustomTokenResponse;
+use application::response::CreateSessionTokenResponse;
 use application::use_case::AddCategoryUseCase;
 use application::use_case::AddOwnerUseCase;
 use application::use_case::AddTransactionUseCase;
 use application::use_case::CreateAccountUseCase;
-use application::use_case::CreateCustomTokenUseCase;
+use application::use_case::CreateSessionTokenUseCase;
 use application::use_case::DeleteAccountUseCase;
 use application::use_case::DeleteCategoryUseCase;
 use application::use_case::DeleteTransactionUseCase;
@@ -140,10 +140,10 @@ pub async fn delete_transaction(
 
 // Auth commands
 
-pub async fn create_custom_token(
-    State(use_case): State<CreateCustomTokenUseCase>,
-    Json(request): Json<CreateCustomTokenRequest>,
-) -> Result<Json<CreateCustomTokenResponse>, ApiError> {
+pub async fn create_session_token(
+    State(use_case): State<CreateSessionTokenUseCase>,
+    Json(request): Json<CreateSessionTokenRequest>,
+) -> Result<Json<CreateSessionTokenResponse>, ApiError> {
     let response = use_case.execute(request).await?;
     Ok(Json(response))
 }

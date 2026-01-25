@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use application::token_signer::TokenVerifier;
+use application::session_token::SessionTokenVerifier;
 use application::UserId;
 use axum::extract::FromRef;
 use axum::extract::FromRequestParts;
@@ -14,7 +14,7 @@ pub struct AuthUser(pub UserId);
 impl<S> FromRequestParts<S> for AuthUser
 where
     S: Send + Sync,
-    Arc<dyn TokenVerifier>: FromRef<S>,
+    Arc<dyn SessionTokenVerifier>: FromRef<S>,
 {
     type Rejection = AuthError;
 
@@ -32,7 +32,7 @@ where
             .ok_or(AuthError)?;
 
         // トークンを検証して UID を取得
-        let verifier = Arc::<dyn TokenVerifier>::from_ref(state);
+        let verifier = Arc::<dyn SessionTokenVerifier>::from_ref(state);
         let uid = verifier.verify(token).map_err(|_| AuthError)?;
 
         // UID を UserId に変換

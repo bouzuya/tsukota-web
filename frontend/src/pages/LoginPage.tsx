@@ -9,7 +9,7 @@ import {
 	setDeviceId,
 	setDeviceSecret,
 } from "../atoms/auth";
-import { createCustomToken } from "../api/auth";
+import { createSessionToken } from "../api/auth";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 import { PageLoader } from "../components/LoadingSpinner";
@@ -42,7 +42,7 @@ export function LoginPage() {
 		setIsLoggingIn(true);
 
 		try {
-			const token = await createCustomToken({
+			const token = await createSessionToken({
 				deviceId: trimmedDeviceId,
 				deviceSecret: trimmedDeviceSecret,
 			});

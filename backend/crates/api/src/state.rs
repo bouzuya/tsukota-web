@@ -6,13 +6,13 @@ use application::projection::TransactionProjection;
 use application::repository::AccountRepository;
 use application::repository::DeviceRepository;
 use application::repository::UserRepository;
-use application::token_signer::TokenSigner;
-use application::token_signer::TokenVerifier;
+use application::session_token::SessionTokenCreator;
+use application::session_token::SessionTokenVerifier;
 use application::use_case::AddCategoryUseCase;
 use application::use_case::AddOwnerUseCase;
 use application::use_case::AddTransactionUseCase;
 use application::use_case::CreateAccountUseCase;
-use application::use_case::CreateCustomTokenUseCase;
+use application::use_case::CreateSessionTokenUseCase;
 use application::use_case::DeleteAccountUseCase;
 use application::use_case::DeleteCategoryUseCase;
 use application::use_case::DeleteTransactionUseCase;
@@ -30,8 +30,8 @@ use axum::extract::FromRef;
 /// Application state holding all use cases
 #[derive(Clone)]
 pub struct AppState {
-    // Token verifier for authentication
-    pub token_verifier: Arc<dyn TokenVerifier>,
+    // Session token verifier for authentication
+    pub session_token_verifier: Arc<dyn SessionTokenVerifier>,
 
     // Command use cases
     pub create_account: CreateAccountUseCase,
@@ -45,7 +45,7 @@ pub struct AppState {
     pub add_transaction: AddTransactionUseCase,
     pub update_transaction: UpdateTransactionUseCase,
     pub delete_transaction: DeleteTransactionUseCase,
-    pub create_custom_token: CreateCustomTokenUseCase,
+    pub create_session_token: CreateSessionTokenUseCase,
 
     // Query use cases
     pub list_accounts: ListAccountsUseCase,
@@ -63,13 +63,13 @@ impl AppState {
         category_projection: Arc<dyn CategoryProjection>,
         transaction_projection: Arc<dyn TransactionProjection>,
         device_repository: Arc<dyn DeviceRepository>,
-        signer: Arc<dyn TokenSigner>,
-        verifier: Arc<dyn TokenVerifier>,
+        creator: Arc<dyn SessionTokenCreator>,
+        verifier: Arc<dyn SessionTokenVerifier>,
         user_repository: Arc<dyn UserRepository>,
     ) -> Self {
         Self {
-            // Token verifier
-            token_verifier: verifier,
+            // Session token verifier
+            session_token_verifier: verifier,
 
             // Command use cases
             create_account: CreateAccountUseCase::new(account_repository.clone()),
@@ -83,9 +83,9 @@ impl AppState {
             add_transaction: AddTransactionUseCase::new(account_repository.clone()),
             update_transaction: UpdateTransactionUseCase::new(account_repository.clone()),
             delete_transaction: DeleteTransactionUseCase::new(account_repository),
-            create_custom_token: CreateCustomTokenUseCase::new(
+            create_session_token: CreateSessionTokenUseCase::new(
                 device_repository,
-                signer,
+                creator,
                 user_repository,
             ),
 
@@ -176,9 +176,9 @@ impl FromRef<AppState> for DeleteTransactionUseCase {
     }
 }
 
-impl FromRef<AppState> for CreateCustomTokenUseCase {
+impl FromRef<AppState> for CreateSessionTokenUseCase {
     fn from_ref(state: &AppState) -> Self {
-        state.create_custom_token.clone()
+        state.create_session_token.clone()
     }
 }
 
@@ -212,8 +212,8 @@ impl FromRef<AppState> for ExportTransactionsUseCase {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn TokenVerifier> {
+impl FromRef<AppState> for Arc<dyn SessionTokenVerifier> {
     fn from_ref(state: &AppState) -> Self {
-        state.token_verifier.clone()
+        state.session_token_verifier.clone()
     }
 }

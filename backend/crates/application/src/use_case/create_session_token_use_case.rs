@@ -5,52 +5,52 @@ use domain::Device;
 use crate::error::ApplicationError;
 use crate::repository::DeviceRepository;
 use crate::repository::UserRepository;
-use crate::request::CreateCustomTokenRequest;
-use crate::response::CreateCustomTokenResponse;
-use crate::token_signer::TokenSigner;
+use crate::request::CreateSessionTokenRequest;
+use crate::response::CreateSessionTokenResponse;
+use crate::session_token::SessionTokenCreator;
 
-/// カスタムトークン作成ユースケース
+/// セッショントークン作成ユースケース
 ///
-/// デバイス認証を行い、Firebase カスタムトークンを発行する
+/// デバイス認証を行い、セッショントークンを発行する
 #[derive(Clone)]
-pub struct CreateCustomTokenUseCase {
+pub struct CreateSessionTokenUseCase {
     device_repository: Arc<dyn DeviceRepository>,
-    signer: Arc<dyn TokenSigner>,
+    creator: Arc<dyn SessionTokenCreator>,
     user_repository: Arc<dyn UserRepository>,
 }
 
-impl CreateCustomTokenUseCase {
+impl CreateSessionTokenUseCase {
     /// 新しいユースケースインスタンスを作成する
     pub fn new(
         device_repository: Arc<dyn DeviceRepository>,
-        signer: Arc<dyn TokenSigner>,
+        creator: Arc<dyn SessionTokenCreator>,
         user_repository: Arc<dyn UserRepository>,
     ) -> Self {
         Self {
             device_repository,
-            signer,
+            creator,
             user_repository,
         }
     }
 
-    /// カスタムトークンを作成する
+    /// セッショントークンを作成する
     ///
     /// # 処理フロー
     ///
     /// 1. デバイスドキュメントを取得
     /// 2. デバイスが存在する場合: bcrypt でシークレットを検証
     /// 3. デバイスが存在しない場合: 新しい UID を生成
-    /// 4. カスタムトークンを署名
+    /// 4. セッショントークンを作成
     /// 5. デバイスドキュメントを保存
     /// 6. ユーザードキュメントを作成（存在しなければ）
-    /// 7. カスタムトークンを返す
+    /// 7. セッショントークンを返す
     pub async fn execute(
         &self,
-        CreateCustomTokenRequest {
+        CreateSessionTokenRequest {
             device_id,
             device_secret,
-        }: CreateCustomTokenRequest,
-    ) -> Result<CreateCustomTokenResponse, ApplicationError> {
+        }: CreateSessionTokenRequest,
+    ) -> Result<CreateSessionTokenResponse, ApplicationError> {
         let device_id: domain::DeviceId = device_id
             .parse()
             .map_err(|_| ApplicationError::InvalidRequest("無効なデバイスID形式です".to_owned()))?;
@@ -92,14 +92,14 @@ impl CreateCustomTokenUseCase {
             Device::Active(active) => active,
         };
 
-        // 4. カスタムトークンを署名
+        // 4. セッショントークンを作成
         let now = self
-            .signer
+            .creator
             .now()
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-        let custom_token = self
-            .signer
-            .sign(&device.user_id().to_string(), now)
+        let session_token = self
+            .creator
+            .create(&device.user_id().to_string(), now)
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
 
         // 5. デバイスドキュメントを保存
@@ -134,7 +134,7 @@ impl CreateCustomTokenUseCase {
             }
         }
 
-        // 7. カスタムトークンを返す
-        Ok(CreateCustomTokenResponse { custom_token })
+        // 7. セッショントークンを返す
+        Ok(CreateSessionTokenResponse { session_token })
     }
 }

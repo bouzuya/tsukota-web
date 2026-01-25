@@ -1,10 +1,9 @@
-use application::TokenSigner;
-use application::TokenVerifier;
+use application::SessionTokenCreator;
+use application::SessionTokenVerifier;
 
-/// Claims for Firebase custom token
-/// <https://firebase.google.com/docs/auth/admin/create-custom-tokens#create_custom_tokens_using_a_third-party_jwt_library> に従って JWT を発行します
+/// セッショントークンの JWT クレーム
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct FirebaseCustomTokenClaims {
+pub struct SessionTokenClaims {
     /// Issuer - service account email address
     pub iss: String,
     /// Subject - service account email address
@@ -19,49 +18,49 @@ pub struct FirebaseCustomTokenClaims {
     pub uid: String,
 }
 
-/// Error type for signing operations
+/// トークン作成エラー
 #[derive(Debug)]
-pub enum SignError {
-    /// UID is empty or exceeds 128 characters
+pub enum CreateError {
+    /// UID が空または 128 文字を超えている
     InvalidUid,
-    /// JWT encoding failed
+    /// JWT エンコードに失敗
     JwtEncodingError(jsonwebtoken::errors::Error),
-    /// System time error
+    /// システム時刻エラー
     SystemTimeError,
 }
 
-impl std::fmt::Display for SignError {
+impl std::fmt::Display for CreateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SignError::InvalidUid => {
+            CreateError::InvalidUid => {
                 write!(f, "UID must be between 1 and 128 characters")
             }
-            SignError::JwtEncodingError(e) => {
+            CreateError::JwtEncodingError(e) => {
                 write!(f, "JWT encoding error: {}", e)
             }
-            SignError::SystemTimeError => {
+            CreateError::SystemTimeError => {
                 write!(f, "Failed to get system time")
             }
         }
     }
 }
 
-impl std::error::Error for SignError {}
+impl std::error::Error for CreateError {}
 
-/// Signer for creating Firebase custom tokens
+/// セッショントークン作成器
 #[derive(Clone)]
-pub struct Signer {
+pub struct Creator {
     encoding_key: jsonwebtoken::EncodingKey,
     service_account_email: String,
 }
 
-impl Signer {
-    /// Creates a new Signer instance.
+impl Creator {
+    /// 新しい Creator インスタンスを作成する
     ///
     /// # Arguments
     ///
-    /// * `private_key_pem` - The RSA private key in PEM format
-    /// * `service_account_email` - The service account email address (used as iss and sub)
+    /// * `private_key_pem` - RSA 秘密鍵 (PEM 形式)
+    /// * `service_account_email` - サービスアカウントのメールアドレス (iss と sub に使用)
     pub fn new(
         private_key_pem: &str,
         service_account_email: String,
@@ -73,32 +72,32 @@ impl Signer {
         })
     }
 
-    /// Returns the current time in seconds since UNIX epoch.
-    pub fn now() -> Result<u64, SignError> {
+    /// 現在時刻を UNIX エポックからの秒数で返す
+    pub fn now() -> Result<u64, CreateError> {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())
-            .map_err(|_| SignError::SystemTimeError)
+            .map_err(|_| CreateError::SystemTimeError)
     }
 
-    /// Signs a Firebase custom token for the given user.
+    /// 指定されたユーザーのセッショントークンを作成する
     ///
     /// # Arguments
     ///
-    /// * `uid` - The unique identifier of the user (1-128 characters)
-    /// * `now` - The current time in seconds since UNIX epoch
+    /// * `uid` - ユーザー識別子 (1-128 文字)
+    /// * `now` - 現在時刻 (UNIX エポックからの秒数)
     ///
     /// # Returns
     ///
-    /// A JWT string that can be used with Firebase's `signInWithCustomToken`
-    pub fn sign(&self, uid: &str, now: u64) -> Result<String, SignError> {
-        // Validate UID length
+    /// JWT 形式のセッショントークン
+    pub fn create(&self, uid: &str, now: u64) -> Result<String, CreateError> {
+        // UID の長さを検証
         if !(1..=128).contains(&uid.len()) {
-            return Err(SignError::InvalidUid);
+            return Err(CreateError::InvalidUid);
         }
 
-        // Create claims
-        let claims = FirebaseCustomTokenClaims {
+        // クレームを作成
+        let claims = SessionTokenClaims {
             iss: self.service_account_email.clone(),
             sub: self.service_account_email.clone(),
             aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit".to_owned(),
@@ -107,23 +106,23 @@ impl Signer {
             uid: uid.to_string(),
         };
 
-        // Create header with RS256 algorithm
+        // RS256 アルゴリズムでヘッダーを作成
         let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
 
-        // Encode the token
+        // トークンをエンコード
         jsonwebtoken::encode(&header, &claims, &self.encoding_key)
-            .map_err(SignError::JwtEncodingError)
+            .map_err(CreateError::JwtEncodingError)
     }
 }
 
-impl TokenSigner for Signer {
-    fn now(&self) -> Result<u64, application::token_signer::SignerError> {
-        Self::now().map_err(|e| Box::new(e) as application::token_signer::SignerError)
+impl SessionTokenCreator for Creator {
+    fn now(&self) -> Result<u64, application::session_token::CreatorError> {
+        Self::now().map_err(|e| Box::new(e) as application::session_token::CreatorError)
     }
 
-    fn sign(&self, uid: &str, now: u64) -> Result<String, application::token_signer::SignerError> {
-        self.sign(uid, now)
-            .map_err(|e| Box::new(e) as application::token_signer::SignerError)
+    fn create(&self, uid: &str, now: u64) -> Result<String, application::session_token::CreatorError> {
+        self.create(uid, now)
+            .map_err(|e| Box::new(e) as application::session_token::CreatorError)
     }
 }
 
@@ -208,7 +207,7 @@ impl Verifier {
         // 標準クレームの検証を無効化（uid は標準クレームではない）
         validation.set_required_spec_claims::<&str>(&[]);
 
-        let token_data = jsonwebtoken::decode::<FirebaseCustomTokenClaims>(
+        let token_data = jsonwebtoken::decode::<SessionTokenClaims>(
             token,
             &self.decoding_key,
             &validation,
@@ -219,10 +218,10 @@ impl Verifier {
     }
 }
 
-impl TokenVerifier for Verifier {
-    fn verify(&self, token: &str) -> Result<String, application::token_signer::VerifierError> {
+impl SessionTokenVerifier for Verifier {
+    fn verify(&self, token: &str) -> Result<String, application::session_token::VerifierError> {
         self.verify(token)
-            .map_err(|e| Box::new(e) as application::token_signer::VerifierError)
+            .map_err(|e| Box::new(e) as application::session_token::VerifierError)
     }
 }
 
@@ -273,31 +272,31 @@ XHoL8lz5DpxcSiLilKDCKxo=
 
     #[test]
     fn test_invalid_uid_empty() -> anyhow::Result<()> {
-        let signer = Signer::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
-        let result = signer.sign("", 1000);
-        assert!(matches!(result, Err(SignError::InvalidUid)));
+        let creator = Creator::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
+        let result = creator.create("", 1000);
+        assert!(matches!(result, Err(CreateError::InvalidUid)));
         Ok(())
     }
 
     #[test]
     fn test_invalid_uid_too_long() -> anyhow::Result<()> {
-        let signer = Signer::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
+        let creator = Creator::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
         let long_uid = "a".repeat(129);
-        let result = signer.sign(&long_uid, 1000);
-        assert!(matches!(result, Err(SignError::InvalidUid)));
+        let result = creator.create(&long_uid, 1000);
+        assert!(matches!(result, Err(CreateError::InvalidUid)));
         Ok(())
     }
 
     #[test]
-    fn test_sign_success() -> anyhow::Result<()> {
+    fn test_create_success() -> anyhow::Result<()> {
         let service_account_email = "test@example.iam.gserviceaccount.com";
-        let signer = Signer::new(TEST_PRIVATE_KEY_PEM, service_account_email.to_string())?;
+        let creator = Creator::new(TEST_PRIVATE_KEY_PEM, service_account_email.to_string())?;
         let uid = "user123";
         let now = 1700000000_u64;
 
-        let token = signer.sign(uid, now)?;
+        let token = creator.create(uid, now)?;
 
-        // Decode and verify the token claims
+        // トークンクレームをデコードして検証
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.validate_exp = false;
         validation.set_required_spec_claims::<&str>(&[]);
@@ -306,7 +305,7 @@ XHoL8lz5DpxcSiLilKDCKxo=
 
         let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(TEST_PUBLIC_KEY_PEM.as_bytes())?;
         let token_data =
-            jsonwebtoken::decode::<FirebaseCustomTokenClaims>(&token, &decoding_key, &validation)?;
+            jsonwebtoken::decode::<SessionTokenClaims>(&token, &decoding_key, &validation)?;
 
         assert_eq!(token_data.claims.iss, service_account_email);
         assert_eq!(token_data.claims.sub, service_account_email);

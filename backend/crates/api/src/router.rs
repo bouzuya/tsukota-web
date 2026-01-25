@@ -28,8 +28,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/commands/add_transaction", post(command::add_transaction))
         .route("/commands/create_account", post(command::create_account))
         .route(
-            "/commands/create_custom_token",
-            post(command::create_custom_token),
+            "/commands/create_session_token",
+            post(command::create_session_token),
         )
         .route("/commands/delete_account", post(command::delete_account))
         .route("/commands/delete_category", post(command::delete_category))

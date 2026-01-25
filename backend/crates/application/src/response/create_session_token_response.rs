@@ -1,6 +1,6 @@
-/// カスタムトークン作成レスポンス
+/// セッショントークン作成レスポンス
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-pub struct CreateCustomTokenResponse {
+pub struct CreateSessionTokenResponse {
     /// Authorization ヘッダーに指定する Bearer トークン
-    pub custom_token: String,
+    pub session_token: String,
 }

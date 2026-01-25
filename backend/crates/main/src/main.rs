@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use api::AppState;
+use api::Creator;
 use api::ServiceAccountCredentials;
-use api::Signer;
 use api::Verifier;
-use application::TokenSigner;
-use application::TokenVerifier;
+use application::SessionTokenCreator;
+use application::SessionTokenVerifier;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::TransactionProjection;
@@ -37,24 +37,24 @@ async fn main() {
     let category_projection: Arc<dyn CategoryProjection> = Arc::new(projection.clone());
     let transaction_projection: Arc<dyn TransactionProjection> = Arc::new(projection);
 
-    // Create token signer and verifier
-    let (signer, verifier): (Arc<dyn TokenSigner>, Arc<dyn TokenVerifier>) =
+    // Create session token creator and verifier
+    let (creator, verifier): (Arc<dyn SessionTokenCreator>, Arc<dyn SessionTokenVerifier>) =
         match ServiceAccountCredentials::load() {
             Ok(Some(credentials)) => {
-                let signer =
-                    Signer::new(&credentials.private_key, credentials.client_email.clone())
-                        .expect("Failed to create signer");
+                let creator =
+                    Creator::new(&credentials.private_key, credentials.client_email.clone())
+                        .expect("Failed to create session token creator");
                 let verifier = Verifier::new(&credentials.private_key, credentials.client_email)
-                    .expect("Failed to create verifier");
-                (Arc::new(signer), Arc::new(verifier))
+                    .expect("Failed to create session token verifier");
+                (Arc::new(creator), Arc::new(verifier))
             }
             Ok(None) => {
                 eprintln!(
                     "WARNING: GOOGLE_APPLICATION_CREDENTIALS not set. \
                      Authentication will not work."
                 );
-                // ダミー signer/verifier を作成（本番では使用不可）
-                (Arc::new(DummySigner), Arc::new(DummyVerifier))
+                // ダミー creator/verifier を作成（本番では使用不可）
+                (Arc::new(DummyCreator), Arc::new(DummyVerifier))
             }
             Err(e) => {
                 eprintln!("ERROR: Failed to load credentials: {}", e);
@@ -69,7 +69,7 @@ async fn main() {
         category_projection,
         transaction_projection,
         device_repository,
-        signer,
+        creator,
         verifier,
         user_repository,
     );
@@ -78,28 +78,28 @@ async fn main() {
     api::run(state).await;
 }
 
-/// ダミー TokenSigner（認証情報がない場合のフォールバック）
-struct DummySigner;
+/// ダミー SessionTokenCreator（認証情報がない場合のフォールバック）
+struct DummyCreator;
 
-impl TokenSigner for DummySigner {
-    fn now(&self) -> Result<u64, application::token_signer::SignerError> {
-        Err(Box::new(std::io::Error::other("Signer not configured")))
+impl SessionTokenCreator for DummyCreator {
+    fn now(&self) -> Result<u64, application::session_token::CreatorError> {
+        Err(Box::new(std::io::Error::other("Creator not configured")))
     }
 
-    fn sign(
+    fn create(
         &self,
         _uid: &str,
         _now: u64,
-    ) -> Result<String, application::token_signer::SignerError> {
-        Err(Box::new(std::io::Error::other("Signer not configured")))
+    ) -> Result<String, application::session_token::CreatorError> {
+        Err(Box::new(std::io::Error::other("Creator not configured")))
     }
 }
 
-/// ダミー TokenVerifier（認証情報がない場合のフォールバック）
+/// ダミー SessionTokenVerifier（認証情報がない場合のフォールバック）
 struct DummyVerifier;
 
-impl TokenVerifier for DummyVerifier {
-    fn verify(&self, _token: &str) -> Result<String, application::token_signer::VerifierError> {
+impl SessionTokenVerifier for DummyVerifier {
+    fn verify(&self, _token: &str) -> Result<String, application::session_token::VerifierError> {
         Err(Box::new(std::io::Error::other("Verifier not configured")))
     }
 }
