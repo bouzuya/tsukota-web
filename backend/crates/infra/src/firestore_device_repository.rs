@@ -3,9 +3,9 @@ use application::repository::DeviceRepository;
 use async_trait::async_trait;
 use domain::DeviceEvent;
 use domain::DeviceId;
+use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;
-use firestore_client::FirestoreClient;
 
 /// Internal error type for FirestoreDeviceRepository operations
 #[derive(Debug, thiserror::Error)]
