@@ -89,6 +89,7 @@ struct UserEventStreamDocumentData {
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UserDocumentData {
+    account_ids: Vec<String>,
     id: String,
 }
 
@@ -173,6 +174,7 @@ impl FirestoreUserRepository {
             match event {
                 UserEvent::UserCreated { .. } => {
                     let user_doc = UserDocumentData {
+                        account_ids: vec![],
                         id: user_id.to_string(),
                     };
                     let user_path = Self::user_path(user_id)?;
