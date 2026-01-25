@@ -7,6 +7,11 @@ import {
 	isAuthenticatedAtom,
 	getManualUserId,
 	setManualUserId,
+	getAuthToken,
+	getDeviceId,
+	setAuthToken,
+	setDeviceId,
+	setDeviceSecret,
 } from "../atoms/auth";
 
 export function useAuth() {
@@ -18,7 +23,21 @@ export function useAuth() {
 	const checkAuth = useCallback(() => {
 		setAuthLoading(true);
 
-		// Check for manual user ID in localStorage (development mode)
+		// 優先: トークンベース認証
+		const authToken = getAuthToken();
+		if (authToken) {
+			const deviceId = getDeviceId();
+			setCurrentUser({
+				id: deviceId ?? "unknown",
+				email: "",
+				displayName: deviceId ?? "User",
+				createdAt: new Date().toISOString(),
+			});
+			setAuthLoading(false);
+			return;
+		}
+
+		// フォールバック: 開発モードの X-User-Id
 		const manualUserId = getManualUserId();
 		if (manualUserId) {
 			setCurrentUser({
@@ -35,6 +54,11 @@ export function useAuth() {
 	}, [setCurrentUser, setAuthLoading]);
 
 	const logout = useCallback(() => {
+		// トークン認証のクリア
+		setAuthToken(null);
+		setDeviceId(null);
+		setDeviceSecret(null);
+		// 開発モードのクリア
 		setManualUserId(null);
 		setCurrentUser(null);
 		navigate("/login");

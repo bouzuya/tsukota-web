@@ -5,8 +5,11 @@ import {
 	isAuthenticatedAtom,
 	authLoadingAtom,
 	currentUserAtom,
-	setManualUserId,
+	setAuthToken,
+	setDeviceId,
+	setDeviceSecret,
 } from "../atoms/auth";
+import { createCustomToken } from "../api/auth";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 import { PageLoader } from "../components/LoadingSpinner";
@@ -18,7 +21,10 @@ export function LoginPage() {
 	const setAuthLoading = useSetAtom(authLoadingAtom);
 	const navigate = useNavigate();
 
-	const [userId, setUserId] = useState("");
+	const [deviceIdInput, setDeviceIdInput] = useState("");
+	const [deviceSecretInput, setDeviceSecretInput] = useState("");
+	const [error, setError] = useState<string | null>(null);
+	const [isLoggingIn, setIsLoggingIn] = useState(false);
 
 	useEffect(() => {
 		if (!authLoading && isAuthenticated) {
@@ -26,27 +32,56 @@ export function LoginPage() {
 		}
 	}, [authLoading, isAuthenticated, navigate]);
 
-	const handleLogin = () => {
-		if (!userId.trim()) return;
+	const handleLogin = async () => {
+		const trimmedDeviceId = deviceIdInput.trim();
+		const trimmedDeviceSecret = deviceSecretInput.trim();
 
-		// Store the manual user ID
-		setManualUserId(userId.trim());
+		if (!trimmedDeviceId || !trimmedDeviceSecret) return;
 
-		// Create a mock user for development
-		setCurrentUser({
-			id: userId.trim(),
-			email: `${userId.trim()}@example.com`,
-			displayName: `User ${userId.trim()}`,
-			createdAt: new Date().toISOString(),
-		});
+		setError(null);
+		setIsLoggingIn(true);
 
-		setAuthLoading(false);
-		navigate("/");
+		try {
+			const token = await createCustomToken({
+				deviceId: trimmedDeviceId,
+				deviceSecret: trimmedDeviceSecret,
+			});
+
+			// トークンとデバイス情報を保存
+			setAuthToken(token);
+			setDeviceId(trimmedDeviceId);
+			setDeviceSecret(trimmedDeviceSecret);
+
+			// ユーザー情報を設定（トークンからは取得できないため、device_id を使用）
+			setCurrentUser({
+				id: trimmedDeviceId,
+				email: "",
+				displayName: trimmedDeviceId,
+				createdAt: new Date().toISOString(),
+			});
+
+			setAuthLoading(false);
+			navigate("/");
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : "サインインに失敗しました";
+			setError(message);
+		} finally {
+			setIsLoggingIn(false);
+		}
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === "Enter" && !isLoggingIn) {
+			handleLogin();
+		}
 	};
 
 	if (authLoading) {
 		return <PageLoader />;
 	}
+
+	const isFormValid = deviceIdInput.trim() && deviceSecretInput.trim();
 
 	return (
 		<div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4">
@@ -54,35 +89,41 @@ export function LoginPage() {
 				<div className="text-center mb-8">
 					<h1 className="text-3xl font-bold text-gray-900 mb-2">tsukota</h1>
 					<p className="text-gray-600">アカウント・支出管理アプリ</p>
-					<p className="text-sm text-yellow-600 mt-2">(開発モード)</p>
 				</div>
 
 				<div className="space-y-4">
 					<Input
-						label="User ID"
-						value={userId}
-						onChange={(e) => setUserId(e.target.value)}
-						placeholder="ユーザーIDを入力"
-						onKeyDown={(e) => {
-							if (e.key === "Enter") {
-								handleLogin();
-							}
-						}}
+						label="Device ID"
+						value={deviceIdInput}
+						onChange={(e) => setDeviceIdInput(e.target.value)}
+						placeholder="デバイスIDを入力"
+						onKeyDown={handleKeyDown}
+						disabled={isLoggingIn}
+					/>
+
+					<Input
+						label="Device Secret"
+						type="password"
+						value={deviceSecretInput}
+						onChange={(e) => setDeviceSecretInput(e.target.value)}
+						placeholder="デバイスシークレットを入力"
+						onKeyDown={handleKeyDown}
+						disabled={isLoggingIn}
 					/>
 
 					<Button
 						onClick={handleLogin}
 						className="w-full"
 						size="lg"
-						disabled={!userId.trim()}
+						disabled={!isFormValid || isLoggingIn}
 					>
-						ログイン
+						{isLoggingIn ? "サインイン中..." : "サインイン"}
 					</Button>
 				</div>
 
-				<p className="mt-6 text-xs text-center text-gray-500">
-					開発用: X-User-Id ヘッダーに指定される User ID を入力してください
-				</p>
+				{error && (
+					<p className="mt-4 text-sm text-center text-red-600">{error}</p>
+				)}
 			</div>
 		</div>
 	);

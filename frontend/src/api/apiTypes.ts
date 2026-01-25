@@ -132,3 +132,13 @@ export interface ApiUpdateUserCommand {
 	user_id: string;
 	display_name: string;
 }
+
+// Authentication
+export interface ApiCreateCustomTokenCommand {
+	device_id: string;
+	device_secret: string;
+}
+
+export interface ApiCreateCustomTokenResponse {
+	custom_token: string;
+}
