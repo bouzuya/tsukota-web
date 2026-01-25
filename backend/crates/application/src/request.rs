@@ -15,6 +15,7 @@ mod remove_owner_request;
 mod update_account_request;
 mod update_category_request;
 mod update_transaction_request;
+mod verify_session_token_request;
 
 pub use self::add_category_request::AddCategoryRequest;
 pub use self::add_owner_request::AddOwnerRequest;
@@ -33,3 +34,4 @@ pub use self::remove_owner_request::RemoveOwnerRequest;
 pub use self::update_account_request::UpdateAccountRequest;
 pub use self::update_category_request::UpdateCategoryRequest;
 pub use self::update_transaction_request::UpdateTransactionRequest;
+pub use self::verify_session_token_request::VerifySessionTokenRequest;

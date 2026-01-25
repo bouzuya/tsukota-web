@@ -25,13 +25,14 @@ use application::use_case::RemoveOwnerUseCase;
 use application::use_case::UpdateAccountUseCase;
 use application::use_case::UpdateCategoryUseCase;
 use application::use_case::UpdateTransactionUseCase;
+use application::use_case::VerifySessionTokenUseCase;
 use axum::extract::FromRef;
 
 /// Application state holding all use cases
 #[derive(Clone)]
 pub struct AppState {
-    // Session token verifier for authentication
-    pub session_token_verifier: Arc<dyn SessionTokenVerifier>,
+    // Auth use cases
+    pub verify_session_token: VerifySessionTokenUseCase,
 
     // Command use cases
     pub create_account: CreateAccountUseCase,
@@ -68,8 +69,8 @@ impl AppState {
         user_repository: Arc<dyn UserRepository>,
     ) -> Self {
         Self {
-            // Session token verifier
-            session_token_verifier: verifier,
+            // Auth use cases
+            verify_session_token: VerifySessionTokenUseCase::new(verifier),
 
             // Command use cases
             create_account: CreateAccountUseCase::new(account_repository.clone()),
@@ -212,8 +213,8 @@ impl FromRef<AppState> for ExportTransactionsUseCase {
     }
 }
 
-impl FromRef<AppState> for Arc<dyn SessionTokenVerifier> {
+impl FromRef<AppState> for VerifySessionTokenUseCase {
     fn from_ref(state: &AppState) -> Self {
-        state.session_token_verifier.clone()
+        state.verify_session_token.clone()
     }
 }

@@ -15,6 +15,7 @@ mod remove_owner_use_case;
 mod update_account_use_case;
 mod update_category_use_case;
 mod update_transaction_use_case;
+mod verify_session_token_use_case;
 
 pub use self::add_category_use_case::AddCategoryUseCase;
 pub use self::add_owner_use_case::AddOwnerUseCase;
@@ -33,3 +34,4 @@ pub use self::remove_owner_use_case::RemoveOwnerUseCase;
 pub use self::update_account_use_case::UpdateAccountUseCase;
 pub use self::update_category_use_case::UpdateCategoryUseCase;
 pub use self::update_transaction_use_case::UpdateTransactionUseCase;
+pub use self::verify_session_token_use_case::VerifySessionTokenUseCase;

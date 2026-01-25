@@ -120,7 +120,11 @@ impl SessionTokenCreator for Creator {
         Self::now().map_err(|e| Box::new(e) as application::session_token::CreatorError)
     }
 
-    fn create(&self, uid: &str, now: u64) -> Result<String, application::session_token::CreatorError> {
+    fn create(
+        &self,
+        uid: &str,
+        now: u64,
+    ) -> Result<String, application::session_token::CreatorError> {
         self.create(uid, now)
             .map_err(|e| Box::new(e) as application::session_token::CreatorError)
     }
@@ -188,13 +192,20 @@ impl Verifier {
         use rsa::pkcs8::DecodePrivateKey;
         use rsa::pkcs8::EncodePublicKey;
 
-        let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(private_key_pem)
-            .map_err(|e| jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidRsaKey(e.to_string())))?;
+        let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(private_key_pem).map_err(|e| {
+            jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidRsaKey(
+                e.to_string(),
+            ))
+        })?;
 
         let public_key = rsa::RsaPublicKey::from(&private_key);
         let public_key_pem = public_key
             .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
-            .map_err(|e| jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidRsaKey(e.to_string())))?;
+            .map_err(|e| {
+                jsonwebtoken::errors::Error::from(jsonwebtoken::errors::ErrorKind::InvalidRsaKey(
+                    e.to_string(),
+                ))
+            })?;
 
         Ok(public_key_pem)
     }
@@ -207,12 +218,9 @@ impl Verifier {
         // 標準クレームの検証を無効化（uid は標準クレームではない）
         validation.set_required_spec_claims::<&str>(&[]);
 
-        let token_data = jsonwebtoken::decode::<SessionTokenClaims>(
-            token,
-            &self.decoding_key,
-            &validation,
-        )
-        .map_err(VerifyError::JwtDecodeError)?;
+        let token_data =
+            jsonwebtoken::decode::<SessionTokenClaims>(token, &self.decoding_key, &validation)
+                .map_err(VerifyError::JwtDecodeError)?;
 
         Ok(token_data.claims.uid)
     }

@@ -1,7 +1,6 @@
-use std::sync::Arc;
-
-use application::session_token::SessionTokenVerifier;
 use application::UserId;
+use application::request::VerifySessionTokenRequest;
+use application::use_case::VerifySessionTokenUseCase;
 use axum::extract::FromRef;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
@@ -14,7 +13,7 @@ pub struct AuthUser(pub UserId);
 impl<S> FromRequestParts<S> for AuthUser
 where
     S: Send + Sync,
-    Arc<dyn SessionTokenVerifier>: FromRef<S>,
+    VerifySessionTokenUseCase: FromRef<S>,
 {
     type Rejection = AuthError;
 
@@ -27,16 +26,18 @@ where
             .ok_or(AuthError)?;
 
         // "Bearer " プレフィックスを確認して取り除く
-        let token = auth_header
-            .strip_prefix("Bearer ")
-            .ok_or(AuthError)?;
+        let token = auth_header.strip_prefix("Bearer ").ok_or(AuthError)?;
 
         // トークンを検証して UID を取得
-        let verifier = Arc::<dyn SessionTokenVerifier>::from_ref(state);
-        let uid = verifier.verify(token).map_err(|_| AuthError)?;
+        let use_case = VerifySessionTokenUseCase::from_ref(state);
+        let response = use_case
+            .execute(VerifySessionTokenRequest {
+                session_token: token.to_string(),
+            })
+            .map_err(|_| AuthError)?;
 
         // UID を UserId に変換
-        let user_id = uid.parse::<UserId>().map_err(|_| AuthError)?;
+        let user_id = response.user_id.parse::<UserId>().map_err(|_| AuthError)?;
 
         Ok(AuthUser(user_id))
     }

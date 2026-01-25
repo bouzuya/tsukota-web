@@ -15,6 +15,7 @@ mod remove_owner_response;
 mod update_account_response;
 mod update_category_response;
 mod update_transaction_response;
+mod verify_session_token_response;
 
 pub use self::add_category_response::AddCategoryResponse;
 pub use self::add_owner_response::AddOwnerResponse;
@@ -33,3 +34,4 @@ pub use self::remove_owner_response::RemoveOwnerResponse;
 pub use self::update_account_response::UpdateAccountResponse;
 pub use self::update_category_response::UpdateCategoryResponse;
 pub use self::update_transaction_response::UpdateTransactionResponse;
+pub use self::verify_session_token_response::VerifySessionTokenResponse;
