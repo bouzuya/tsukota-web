@@ -1,5 +1,6 @@
 mod account;
 mod device;
+mod user;
 
 pub use self::account::Account;
 pub use self::account::AccountCommand;
@@ -14,3 +15,8 @@ pub use self::device::DeviceCommand;
 pub use self::device::DeviceError;
 pub use self::device::DeviceEvent;
 pub use self::device::DeviceEventCommonProps;
+pub use self::user::User;
+pub use self::user::UserCommand;
+pub use self::user::UserError;
+pub use self::user::UserEvent;
+pub use self::user::UserEventCommonProps;
