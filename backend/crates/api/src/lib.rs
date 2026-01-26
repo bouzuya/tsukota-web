@@ -11,6 +11,8 @@ pub use self::credentials::CredentialsError;
 pub use self::credentials::ServiceAccountCredentials;
 pub use self::iam_signer::IamSessionTokenCreateError;
 pub use self::iam_signer::IamSessionTokenCreator;
+pub use self::iam_signer::IamSessionTokenVerifier;
+pub use self::iam_signer::IamSessionTokenVerifyError;
 pub use self::signer::CreateError;
 pub use self::signer::Creator;
 pub use self::signer::Verifier;
