@@ -42,10 +42,9 @@ async fn main() {
     let (creator, verifier): (Arc<dyn SessionTokenCreator>, Arc<dyn SessionTokenVerifier>) =
         match ServiceAccountCredentials::load() {
             Ok(Some(credentials)) => {
-                let creator =
-                    Creator::new(&credentials.private_key, credentials.client_email.clone())
-                        .expect("Failed to create session token creator");
-                let verifier = Verifier::new(&credentials.private_key, credentials.client_email)
+                let creator = Creator::new(&credentials.private_key)
+                    .expect("Failed to create session token creator");
+                let verifier = Verifier::new(&credentials.private_key)
                     .expect("Failed to create session token verifier");
                 (Arc::new(creator), Arc::new(verifier))
             }

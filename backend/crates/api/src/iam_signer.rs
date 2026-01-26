@@ -13,40 +13,30 @@ use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
 use google_cloud_iam_credentials_v1::client::IAMCredentials;
 
-use crate::signer::SessionTokenClaims;
+use crate::session_claims::SessionTokenClaims;
 
 /// IAM signJwt API を使用したトークン作成エラー
 #[derive(Debug)]
 pub enum IamSessionTokenCreateError {
-    /// UID が空または 128 文字を超えている
-    InvalidUid,
-    /// システム時刻エラー
-    SystemTimeError,
     /// IAM クライアントの作成に失敗
     ClientBuildError(String),
-    /// JWT の署名に失敗
-    SignJwtError(String),
     /// JSON シリアライズエラー
     JsonError(String),
+    /// JWT の署名に失敗
+    SignJwtError(String),
 }
 
 impl std::fmt::Display for IamSessionTokenCreateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IamSessionTokenCreateError::InvalidUid => {
-                write!(f, "UID must be between 1 and 128 characters")
-            }
-            IamSessionTokenCreateError::SystemTimeError => {
-                write!(f, "Failed to get system time")
-            }
             IamSessionTokenCreateError::ClientBuildError(e) => {
                 write!(f, "Failed to build IAM client: {}", e)
             }
-            IamSessionTokenCreateError::SignJwtError(e) => {
-                write!(f, "Failed to sign JWT: {}", e)
-            }
             IamSessionTokenCreateError::JsonError(e) => {
                 write!(f, "JSON serialization error: {}", e)
+            }
+            IamSessionTokenCreateError::SignJwtError(e) => {
+                write!(f, "Failed to sign JWT: {}", e)
             }
         }
     }
@@ -102,27 +92,19 @@ impl IamSessionTokenCreator {
     ///
     /// # Arguments
     ///
-    /// * `uid` - ユーザー識別子 (1-128 文字)
+    /// * `user_id` - ユーザー識別子
     /// * `now` - 現在時刻 (UNIX エポックからの秒数)
     ///
     /// # Returns
     ///
     /// JWT 形式のセッショントークン
-    async fn create_impl(&self, uid: &str, now: u64) -> Result<String, IamSessionTokenCreateError> {
-        // UID の長さを検証
-        if !(1..=128).contains(&uid.len()) {
-            return Err(IamSessionTokenCreateError::InvalidUid);
-        }
-
+    async fn create_impl(
+        &self,
+        user_id: &str,
+        now: u64,
+    ) -> Result<String, IamSessionTokenCreateError> {
         // クレームを作成
-        let claims = SessionTokenClaims {
-            iss: self.service_account_email.clone(),
-            sub: self.service_account_email.clone(),
-            aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit".to_owned(),
-            iat: now,
-            exp: now + 3600,
-            uid: uid.to_string(),
-        };
+        let claims = SessionTokenClaims::new(user_id.to_owned(), now);
 
         // JWT ペイロードを JSON 文字列に変換
         let payload = serde_json::to_string(&claims)
@@ -137,10 +119,10 @@ impl IamSessionTokenCreator {
 impl SessionTokenCreator for IamSessionTokenCreator {
     async fn create(
         &self,
-        uid: &str,
+        user_id: &str,
         now: u64,
     ) -> Result<String, application::session_token::CreatorError> {
-        self.create_impl(uid, now)
+        self.create_impl(user_id, now)
             .await
             .map_err(|e| Box::new(e) as application::session_token::CreatorError)
     }
@@ -316,7 +298,9 @@ impl IamSessionTokenVerifier {
             .map_err(|e| IamSessionTokenVerifyError::JwkParseError(e.to_string()))
     }
 
-    /// トークンを検証して UID を取得する（非同期版）
+    /// トークンを検証してユーザー ID を取得する（非同期版）
+    ///
+    /// exp, aud, iss を検証する
     ///
     /// # Arguments
     ///
@@ -324,7 +308,7 @@ impl IamSessionTokenVerifier {
     ///
     /// # Returns
     ///
-    /// トークンに含まれる UID
+    /// トークンに含まれるユーザー ID
     pub async fn verify_async(&self, token: &str) -> Result<String, IamSessionTokenVerifyError> {
         // JWT ヘッダーからキー ID を取得
         let kid = Self::get_key_id_from_token(token)?;
@@ -340,17 +324,18 @@ impl IamSessionTokenVerifier {
         // JWK から DecodingKey を作成
         let decoding_key = Self::create_decoding_key(jwk)?;
 
-        // JWT を検証
+        // JWT を検証（exp, aud, iss を検証）
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        validation.set_audience(&["https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"]);
-        validation.set_issuer(&[&self.service_account_email]);
-        validation.set_required_spec_claims::<&str>(&[]);
+        validation.set_audience(&[SessionTokenClaims::AUDIENCE]);
+        validation.set_issuer(&[SessionTokenClaims::ISSUER]);
+        validation.set_required_spec_claims(&["aud", "exp", "iss", "sub"]);
+        validation.validate_exp = true;
 
         let token_data =
             jsonwebtoken::decode::<SessionTokenClaims>(token, &decoding_key, &validation)
                 .map_err(|e| IamSessionTokenVerifyError::JwtDecodeError(e.to_string()))?;
 
-        Ok(token_data.claims.uid)
+        Ok(token_data.claims.user_id().to_owned())
     }
 }
 

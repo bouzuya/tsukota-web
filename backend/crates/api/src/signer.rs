@@ -1,45 +1,20 @@
 use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
 
-/// セッショントークンの JWT クレーム
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct SessionTokenClaims {
-    /// Issuer - service account email address
-    pub iss: String,
-    /// Subject - service account email address
-    pub sub: String,
-    /// Audience - Firebase Identity Toolkit URL
-    pub aud: String,
-    /// Issued-at time in seconds since UNIX epoch
-    pub iat: u64,
-    /// Expiration time in seconds since UNIX epoch
-    pub exp: u64,
-    /// Unique identifier of the user (1-128 characters)
-    pub uid: String,
-}
+use crate::session_claims::SessionTokenClaims;
 
 /// トークン作成エラー
 #[derive(Debug)]
 pub enum CreateError {
-    /// UID が空または 128 文字を超えている
-    InvalidUid,
     /// JWT エンコードに失敗
     JwtEncodingError(jsonwebtoken::errors::Error),
-    /// システム時刻エラー
-    SystemTimeError,
 }
 
 impl std::fmt::Display for CreateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CreateError::InvalidUid => {
-                write!(f, "UID must be between 1 and 128 characters")
-            }
             CreateError::JwtEncodingError(e) => {
                 write!(f, "JWT encoding error: {}", e)
-            }
-            CreateError::SystemTimeError => {
-                write!(f, "Failed to get system time")
             }
         }
     }
@@ -51,7 +26,6 @@ impl std::error::Error for CreateError {}
 #[derive(Clone)]
 pub struct Creator {
     encoding_key: jsonwebtoken::EncodingKey,
-    service_account_email: String,
 }
 
 impl Creator {
@@ -60,51 +34,24 @@ impl Creator {
     /// # Arguments
     ///
     /// * `private_key_pem` - RSA 秘密鍵 (PEM 形式)
-    /// * `service_account_email` - サービスアカウントのメールアドレス (iss と sub に使用)
-    pub fn new(
-        private_key_pem: &str,
-        service_account_email: String,
-    ) -> Result<Self, jsonwebtoken::errors::Error> {
+    pub fn new(private_key_pem: &str) -> Result<Self, jsonwebtoken::errors::Error> {
         let encoding_key = jsonwebtoken::EncodingKey::from_rsa_pem(private_key_pem.as_bytes())?;
-        Ok(Self {
-            service_account_email,
-            encoding_key,
-        })
-    }
-
-    /// 現在時刻を UNIX エポックからの秒数で返す
-    pub fn now() -> Result<u64, CreateError> {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .map_err(|_| CreateError::SystemTimeError)
+        Ok(Self { encoding_key })
     }
 
     /// 指定されたユーザーのセッショントークンを作成する
     ///
     /// # Arguments
     ///
-    /// * `uid` - ユーザー識別子 (1-128 文字)
+    /// * `user_id` - ユーザー識別子
     /// * `now` - 現在時刻 (UNIX エポックからの秒数)
     ///
     /// # Returns
     ///
     /// JWT 形式のセッショントークン
-    pub fn create(&self, uid: &str, now: u64) -> Result<String, CreateError> {
-        // UID の長さを検証
-        if !(1..=128).contains(&uid.len()) {
-            return Err(CreateError::InvalidUid);
-        }
-
+    pub fn create(&self, user_id: &str, now: u64) -> Result<String, CreateError> {
         // クレームを作成
-        let claims = SessionTokenClaims {
-            iss: self.service_account_email.clone(),
-            sub: self.service_account_email.clone(),
-            aud: "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit".to_owned(),
-            iat: now,
-            exp: now + 3600,
-            uid: uid.to_string(),
-        };
+        let claims = SessionTokenClaims::new(user_id.to_owned(), now);
 
         // RS256 アルゴリズムでヘッダーを作成
         let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
@@ -119,10 +66,10 @@ impl Creator {
 impl SessionTokenCreator for Creator {
     async fn create(
         &self,
-        uid: &str,
+        user_id: &str,
         now: u64,
     ) -> Result<String, application::session_token::CreatorError> {
-        self.create(uid, now)
+        self.create(user_id, now)
             .map_err(|e| Box::new(e) as application::session_token::CreatorError)
     }
 }
@@ -132,10 +79,6 @@ impl SessionTokenCreator for Creator {
 pub enum VerifyError {
     /// JWT デコードに失敗
     JwtDecodeError(jsonwebtoken::errors::Error),
-    /// トークンが期限切れ
-    TokenExpired,
-    /// システム時刻エラー
-    SystemTimeError,
 }
 
 impl std::fmt::Display for VerifyError {
@@ -143,12 +86,6 @@ impl std::fmt::Display for VerifyError {
         match self {
             VerifyError::JwtDecodeError(e) => {
                 write!(f, "JWT decode error: {}", e)
-            }
-            VerifyError::TokenExpired => {
-                write!(f, "Token has expired")
-            }
-            VerifyError::SystemTimeError => {
-                write!(f, "Failed to get system time")
             }
         }
     }
@@ -160,7 +97,6 @@ impl std::error::Error for VerifyError {}
 #[derive(Clone)]
 pub struct Verifier {
     decoding_key: jsonwebtoken::DecodingKey,
-    service_account_email: String,
 }
 
 impl Verifier {
@@ -169,19 +105,12 @@ impl Verifier {
     /// # Arguments
     ///
     /// * `private_key_pem` - RSA 秘密鍵 (PEM 形式)
-    /// * `service_account_email` - サービスアカウントのメールアドレス
-    pub fn new(
-        private_key_pem: &str,
-        service_account_email: String,
-    ) -> Result<Self, jsonwebtoken::errors::Error> {
+    pub fn new(private_key_pem: &str) -> Result<Self, jsonwebtoken::errors::Error> {
         // 秘密鍵から公開鍵コンポーネントを抽出してデコード用キーを作成
         let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(
             Self::extract_public_key(private_key_pem)?.as_bytes(),
         )?;
-        Ok(Self {
-            decoding_key,
-            service_account_email,
-        })
+        Ok(Self { decoding_key })
     }
 
     /// 秘密鍵から公開鍵を抽出する
@@ -207,19 +136,21 @@ impl Verifier {
         Ok(public_key_pem)
     }
 
-    /// トークンを検証して UID を取得する
+    /// トークンを検証してユーザー ID を取得する
+    ///
+    /// exp, aud, iss を検証する
     pub fn verify(&self, token: &str) -> Result<String, VerifyError> {
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
-        validation.set_audience(&["https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"]);
-        validation.set_issuer(&[&self.service_account_email]);
-        // 標準クレームの検証を無効化（uid は標準クレームではない）
-        validation.set_required_spec_claims::<&str>(&[]);
+        validation.set_audience(&[SessionTokenClaims::AUDIENCE]);
+        validation.set_issuer(&[SessionTokenClaims::ISSUER]);
+        validation.set_required_spec_claims(&["aud", "exp", "iss", "sub"]);
+        validation.validate_exp = true;
 
         let token_data =
             jsonwebtoken::decode::<SessionTokenClaims>(token, &self.decoding_key, &validation)
                 .map_err(VerifyError::JwtDecodeError)?;
 
-        Ok(token_data.claims.uid)
+        Ok(token_data.claims.user_id().to_owned())
     }
 }
 
@@ -280,51 +211,51 @@ XHoL8lz5DpxcSiLilKDCKxo=
 -----END PRIVATE KEY-----"#;
 
     #[test]
-    fn test_invalid_uid_empty() -> anyhow::Result<()> {
-        let creator = Creator::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
-        let result = creator.create("", 1000);
-        assert!(matches!(result, Err(CreateError::InvalidUid)));
-        Ok(())
-    }
-
-    #[test]
-    fn test_invalid_uid_too_long() -> anyhow::Result<()> {
-        let creator = Creator::new(TEST_PRIVATE_KEY_PEM, "test@example.com".to_string())?;
-        let long_uid = "a".repeat(129);
-        let result = creator.create(&long_uid, 1000);
-        assert!(matches!(result, Err(CreateError::InvalidUid)));
-        Ok(())
-    }
-
-    #[test]
     fn test_create_success() -> anyhow::Result<()> {
-        let service_account_email = "test@example.iam.gserviceaccount.com";
-        let creator = Creator::new(TEST_PRIVATE_KEY_PEM, service_account_email.to_string())?;
-        let uid = "user123";
+        let creator = Creator::new(TEST_PRIVATE_KEY_PEM)?;
+        let user_id = "user123";
         let now = 1700000000_u64;
 
-        let token = creator.create(uid, now)?;
+        let token = creator.create(user_id, now)?;
 
         // トークンクレームをデコードして検証
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.validate_exp = false;
-        validation.set_required_spec_claims::<&str>(&[]);
-        validation.set_audience(&["https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"]);
-        validation.set_issuer(&[service_account_email]);
+        validation.set_audience(&[SessionTokenClaims::AUDIENCE]);
+        validation.set_issuer(&[SessionTokenClaims::ISSUER]);
+        validation.set_required_spec_claims(&["aud", "exp", "iss", "sub"]);
+        // exp はテストコードなので意図的に含めていない
+        // validation.validate_exp = true;
 
         let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(TEST_PUBLIC_KEY_PEM.as_bytes())?;
         let token_data =
             jsonwebtoken::decode::<SessionTokenClaims>(&token, &decoding_key, &validation)?;
 
-        assert_eq!(token_data.claims.iss, service_account_email);
-        assert_eq!(token_data.claims.sub, service_account_email);
+        assert_eq!(token_data.claims.iss, SessionTokenClaims::ISSUER);
+        assert_eq!(token_data.claims.aud, SessionTokenClaims::AUDIENCE);
+        assert_eq!(token_data.claims.sub, user_id);
         assert_eq!(
-            token_data.claims.aud,
-            "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
+            token_data.claims.exp,
+            now + SessionTokenClaims::EXPIRATION_SECONDS
         );
-        assert_eq!(token_data.claims.iat, now);
-        assert_eq!(token_data.claims.exp, now + 3600);
-        assert_eq!(token_data.claims.uid, uid);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_and_verify() -> anyhow::Result<()> {
+        let creator = Creator::new(TEST_PRIVATE_KEY_PEM)?;
+        let verifier = Verifier::new(TEST_PRIVATE_KEY_PEM)?;
+
+        let user_id = "test_user_123";
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
+
+        let token = creator.create(user_id, now)?;
+        let verified_user_id = verifier.verify(&token)?;
+
+        assert_eq!(verified_user_id, user_id);
 
         Ok(())
     }
