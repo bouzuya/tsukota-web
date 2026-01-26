@@ -1,14 +1,23 @@
+use std::path::Path;
+
 use axum::Router;
 use axum::routing::get;
 use axum::routing::post;
+use tower_http::services::ServeDir;
+use tower_http::services::ServeFile;
 
 use crate::handler::command;
 use crate::handler::query;
 use crate::state::AppState;
 
 /// API ルーターを作成する
-pub fn create_router(state: AppState) -> Router {
-    Router::new()
+///
+/// # Arguments
+///
+/// * `state` - アプリケーションステート
+/// * `public_dir` - 静的ファイルを配信するディレクトリ（None の場合は配信しない）
+pub fn create_router(state: AppState, public_dir: Option<&Path>) -> Router {
+    let api_router = Router::new()
         .route("/accounts", get(query::list_accounts))
         .route("/accounts/{account_id}", get(query::get_account))
         .route(
@@ -44,5 +53,17 @@ pub fn create_router(state: AppState) -> Router {
             "/commands/update_transaction",
             post(command::update_transaction),
         )
-        .with_state(state)
+        .with_state(state);
+
+    match public_dir {
+        Some(dir) => {
+            let index_path = dir.join("index.html");
+            let assets_path = dir.join("assets");
+
+            api_router
+                .nest_service("/assets", ServeDir::new(assets_path))
+                .fallback_service(ServeFile::new(index_path))
+        }
+        None => api_router,
+    }
 }

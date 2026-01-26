@@ -21,9 +21,16 @@ pub use self::signer::Verifier;
 pub use self::signer::VerifyError;
 pub use self::state::AppState;
 
+use std::path::Path;
+
 /// API サーバーを起動する
-pub async fn run(state: AppState) {
-    let app = router::create_router(state);
+///
+/// # Arguments
+///
+/// * `state` - アプリケーションステート
+/// * `public_dir` - 静的ファイルを配信するディレクトリ（None の場合は配信しない）
+pub async fn run(state: AppState, public_dir: Option<&Path>) {
+    let app = router::create_router(state, public_dir);
 
     let addr = "0.0.0.0:3000";
     println!("Starting server on {}", addr);

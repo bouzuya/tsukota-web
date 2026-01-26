@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use api::AppState;
@@ -73,8 +74,11 @@ async fn main() {
         user_repository,
     );
 
+    // Get public directory from environment variable
+    let public_dir = std::env::var("PUBLIC_DIR").ok().map(PathBuf::from);
+
     // Run the server
-    api::run(state).await;
+    api::run(state, public_dir.as_deref()).await;
 }
 
 /// ダミー SessionTokenVerifier（認証情報がない場合のフォールバック）
