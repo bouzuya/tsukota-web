@@ -13,13 +13,11 @@ base64 = "0.22"
 google-cloud-iam-credentials-v1 = "1"
 infra = { path = "../infra" }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
-pem = "3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 rsa = { version = "0.9", features = ["pem"] }
 serde.workspace = true
-urlencoding = "2"
-x509-cert = "0.2"
 serde_json.workspace = true
+urlencoding = "2"
 thiserror.workspace = true
 tokio.workspace = true
 

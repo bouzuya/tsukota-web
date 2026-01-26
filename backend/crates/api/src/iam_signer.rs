@@ -2,9 +2,12 @@
 //!
 //! Cloud Run では秘密鍵ファイルに直接アクセスできないため、
 //! Google Cloud IAM の signJwt API を使用して JWT に署名する。
-//! 検証時は Google の公開エンドポイントから公開鍵を取得する。
+//! 検証時は Google の JWK エンドポイントから公開鍵を取得する。
 
-use std::collections::BTreeMap;
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::time::Duration;
+use std::time::Instant;
 
 use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
@@ -150,12 +153,12 @@ pub enum IamSessionTokenVerifyError {
     HttpError(String),
     /// 公開鍵の取得に失敗
     FetchPublicKeyError(String),
-    /// キー ID が見つからない
-    KeyIdNotFound(String),
-    /// X.509 証明書のパースに失敗
-    CertificateParseError(String),
+    /// JWK のパースに失敗
+    JwkParseError(String),
     /// JWT デコードに失敗
     JwtDecodeError(String),
+    /// キー ID が見つからない
+    KeyIdNotFound(String),
 }
 
 impl std::fmt::Display for IamSessionTokenVerifyError {
@@ -167,14 +170,14 @@ impl std::fmt::Display for IamSessionTokenVerifyError {
             IamSessionTokenVerifyError::FetchPublicKeyError(e) => {
                 write!(f, "Failed to fetch public key: {}", e)
             }
-            IamSessionTokenVerifyError::KeyIdNotFound(kid) => {
-                write!(f, "Key ID not found: {}", kid)
-            }
-            IamSessionTokenVerifyError::CertificateParseError(e) => {
-                write!(f, "Failed to parse X.509 certificate: {}", e)
+            IamSessionTokenVerifyError::JwkParseError(e) => {
+                write!(f, "Failed to parse JWK: {}", e)
             }
             IamSessionTokenVerifyError::JwtDecodeError(e) => {
                 write!(f, "JWT decode error: {}", e)
+            }
+            IamSessionTokenVerifyError::KeyIdNotFound(kid) => {
+                write!(f, "Key ID not found: {}", kid)
             }
         }
     }
@@ -182,16 +185,50 @@ impl std::fmt::Display for IamSessionTokenVerifyError {
 
 impl std::error::Error for IamSessionTokenVerifyError {}
 
+/// JWK レスポンスの構造体
+#[derive(Debug, serde::Deserialize)]
+struct JwkSet {
+    keys: Vec<Jwk>,
+}
+
+/// 個別の JWK
+#[derive(Clone, Debug, serde::Deserialize)]
+struct Jwk {
+    /// キー ID
+    kid: String,
+    /// RSA modulus (Base64URL エンコード)
+    n: String,
+    /// RSA exponent (Base64URL エンコード)
+    e: String,
+}
+
+/// キャッシュされた JWK セット
+struct CachedJwkSet {
+    /// 取得した JWK リスト
+    keys: Vec<Jwk>,
+    /// 取得時刻
+    fetched_at: Instant,
+}
+
 /// Cloud Run 向け IAM ベースのセッショントークン検証器
 ///
-/// Google の公開エンドポイントから公開鍵を取得して JWT を検証する。
-/// 公開鍵は `https://www.googleapis.com/robot/v1/metadata/x509/{SERVICE_ACCOUNT_EMAIL}` から取得する。
+/// Google の JWK エンドポイントから公開鍵を取得して JWT を検証する。
+/// 公開鍵は `https://www.googleapis.com/service_accounts/v1/metadata/jwk/{SERVICE_ACCOUNT_EMAIL}` から取得する。
+/// 取得した鍵は 1 時間キャッシュされる。
 #[derive(Clone)]
 pub struct IamSessionTokenVerifier {
+    /// HTTP クライアント
+    client: reqwest::Client,
+    /// JWK キャッシュ
+    jwk_cache: Arc<RwLock<Option<CachedJwkSet>>>,
+    /// サービスアカウントのメールアドレス
     service_account_email: String,
 }
 
 impl IamSessionTokenVerifier {
+    /// キャッシュの有効期間（1 時間）
+    const CACHE_DURATION: Duration = Duration::from_secs(60 * 60);
+
     /// 新しい IamSessionTokenVerifier インスタンスを作成する
     ///
     /// # Arguments
@@ -199,21 +236,21 @@ impl IamSessionTokenVerifier {
     /// * `service_account_email` - サービスアカウントのメールアドレス
     pub fn new(service_account_email: String) -> Self {
         Self {
+            client: reqwest::Client::new(),
+            jwk_cache: Arc::new(RwLock::new(None)),
             service_account_email,
         }
     }
 
-    /// Google の公開エンドポイントから公開鍵証明書を取得する
-    async fn fetch_public_keys(
-        &self,
-    ) -> Result<BTreeMap<String, String>, IamSessionTokenVerifyError> {
+    /// Google の JWK エンドポイントから公開鍵を取得する
+    async fn fetch_jwk_set(&self) -> Result<Vec<Jwk>, IamSessionTokenVerifyError> {
         let url = format!(
-            "https://www.googleapis.com/robot/v1/metadata/x509/{}",
+            "https://www.googleapis.com/service_accounts/v1/metadata/jwk/{}",
             urlencoding::encode(&self.service_account_email)
         );
 
-        let client = reqwest::Client::new();
-        let response = client
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
@@ -226,10 +263,37 @@ impl IamSessionTokenVerifier {
             )));
         }
 
-        let keys: BTreeMap<String, String> = response
+        let jwk_set: JwkSet = response
             .json()
             .await
             .map_err(|e| IamSessionTokenVerifyError::FetchPublicKeyError(e.to_string()))?;
+
+        Ok(jwk_set.keys)
+    }
+
+    /// キャッシュから JWK を取得するか、新しく取得してキャッシュする
+    async fn get_jwk_set(&self) -> Result<Vec<Jwk>, IamSessionTokenVerifyError> {
+        // キャッシュをチェック
+        {
+            let cache = self.jwk_cache.read().unwrap();
+            if let Some(cached) = cache.as_ref()
+                && cached.fetched_at.elapsed() < Self::CACHE_DURATION
+            {
+                return Ok(cached.keys.clone());
+            }
+        }
+
+        // キャッシュが無効または存在しない場合は新しく取得
+        let keys = self.fetch_jwk_set().await?;
+
+        // キャッシュを更新
+        {
+            let mut cache = self.jwk_cache.write().unwrap();
+            *cache = Some(CachedJwkSet {
+                keys: keys.clone(),
+                fetched_at: Instant::now(),
+            });
+        }
 
         Ok(keys)
     }
@@ -244,34 +308,12 @@ impl IamSessionTokenVerifier {
             .ok_or_else(|| IamSessionTokenVerifyError::KeyIdNotFound("No kid in header".to_owned()))
     }
 
-    /// X.509 証明書から公開鍵を抽出する
-    fn extract_public_key_from_cert(
-        cert_pem: &str,
+    /// JWK から DecodingKey を作成する
+    fn create_decoding_key(
+        jwk: &Jwk,
     ) -> Result<jsonwebtoken::DecodingKey, IamSessionTokenVerifyError> {
-        // X.509 証明書から公開鍵を抽出
-        use x509_cert::der::Decode;
-
-        // PEM からDER に変換
-        let pem = pem::parse(cert_pem)
-            .map_err(|e| IamSessionTokenVerifyError::CertificateParseError(e.to_string()))?;
-
-        // X.509 証明書をパース
-        let cert = x509_cert::Certificate::from_der(pem.contents())
-            .map_err(|e| IamSessionTokenVerifyError::CertificateParseError(e.to_string()))?;
-
-        // 公開鍵情報を取得
-        let spki = cert.tbs_certificate.subject_public_key_info;
-
-        // SPKI を DER 形式でエンコード
-        use x509_cert::der::Encode;
-        let spki_der = spki
-            .to_der()
-            .map_err(|e| IamSessionTokenVerifyError::CertificateParseError(e.to_string()))?;
-
-        // jsonwebtoken の DecodingKey を作成
-        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_der(&spki_der);
-
-        Ok(decoding_key)
+        jsonwebtoken::DecodingKey::from_rsa_components(&jwk.n, &jwk.e)
+            .map_err(|e| IamSessionTokenVerifyError::JwkParseError(e.to_string()))
     }
 
     /// トークンを検証して UID を取得する（非同期版）
@@ -287,16 +329,16 @@ impl IamSessionTokenVerifier {
         // JWT ヘッダーからキー ID を取得
         let kid = Self::get_key_id_from_token(token)?;
 
-        // 公開鍵証明書を取得
-        let public_keys = self.fetch_public_keys().await?;
+        // JWK セットを取得
+        let jwk_set = self.get_jwk_set().await?;
 
-        // キー ID に対応する証明書を取得
-        let cert_pem = public_keys.get(&kid).ok_or_else(|| {
+        // キー ID に対応する JWK を取得
+        let jwk = jwk_set.iter().find(|k| k.kid == kid).ok_or_else(|| {
             IamSessionTokenVerifyError::KeyIdNotFound(format!("Key ID '{}' not found", kid))
         })?;
 
-        // 証明書から公開鍵を抽出
-        let decoding_key = Self::extract_public_key_from_cert(cert_pem)?;
+        // JWK から DecodingKey を作成
+        let decoding_key = Self::create_decoding_key(jwk)?;
 
         // JWT を検証
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
