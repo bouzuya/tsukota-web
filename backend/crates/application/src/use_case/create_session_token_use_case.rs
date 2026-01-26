@@ -93,13 +93,11 @@ impl CreateSessionTokenUseCase {
         };
 
         // 4. セッショントークンを作成
-        let now = self
-            .creator
-            .now()
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+        let now = self.creator.now();
         let session_token = self
             .creator
             .create(&device.user_id().to_string(), now)
+            .await
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
 
         // 5. デバイスドキュメントを保存

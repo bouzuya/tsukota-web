@@ -115,12 +115,9 @@ impl Creator {
     }
 }
 
+#[async_trait::async_trait]
 impl SessionTokenCreator for Creator {
-    fn now(&self) -> Result<u64, application::session_token::CreatorError> {
-        Self::now().map_err(|e| Box::new(e) as application::session_token::CreatorError)
-    }
-
-    fn create(
+    async fn create(
         &self,
         uid: &str,
         now: u64,

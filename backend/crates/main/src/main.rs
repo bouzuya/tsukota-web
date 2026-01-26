@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use api::AppState;
 use api::Creator;
+use api::IamSessionTokenCreator;
 use api::ServiceAccountCredentials;
 use api::Verifier;
 use application::SessionTokenCreator;
@@ -49,12 +50,11 @@ async fn main() {
                 (Arc::new(creator), Arc::new(verifier))
             }
             Ok(None) => {
-                eprintln!(
-                    "WARNING: GOOGLE_APPLICATION_CREDENTIALS not set. \
-                     Authentication will not work."
-                );
-                // ダミー creator/verifier を作成（本番では使用不可）
-                (Arc::new(DummyCreator), Arc::new(DummyVerifier))
+                println!("GOOGLE_APPLICATION_CREDENTIALS not set, using IamSessionTokenCreator");
+                let creator = IamSessionTokenCreator::new("FIXME@example.com".to_owned());
+                // FIXME
+                let verifier = DummyVerifier;
+                (Arc::new(creator), Arc::new(verifier))
             }
             Err(e) => {
                 eprintln!("ERROR: Failed to load credentials: {}", e);
@@ -76,23 +76,6 @@ async fn main() {
 
     // Run the server
     api::run(state).await;
-}
-
-/// ダミー SessionTokenCreator（認証情報がない場合のフォールバック）
-struct DummyCreator;
-
-impl SessionTokenCreator for DummyCreator {
-    fn now(&self) -> Result<u64, application::session_token::CreatorError> {
-        Err(Box::new(std::io::Error::other("Creator not configured")))
-    }
-
-    fn create(
-        &self,
-        _uid: &str,
-        _now: u64,
-    ) -> Result<String, application::session_token::CreatorError> {
-        Err(Box::new(std::io::Error::other("Creator not configured")))
-    }
 }
 
 /// ダミー SessionTokenVerifier（認証情報がない場合のフォールバック）

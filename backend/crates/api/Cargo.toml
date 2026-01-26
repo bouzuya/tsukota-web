@@ -7,7 +7,10 @@ version.workspace = true
 
 [dependencies]
 application.workspace = true
+async-trait.workspace = true
 axum = "0.8"
+base64 = "0.22"
+google-cloud-iam-credentials-v1 = "1"
 infra = { path = "../infra" }
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 rsa = { version = "0.9", features = ["pem"] }

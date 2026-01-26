@@ -2,17 +2,20 @@ mod credentials;
 mod error;
 mod extractor;
 mod handler;
+mod iam_signer;
 mod router;
 mod signer;
 mod state;
 
-pub use credentials::CredentialsError;
-pub use credentials::ServiceAccountCredentials;
-pub use signer::CreateError;
-pub use signer::Creator;
-pub use signer::Verifier;
-pub use signer::VerifyError;
-pub use state::AppState;
+pub use self::credentials::CredentialsError;
+pub use self::credentials::ServiceAccountCredentials;
+pub use self::iam_signer::IamSessionTokenCreateError;
+pub use self::iam_signer::IamSessionTokenCreator;
+pub use self::signer::CreateError;
+pub use self::signer::Creator;
+pub use self::signer::Verifier;
+pub use self::signer::VerifyError;
+pub use self::state::AppState;
 
 /// API サーバーを起動する
 pub async fn run(state: AppState) {
