@@ -25,6 +25,7 @@ pub trait SessionTokenCreator: Send + Sync {
 }
 
 /// トークンを検証して UID を取得するための trait
+#[async_trait::async_trait]
 pub trait SessionTokenVerifier: Send + Sync {
     /// トークンを検証して UID を取得する
     ///
@@ -35,5 +36,5 @@ pub trait SessionTokenVerifier: Send + Sync {
     /// # Returns
     ///
     /// トークンに含まれる UID、または検証エラー
-    fn verify(&self, token: &str) -> Result<String, VerifierError>;
+    async fn verify(&self, token: &str) -> Result<String, VerifierError>;
 }

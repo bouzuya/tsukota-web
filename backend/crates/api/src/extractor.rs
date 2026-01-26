@@ -34,6 +34,7 @@ where
             .execute(VerifySessionTokenRequest {
                 session_token: token.to_string(),
             })
+            .await
             .map_err(|_| AuthError)?;
 
         // UID を UserId に変換

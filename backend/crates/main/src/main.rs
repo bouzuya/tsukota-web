@@ -81,8 +81,12 @@ async fn main() {
 /// ダミー SessionTokenVerifier（認証情報がない場合のフォールバック）
 struct DummyVerifier;
 
+#[async_trait::async_trait]
 impl SessionTokenVerifier for DummyVerifier {
-    fn verify(&self, _token: &str) -> Result<String, application::session_token::VerifierError> {
+    async fn verify(
+        &self,
+        _token: &str,
+    ) -> Result<String, application::session_token::VerifierError> {
         Err(Box::new(std::io::Error::other("Verifier not configured")))
     }
 }

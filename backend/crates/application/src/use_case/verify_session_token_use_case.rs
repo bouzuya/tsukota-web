@@ -25,13 +25,14 @@ impl VerifySessionTokenUseCase {
     ///
     /// 1. トークンを検証
     /// 2. ユーザー ID を取得
-    pub fn execute(
+    pub async fn execute(
         &self,
         VerifySessionTokenRequest { session_token }: VerifySessionTokenRequest,
     ) -> Result<VerifySessionTokenResponse, ApplicationError> {
         let user_id = self
             .verifier
             .verify(&session_token)
+            .await
             .map_err(|e| ApplicationError::Unauthorized(e.to_string()))?;
 
         Ok(VerifySessionTokenResponse { user_id })

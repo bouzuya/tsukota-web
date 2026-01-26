@@ -12,5 +12,6 @@ path = "src/main.rs"
 [dependencies]
 api = { path = "../api" }
 application = { path = "../application" }
+async-trait.workspace = true
 infra = { path = "../infra" }
 tokio.workspace = true

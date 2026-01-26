@@ -223,8 +223,12 @@ impl Verifier {
     }
 }
 
+#[async_trait::async_trait]
 impl SessionTokenVerifier for Verifier {
-    fn verify(&self, token: &str) -> Result<String, application::session_token::VerifierError> {
+    async fn verify(
+        &self,
+        token: &str,
+    ) -> Result<String, application::session_token::VerifierError> {
         self.verify(token)
             .map_err(|e| Box::new(e) as application::session_token::VerifierError)
     }

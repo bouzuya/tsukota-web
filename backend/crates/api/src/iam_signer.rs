@@ -312,12 +312,14 @@ impl IamSessionTokenVerifier {
     }
 }
 
+#[async_trait::async_trait]
 impl SessionTokenVerifier for IamSessionTokenVerifier {
-    fn verify(&self, token: &str) -> Result<String, application::session_token::VerifierError> {
-        // SessionTokenVerifier trait は同期メソッドなので、tokio ランタイムで非同期処理を実行
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(self.verify_async(token))
-        })
-        .map_err(|e| Box::new(e) as application::session_token::VerifierError)
+    async fn verify(
+        &self,
+        token: &str,
+    ) -> Result<String, application::session_token::VerifierError> {
+        self.verify_async(token)
+            .await
+            .map_err(|e| Box::new(e) as application::session_token::VerifierError)
     }
 }
