@@ -16,8 +16,9 @@ use crate::state::AppState;
 ///
 /// * `state` - アプリケーションステート
 /// * `public_dir` - 静的ファイルを配信するディレクトリ
-pub fn create_router(state: AppState, public_dir: &Path) -> Router<()> {
-    Router::new()
+/// * `base_path` - ベースパス（例: "/api"）
+pub fn create_router(state: AppState, public_dir: &Path, base_path: &str) -> Router<()> {
+    let api_router = Router::new()
         .route("/accounts", get(query::list_accounts))
         .route("/accounts/{account_id}", get(query::get_account))
         .route(
@@ -53,7 +54,19 @@ pub fn create_router(state: AppState, public_dir: &Path) -> Router<()> {
             "/commands/update_transaction",
             post(command::update_transaction),
         )
-        .with_state(state)
-        .nest_service("/assets", ServeDir::new(public_dir.join("assets")))
-        .fallback_service(ServeFile::new(public_dir.join("index.html")))
+        .with_state(state);
+
+    if base_path.is_empty() {
+        // ベースパスが空の場合はそのままルートに配置
+        api_router
+            .nest_service("/assets", ServeDir::new(public_dir.join("assets")))
+            .fallback_service(ServeFile::new(public_dir.join("index.html")))
+    } else {
+        // ベースパスがある場合はネストする
+        let assets_path = format!("{}/assets", base_path);
+        Router::new()
+            .nest(base_path, api_router)
+            .nest_service(&assets_path, ServeDir::new(public_dir.join("assets")))
+            .fallback_service(ServeFile::new(public_dir.join("index.html")))
+    }
 }

@@ -23,6 +23,8 @@ use infra::FirestoreUserRepository;
 
 #[derive(Debug)]
 struct Env {
+    /// ベースパス (デフォルト: "")
+    base_path: String,
     /// Cloud Run では metadata server から取得するので None
     google_application_credentials: Option<String>,
     /// ポート番号 (デフォルト: 3000)
@@ -37,6 +39,7 @@ struct Env {
 
 impl Env {
     fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
+        let base_path = std::env::var("BASE_PATH").unwrap_or_default();
         let google_application_credentials = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let port = std::env::var("PORT")
             .ok()
@@ -51,6 +54,7 @@ impl Env {
             .ok()
             .ok_or("SERVICE_ACCOUNT_EMAIL not set")?;
         Ok(Self {
+            base_path,
             google_application_credentials,
             port,
             project_id,
@@ -129,5 +133,5 @@ async fn main() {
     );
 
     // Run the server
-    api::run(state, env.port, &env.public_dir).await;
+    api::run(state, env.port, &env.public_dir, &env.base_path).await;
 }

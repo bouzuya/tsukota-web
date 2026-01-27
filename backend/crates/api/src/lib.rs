@@ -28,9 +28,11 @@ use std::path::Path;
 /// # Arguments
 ///
 /// * `state` - アプリケーションステート
+/// * `port` - ポート番号
 /// * `public_dir` - 静的ファイルを配信するディレクトリ
-pub async fn run(state: AppState, port: u16, public_dir: &Path) {
-    let app = router::create_router(state, public_dir);
+/// * `base_path` - ベースパス（例: "/api"）
+pub async fn run(state: AppState, port: u16, public_dir: &Path, base_path: &str) {
+    let app = router::create_router(state, public_dir, base_path);
 
     let addr = format!("0.0.0.0:{}", port);
     println!("Starting server on {}", addr);
