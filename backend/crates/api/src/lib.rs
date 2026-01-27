@@ -32,7 +32,11 @@ use std::path::Path;
 pub async fn run(state: AppState, public_dir: Option<&Path>) {
     let app = router::create_router(state, public_dir);
 
-    let addr = "0.0.0.0:3000";
+    let port = std::env::var("PORT")
+        .ok()
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(3000);
+    let addr = format!("0.0.0.0:{}", port);
     println!("Starting server on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
