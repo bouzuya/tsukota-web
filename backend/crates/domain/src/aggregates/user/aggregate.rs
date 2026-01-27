@@ -88,7 +88,7 @@ impl User {
 
     fn create_common_props(user_id: &UserId) -> UserEventCommonProps {
         UserEventCommonProps {
-            at: chrono::Utc::now().to_rfc3339(),
+            at: date_time::DateTime::now().into(),
             id: uuid::Uuid::new_v4().to_string(),
             user_id: user_id.to_string(),
         }

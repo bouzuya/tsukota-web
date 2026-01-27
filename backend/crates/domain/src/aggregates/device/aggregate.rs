@@ -125,7 +125,7 @@ impl Device {
 
     fn create_common_props(device_id: &DeviceId) -> DeviceEventCommonProps {
         DeviceEventCommonProps {
-            at: chrono::Utc::now().to_rfc3339(),
+            at: date_time::DateTime::now().into(),
             device_id: device_id.to_string(),
             id: uuid::Uuid::new_v4().to_string(),
         }

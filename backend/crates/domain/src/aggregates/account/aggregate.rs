@@ -600,7 +600,7 @@ impl Account {
     fn create_common_props(account_id: &AccountId) -> AccountEventCommonProps {
         AccountEventCommonProps {
             account_id: account_id.to_string(),
-            at: chrono::Utc::now().to_rfc3339(),
+            at: date_time::DateTime::now().into(),
             id: uuid::Uuid::new_v4().to_string(),
             protocol_version: Self::PROTOCOL_VERSION,
         }

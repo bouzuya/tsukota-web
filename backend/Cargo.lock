@@ -356,6 +356,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "date-time"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -405,7 +413,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bcrypt",
- "chrono",
+ "date-time",
  "serde",
  "serde_json",
  "thiserror",
