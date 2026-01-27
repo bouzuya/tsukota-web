@@ -30,19 +30,14 @@ impl ServiceAccountCredentials {
     ///
     /// # Returns
     ///
-    /// 読み込んだ認証情報、または読み込みに失敗した場合は None
+    /// 読み込んだ認証情報
     ///
     /// # Note
     ///
     /// ローカル開発環境では GOOGLE_APPLICATION_CREDENTIALS が設定されている必要がある。
     /// 本番環境では別の方法（Secret Manager など）で認証情報を取得することを推奨。
-    pub fn load() -> Result<Option<Self>, CredentialsError> {
-        let path = match std::env::var("GOOGLE_APPLICATION_CREDENTIALS") {
-            Ok(p) => p,
-            Err(_) => return Ok(None),
-        };
-
-        let content = std::fs::read_to_string(&path)?;
+    pub fn load(google_application_credentials: String) -> Result<Self, CredentialsError> {
+        let content = std::fs::read_to_string(&google_application_credentials)?;
         let json: serde_json::Value = serde_json::from_str(&content)?;
 
         let client_email = json["client_email"]
@@ -55,9 +50,9 @@ impl ServiceAccountCredentials {
             .ok_or_else(|| CredentialsError::MissingField("private_key".to_string()))?
             .to_string();
 
-        Ok(Some(Self {
+        Ok(Self {
             client_email,
             private_key,
-        }))
+        })
     }
 }

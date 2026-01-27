@@ -21,44 +21,98 @@ use infra::FirestoreDeviceRepository;
 use infra::FirestoreProjection;
 use infra::FirestoreUserRepository;
 
+#[derive(Debug)]
+struct Env {
+    /// Cloud Run では metadata server から取得するので None
+    google_application_credentials: Option<String>,
+    /// ポート番号 (デフォルト: 3000)
+    port: u16,
+    /// Firestore の接続先 プロジェクト ID (None のときは Firebase Emulator)
+    project_id: Option<String>,
+    /// 静的ファイルのディレクトリ
+    public_dir: PathBuf,
+    /// 署名に使用するサービスアカウントのメールアドレス
+    service_account_email: String,
+}
+
+impl Env {
+    fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
+        let google_application_credentials = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
+        let port = std::env::var("PORT")
+            .ok()
+            .and_then(|s| s.parse::<u16>().ok())
+            .unwrap_or(3000);
+        let project_id = std::env::var("PROJECT_ID").ok();
+        let public_dir = std::env::var("PUBLIC_DIR")
+            .ok()
+            .map(PathBuf::from)
+            .ok_or("PUBLIC_DIR not set")?;
+        let service_account_email = std::env::var("SERVICE_ACCOUNT_EMAIL")
+            .ok()
+            .ok_or("SERVICE_ACCOUNT_EMAIL not set")?;
+        Ok(Self {
+            google_application_credentials,
+            port,
+            project_id,
+            public_dir,
+            service_account_email,
+        })
+    }
+}
+
 #[tokio::main]
 async fn main() {
+    let env = Env::from_env().expect("Failed to load environment variables");
+
+    println!("{:?}", env);
+
     // Initialize Firestore client
-    let client = FirestoreClient::connect_with_emulator().await.unwrap();
+    let firestore_client = match env.project_id {
+        None => FirestoreClient::connect_with_emulator().await.unwrap(),
+        Some(project_id) => {
+            FirestoreClient::connect(infra::DatabaseName::from_project_id(project_id).unwrap())
+                .await
+                .unwrap()
+        }
+    };
 
     // Create repositories with Arc<dyn T>
     let account_repository: Arc<dyn AccountRepository> =
-        Arc::new(FirestoreAccountRepository::new(client.clone()));
+        Arc::new(FirestoreAccountRepository::new(firestore_client.clone()));
     let device_repository: Arc<dyn DeviceRepository> =
-        Arc::new(FirestoreDeviceRepository::new(client.clone()));
+        Arc::new(FirestoreDeviceRepository::new(firestore_client.clone()));
     let user_repository: Arc<dyn UserRepository> =
-        Arc::new(FirestoreUserRepository::new(client.clone()));
+        Arc::new(FirestoreUserRepository::new(firestore_client.clone()));
 
     // Create projections with Arc<dyn T>
-    let projection = FirestoreProjection::new(client);
+    let projection = FirestoreProjection::new(firestore_client);
     let account_projection: Arc<dyn AccountProjection> = Arc::new(projection.clone());
     let category_projection: Arc<dyn CategoryProjection> = Arc::new(projection.clone());
     let transaction_projection: Arc<dyn TransactionProjection> = Arc::new(projection);
 
     // Create session token creator and verifier
     let (creator, verifier): (Arc<dyn SessionTokenCreator>, Arc<dyn SessionTokenVerifier>) =
-        match ServiceAccountCredentials::load() {
-            Ok(Some(credentials)) => {
-                let creator = Creator::new(&credentials.private_key)
-                    .expect("Failed to create session token creator");
-                let verifier = Verifier::new(&credentials.private_key)
-                    .expect("Failed to create session token verifier");
-                (Arc::new(creator), Arc::new(verifier))
+        match env.google_application_credentials {
+            Some(google_application_credentials) => {
+                match ServiceAccountCredentials::load(google_application_credentials) {
+                    Ok(credentials) => {
+                        let creator = Creator::new(&credentials.private_key)
+                            .expect("Failed to create session token creator");
+                        let verifier = Verifier::new(&credentials.private_key)
+                            .expect("Failed to create session token verifier");
+                        (Arc::new(creator), Arc::new(verifier))
+                    }
+                    Err(e) => {
+                        eprintln!("ERROR: Failed to load credentials: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             }
-            Ok(None) => {
+            None => {
                 println!("GOOGLE_APPLICATION_CREDENTIALS not set, using IamSessionTokenCreator");
-                let creator = IamSessionTokenCreator::new("FIXME@example.com".to_owned());
-                let verifier = IamSessionTokenVerifier::new("FIXME@example.com".to_owned());
+                let creator = IamSessionTokenCreator::new(env.service_account_email.clone());
+                let verifier = IamSessionTokenVerifier::new(env.service_account_email.clone());
                 (Arc::new(creator), Arc::new(verifier))
-            }
-            Err(e) => {
-                eprintln!("ERROR: Failed to load credentials: {}", e);
-                std::process::exit(1);
             }
         };
 
@@ -74,9 +128,6 @@ async fn main() {
         user_repository,
     );
 
-    // Get public directory from environment variable
-    let public_dir = std::env::var("PUBLIC_DIR").ok().map(PathBuf::from);
-
     // Run the server
-    api::run(state, public_dir.as_deref()).await;
+    api::run(state, env.port, &env.public_dir).await;
 }

@@ -69,8 +69,11 @@ COPY --from=builder /app/target/release/tsukota-server /app/tsukota-server
 COPY --from=frontend-builder /app/frontend/dist /app/public
 
 # Set environment variables
-ENV PUBLIC_DIR=/app/public
+# ENV GOOGLE_APPLICATION_CREDENTIALS # optional
 ENV PORT=3000
+# ENV PROJECT_ID # optional
+ENV PUBLIC_DIR=/app/public
+ENV SERVICE_ACCOUNT_EMAIL=your-service-account-email@example.com
 
 # Expose port
 EXPOSE 3000

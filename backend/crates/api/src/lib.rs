@@ -28,14 +28,10 @@ use std::path::Path;
 /// # Arguments
 ///
 /// * `state` - アプリケーションステート
-/// * `public_dir` - 静的ファイルを配信するディレクトリ（None の場合は配信しない）
-pub async fn run(state: AppState, public_dir: Option<&Path>) {
+/// * `public_dir` - 静的ファイルを配信するディレクトリ
+pub async fn run(state: AppState, port: u16, public_dir: &Path) {
     let app = router::create_router(state, public_dir);
 
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|s| s.parse::<u16>().ok())
-        .unwrap_or(3000);
     let addr = format!("0.0.0.0:{}", port);
     println!("Starting server on {}", addr);
 

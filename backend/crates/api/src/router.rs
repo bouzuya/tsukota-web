@@ -15,9 +15,9 @@ use crate::state::AppState;
 /// # Arguments
 ///
 /// * `state` - アプリケーションステート
-/// * `public_dir` - 静的ファイルを配信するディレクトリ（None の場合は配信しない）
-pub fn create_router(state: AppState, public_dir: Option<&Path>) -> Router {
-    let api_router = Router::new()
+/// * `public_dir` - 静的ファイルを配信するディレクトリ
+pub fn create_router(state: AppState, public_dir: &Path) -> Router<()> {
+    Router::new()
         .route("/accounts", get(query::list_accounts))
         .route("/accounts/{account_id}", get(query::get_account))
         .route(
@@ -53,17 +53,7 @@ pub fn create_router(state: AppState, public_dir: Option<&Path>) -> Router {
             "/commands/update_transaction",
             post(command::update_transaction),
         )
-        .with_state(state);
-
-    match public_dir {
-        Some(dir) => {
-            let index_path = dir.join("index.html");
-            let assets_path = dir.join("assets");
-
-            api_router
-                .nest_service("/assets", ServeDir::new(assets_path))
-                .fallback_service(ServeFile::new(index_path))
-        }
-        None => api_router,
-    }
+        .with_state(state)
+        .nest_service("/assets", ServeDir::new(public_dir.join("assets")))
+        .fallback_service(ServeFile::new(public_dir.join("index.html")))
 }
