@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+*.md
+docs/
+prompts/
+
+# Backend build artifacts
+backend/target/
+
+# Frontend build artifacts and dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Local configuration (exclude root level JSON files)
+/*.json
+
+# Firebase
+firebase/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# CI/CD
+.github/
+
+# Claude Code
+.claude/
+
+# Misc
+*.log
+.DS_Store
