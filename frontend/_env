@@ -1,0 +1,7 @@
+# Usage: cp _env .env
+#
+# 本番環境用のデフォルト値
+# VITE_API_BASE=
+#
+# 開発環境用のデフォルト値
+VITE_API_BASE=http://localhost:3000
