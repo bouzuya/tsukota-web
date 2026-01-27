@@ -4,6 +4,7 @@ use std::sync::Arc;
 use api::AppState;
 use api::Creator;
 use api::IamSessionTokenCreator;
+use api::IamSessionTokenVerifier;
 use api::ServiceAccountCredentials;
 use api::Verifier;
 use application::SessionTokenCreator;
@@ -52,8 +53,7 @@ async fn main() {
             Ok(None) => {
                 println!("GOOGLE_APPLICATION_CREDENTIALS not set, using IamSessionTokenCreator");
                 let creator = IamSessionTokenCreator::new("FIXME@example.com".to_owned());
-                // FIXME
-                let verifier = DummyVerifier;
+                let verifier = IamSessionTokenVerifier::new("FIXME@example.com".to_owned());
                 (Arc::new(creator), Arc::new(verifier))
             }
             Err(e) => {
@@ -79,17 +79,4 @@ async fn main() {
 
     // Run the server
     api::run(state, public_dir.as_deref()).await;
-}
-
-/// ダミー SessionTokenVerifier（認証情報がない場合のフォールバック）
-struct DummyVerifier;
-
-#[async_trait::async_trait]
-impl SessionTokenVerifier for DummyVerifier {
-    async fn verify(
-        &self,
-        _token: &str,
-    ) -> Result<String, application::session_token::VerifierError> {
-        Err(Box::new(std::io::Error::other("Verifier not configured")))
-    }
 }
