@@ -97,6 +97,34 @@ pub use user_id::UserId;
 - モジュールファイルでは個別に `pub use` を記述（グループ化しない）
 - alphabetical order で記述
 
+#### lib.rs の構成ルール
+
+**ルール**: `lib.rs` には `mod` 宣言と `pub use` のみを記述し、実装コードは配置しない
+
+```rust
+// ✅ 推奨: lib.rs
+mod date_time;
+
+pub use self::date_time::DateTime;
+pub use self::date_time::ParseDateTimeError;
+```
+
+```rust
+// ❌ 避ける: lib.rs に実装コードを直接配置
+pub struct DateTime(chrono::DateTime<Utc>);
+
+impl DateTime {
+    pub fn now() -> Self {
+        // ...
+    }
+}
+```
+
+**理由**:
+- モジュール構造の一貫性を保つ
+- 各モジュールの責務を明確にする
+- テストコードを含む実装を独立したファイルに分離できる
+
 ## Rust コーディングスタイル
 
 ### 0. インポート形式
