@@ -26,6 +26,7 @@ jobs:
         uses: google-github-actions/auth@v3
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
 
       - name: Set up Cloud SDK
