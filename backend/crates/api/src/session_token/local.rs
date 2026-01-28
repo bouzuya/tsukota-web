@@ -1,7 +1,7 @@
 use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
 
-use crate::session_claims::SessionTokenClaims;
+use super::claims::SessionTokenClaims;
 
 /// トークン作成エラー
 #[derive(Debug)]

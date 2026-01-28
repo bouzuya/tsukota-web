@@ -13,7 +13,7 @@ use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
 use google_cloud_iam_credentials_v1::client::IAMCredentials;
 
-use crate::session_claims::SessionTokenClaims;
+use super::claims::SessionTokenClaims;
 
 /// IAM signJwt API を使用したトークン作成エラー
 #[derive(Debug)]
