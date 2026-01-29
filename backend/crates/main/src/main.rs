@@ -39,7 +39,7 @@ struct Env {
 
 impl Env {
     fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
-        let base_path = std::env::var("BASE_PATH").unwrap_or_default();
+        let base_path = std::env::var("BASE_PATH").unwrap_or_else(|_| "/lab/tsukota".to_owned());
         let google_application_credentials = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let port = std::env::var("PORT")
             .ok()

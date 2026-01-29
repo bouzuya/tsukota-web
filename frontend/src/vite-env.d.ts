@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-	/** API のベース URL (開発時: "http://localhost:3000", 本番: "") */
+	/** API のベース URL */
 	readonly VITE_API_BASE: string;
 }
 
