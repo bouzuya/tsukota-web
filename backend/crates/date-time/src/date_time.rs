@@ -13,15 +13,15 @@ pub struct DateTime(chrono::DateTime<Utc>);
 
 /// DateTime のパースエラー
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ParseDateTimeError;
+pub struct DateTimeError;
 
-impl fmt::Display for ParseDateTimeError {
+impl fmt::Display for DateTimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "invalid datetime format")
     }
 }
 
-impl std::error::Error for ParseDateTimeError {}
+impl std::error::Error for DateTimeError {}
 
 impl DateTime {
     /// 現在の UTC 時刻をミリ秒精度で取得する
@@ -37,19 +37,19 @@ impl fmt::Display for DateTime {
 }
 
 impl FromStr for DateTime {
-    type Err = ParseDateTimeError;
+    type Err = DateTimeError;
 
     /// RFC3339 形式の文字列をパースする
     ///
     /// タイムゾーンオフセット付き（例: "+09:00"）の文字列も受け付け、
     /// UTC に変換して保持する。ミリ秒より細かい精度の場合はエラーを返す。
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let dt = chrono::DateTime::parse_from_rfc3339(s).map_err(|_| ParseDateTimeError)?;
+        let dt = chrono::DateTime::parse_from_rfc3339(s).map_err(|_| DateTimeError)?;
         let utc = dt.with_timezone(&Utc);
         let truncated = utc.trunc_subsecs(3);
         // ミリ秒より細かい精度がある場合はエラー
         if utc != truncated {
-            return Err(ParseDateTimeError);
+            return Err(DateTimeError);
         }
         Ok(Self(truncated))
     }
