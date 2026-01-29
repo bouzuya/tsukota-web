@@ -1,3 +1,7 @@
+mod claims;
+
+pub use self::claims::SessionTokenClaims;
+
 /// 作成エラー型（object-safe のための Box 化）
 pub type CreatorError = Box<dyn std::error::Error + Send + Sync>;
 

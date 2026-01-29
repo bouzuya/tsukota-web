@@ -1,7 +1,6 @@
+use application::SessionTokenClaims;
 use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
-
-use super::claims::SessionTokenClaims;
 
 /// トークン作成エラー
 #[derive(Debug)]

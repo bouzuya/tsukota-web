@@ -10,6 +10,7 @@ mod user_id;
 pub mod view;
 
 pub use session_token::CreatorError;
+pub use session_token::SessionTokenClaims;
 pub use session_token::SessionTokenCreator;
 pub use session_token::SessionTokenVerifier;
 pub use session_token::VerifierError;
