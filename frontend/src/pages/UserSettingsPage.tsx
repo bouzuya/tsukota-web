@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
+import { useState } from "react";
 import { updateUser } from "../api/updateUser";
-import { currentUserAtom } from "../atoms/auth";
-import { Layout } from "../components/Layout";
+import { currentUserAtom, getDeviceId, getDeviceSecret } from "../atoms/auth";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
+import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth, useRequireAuth } from "../hooks/useAuth";
 
@@ -18,6 +18,10 @@ export function UserSettingsPage() {
 		currentUser?.displayName ?? "",
 	);
 	const [saving, setSaving] = useState(false);
+	const [showSecret, setShowSecret] = useState(false);
+
+	const deviceId = getDeviceId();
+	const deviceSecret = getDeviceSecret();
 
 	const handleUpdateName = async () => {
 		if (!currentUser || !displayName.trim()) return;
@@ -83,6 +87,43 @@ export function UserSettingsPage() {
 						>
 							{saving ? "保存中..." : "保存"}
 						</Button>
+					</div>
+				</div>
+
+				{/* Device Info */}
+				<div className="bg-white rounded-lg shadow p-6">
+					<h2 className="text-lg font-semibold text-gray-900 mb-4">
+						デバイス情報
+					</h2>
+					<div className="space-y-4">
+						<div>
+							<div className="block text-sm font-medium text-gray-700">
+								Device ID
+							</div>
+							<p className="mt-1 text-gray-900 font-mono text-sm break-all">
+								{deviceId ?? "-"}
+							</p>
+						</div>
+						<div>
+							<div className="block text-sm font-medium text-gray-700">
+								Device Secret
+							</div>
+							<div className="mt-1 flex items-center gap-2">
+								<p className="text-gray-900 font-mono text-sm break-all flex-1">
+									{showSecret ? (deviceSecret ?? "-") : "********"}
+								</p>
+								<button
+									onClick={() => setShowSecret(!showSecret)}
+									className="text-sm text-blue-600 hover:text-blue-800"
+									type="button"
+								>
+									{showSecret ? "隠す" : "表示"}
+								</button>
+							</div>
+						</div>
+						<p className="text-sm text-amber-600">
+							これらの情報は他のデバイスからサインインする際に必要です。第三者に共有しないでください。
+						</p>
 					</div>
 				</div>
 

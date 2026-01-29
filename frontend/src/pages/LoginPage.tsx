@@ -1,18 +1,24 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAtomValue, useSetAtom } from "jotai";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createSessionToken } from "../api/createSessionToken";
 import {
-	isAuthenticatedAtom,
 	authLoadingAtom,
 	currentUserAtom,
+	isAuthenticatedAtom,
 	setAuthToken,
 	setDeviceId,
 	setDeviceSecret,
 } from "../atoms/auth";
-import { createSessionToken } from "../api/createSessionToken";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 import { PageLoader } from "../components/LoadingSpinner";
+import {
+	generateDeviceId,
+	generateDeviceSecret,
+} from "../utils/deviceCredentials";
+
+type Mode = "select" | "new" | "migrate";
 
 export function LoginPage() {
 	const isAuthenticated = useAtomValue(isAuthenticatedAtom);
@@ -21,6 +27,7 @@ export function LoginPage() {
 	const setAuthLoading = useSetAtom(authLoadingAtom);
 	const navigate = useNavigate();
 
+	const [mode, setMode] = useState<Mode>("select");
 	const [deviceIdInput, setDeviceIdInput] = useState("");
 	const [deviceSecretInput, setDeviceSecretInput] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -32,31 +39,26 @@ export function LoginPage() {
 		}
 	}, [authLoading, isAuthenticated, navigate]);
 
-	const handleLogin = async () => {
-		const trimmedDeviceId = deviceIdInput.trim();
-		const trimmedDeviceSecret = deviceSecretInput.trim();
-
-		if (!trimmedDeviceId || !trimmedDeviceSecret) return;
-
+	const performLogin = async (deviceId: string, deviceSecret: string) => {
 		setError(null);
 		setIsLoggingIn(true);
 
 		try {
 			const token = await createSessionToken({
-				deviceId: trimmedDeviceId,
-				deviceSecret: trimmedDeviceSecret,
+				deviceId,
+				deviceSecret,
 			});
 
 			// トークンとデバイス情報を保存
 			setAuthToken(token);
-			setDeviceId(trimmedDeviceId);
-			setDeviceSecret(trimmedDeviceSecret);
+			setDeviceId(deviceId);
+			setDeviceSecret(deviceSecret);
 
 			// ユーザー情報を設定（トークンからは取得できないため、device_id を使用）
 			setCurrentUser({
-				id: trimmedDeviceId,
+				id: deviceId,
 				email: "",
-				displayName: trimmedDeviceId,
+				displayName: deviceId,
 				createdAt: new Date().toISOString(),
 			});
 
@@ -71,10 +73,33 @@ export function LoginPage() {
 		}
 	};
 
+	const handleStartNew = async () => {
+		setMode("new");
+		const newDeviceId = generateDeviceId();
+		const newDeviceSecret = generateDeviceSecret();
+		await performLogin(newDeviceId, newDeviceSecret);
+	};
+
+	const handleMigrateLogin = async () => {
+		const trimmedDeviceId = deviceIdInput.trim();
+		const trimmedDeviceSecret = deviceSecretInput.trim();
+
+		if (!trimmedDeviceId || !trimmedDeviceSecret) return;
+
+		await performLogin(trimmedDeviceId, trimmedDeviceSecret);
+	};
+
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === "Enter" && !isLoggingIn) {
-			handleLogin();
+			handleMigrateLogin();
 		}
+	};
+
+	const handleBack = () => {
+		setMode("select");
+		setError(null);
+		setDeviceIdInput("");
+		setDeviceSecretInput("");
 	};
 
 	if (authLoading) {
@@ -83,12 +108,79 @@ export function LoginPage() {
 
 	const isFormValid = deviceIdInput.trim() && deviceSecretInput.trim();
 
+	// 選択画面
+	if (mode === "select") {
+		return (
+			<div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4">
+				<div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+					<div className="text-center mb-8">
+						<h1 className="text-3xl font-bold text-gray-900 mb-2">tsukota</h1>
+						<p className="text-gray-600">アカウント・支出管理アプリ</p>
+					</div>
+
+					<div className="space-y-4">
+						<Button
+							onClick={handleStartNew}
+							className="w-full"
+							size="lg"
+							disabled={isLoggingIn}
+						>
+							{isLoggingIn ? "サインイン中..." : "はじめる"}
+						</Button>
+
+						<Button
+							onClick={() => setMode("migrate")}
+							className="w-full"
+							size="lg"
+							variant="secondary"
+							disabled={isLoggingIn}
+						>
+							他のデバイスからの移行
+						</Button>
+					</div>
+
+					{error && (
+						<p className="mt-4 text-sm text-center text-red-600">{error}</p>
+					)}
+				</div>
+			</div>
+		);
+	}
+
+	// 新規作成中（自動生成でログイン中）
+	if (mode === "new") {
+		return (
+			<div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4">
+				<div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+					<div className="text-center mb-8">
+						<h1 className="text-3xl font-bold text-gray-900 mb-2">tsukota</h1>
+						<p className="text-gray-600">アカウント・支出管理アプリ</p>
+					</div>
+
+					<div className="text-center">
+						{isLoggingIn ? (
+							<p className="text-gray-600">サインイン中...</p>
+						) : error ? (
+							<>
+								<p className="text-sm text-red-600 mb-4">{error}</p>
+								<Button onClick={handleBack} variant="secondary">
+									戻る
+								</Button>
+							</>
+						) : null}
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	// 移行モード（手動入力）
 	return (
 		<div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4">
 			<div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
 				<div className="text-center mb-8">
 					<h1 className="text-3xl font-bold text-gray-900 mb-2">tsukota</h1>
-					<p className="text-gray-600">アカウント・支出管理アプリ</p>
+					<p className="text-gray-600">他のデバイスからの移行</p>
 				</div>
 
 				<div className="space-y-4">
@@ -112,7 +204,7 @@ export function LoginPage() {
 					/>
 
 					<Button
-						onClick={handleLogin}
+						onClick={handleMigrateLogin}
 						className="w-full"
 						size="lg"
 						disabled={!isFormValid || isLoggingIn}
@@ -124,6 +216,17 @@ export function LoginPage() {
 				{error && (
 					<p className="mt-4 text-sm text-center text-red-600">{error}</p>
 				)}
+
+				<div className="mt-6">
+					<button
+						onClick={handleBack}
+						className="text-gray-600 hover:text-gray-900 text-sm"
+						disabled={isLoggingIn}
+						type="button"
+					>
+						← 戻る
+					</button>
+				</div>
 			</div>
 		</div>
 	);
