@@ -8,9 +8,7 @@ version.workspace = true
 [dependencies]
 application.workspace = true
 axum = "0.8"
-base64 = "0.22"
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
 tokio.workspace = true
 tower-http = { version = "0.6", features = ["fs"] }

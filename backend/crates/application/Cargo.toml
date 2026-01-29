@@ -10,8 +10,6 @@ async-trait.workspace = true
 domain.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-uuid.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true
-tokio.workspace = true

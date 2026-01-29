@@ -23,10 +23,8 @@ version = "0.0.0"
 dependencies = [
  "application",
  "axum",
- "base64",
  "serde",
  "serde_json",
- "thiserror",
  "tokio",
  "tower-http",
 ]
@@ -40,8 +38,6 @@ dependencies = [
  "domain",
  "serde",
  "thiserror",
- "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -532,7 +528,6 @@ dependencies = [
  "http",
  "serde",
  "serde-firestore-value",
- "serde_json",
  "thiserror",
  "tokio",
  "tonic",
@@ -541,9 +536,9 @@ dependencies = [
 
 [[package]]
 name = "firestore-path"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4678265af6b85ec0dafce70e538c317149275b9523c35aa999e01df850d91ba3"
+checksum = "052a7fb4c9abf3115a296111f76f0f148fcd5ef4ee62acef0cf2d7ee4811713e"
 dependencies = [
  "thiserror",
 ]
@@ -1249,9 +1244,9 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "10.2.0"
+version = "10.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c76e1c7d7df3e34443b3621b459b066a7b79644f059fc8b2db7070c825fd417e"
+checksum = "0529410abe238729a60b108898784df8984c87f6054c9c4fcacc47e4803c1ce1"
 dependencies = [
  "base64",
  "ed25519-dalek",
@@ -1324,7 +1319,6 @@ version = "0.0.0"
 dependencies = [
  "api",
  "application",
- "async-trait",
  "infra",
  "tokio",
 ]
@@ -2006,9 +2000,9 @@ dependencies = [
 
 [[package]]
 name = "serde-firestore-value"
-version = "0.24.3"
+version = "0.24.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ecdcdcdfd6bc181e42bc10727dd49a67c9a908e31013ec0c60fb5eb6cc4215f"
+checksum = "43e475457ba399124ce2243c53e1f347dc8fc50990d3adb0c6333b51cc09ada4"
 dependencies = [
  "googleapis-tonic-google-firestore-v1",
  "prost",
