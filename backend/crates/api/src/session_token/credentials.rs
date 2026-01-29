@@ -1,6 +1,6 @@
 /// サービスアカウント認証情報の読み込みエラー
 #[derive(Debug, thiserror::Error)]
-pub enum CredentialsError {
+pub enum ServiceAccountCredentialsError {
     #[error("GOOGLE_APPLICATION_CREDENTIALS 環境変数が設定されていません")]
     MissingCredentials,
 
@@ -36,18 +36,22 @@ impl ServiceAccountCredentials {
     ///
     /// ローカル開発環境では GOOGLE_APPLICATION_CREDENTIALS が設定されている必要がある。
     /// 本番環境では別の方法（Secret Manager など）で認証情報を取得することを推奨。
-    pub fn load(google_application_credentials: String) -> Result<Self, CredentialsError> {
+    pub fn load(
+        google_application_credentials: String,
+    ) -> Result<Self, ServiceAccountCredentialsError> {
         let content = std::fs::read_to_string(&google_application_credentials)?;
         let json: serde_json::Value = serde_json::from_str(&content)?;
 
         let client_email = json["client_email"]
             .as_str()
-            .ok_or_else(|| CredentialsError::MissingField("client_email".to_string()))?
+            .ok_or_else(|| {
+                ServiceAccountCredentialsError::MissingField("client_email".to_string())
+            })?
             .to_string();
 
         let private_key = json["private_key"]
             .as_str()
-            .ok_or_else(|| CredentialsError::MissingField("private_key".to_string()))?
+            .ok_or_else(|| ServiceAccountCredentialsError::MissingField("private_key".to_string()))?
             .to_string();
 
         Ok(Self {

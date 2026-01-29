@@ -2,11 +2,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use api::AppState;
-use api::Creator;
 use api::IamSessionTokenCreator;
 use api::IamSessionTokenVerifier;
+use api::PemSessionTokenCreator;
+use api::PemSessionTokenVerifier;
 use api::ServiceAccountCredentials;
-use api::Verifier;
 use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
 use application::projection::AccountProjection;
@@ -100,9 +100,9 @@ async fn main() {
             Some(google_application_credentials) => {
                 match ServiceAccountCredentials::load(google_application_credentials) {
                     Ok(credentials) => {
-                        let creator = Creator::new(&credentials.private_key)
+                        let creator = PemSessionTokenCreator::new(&credentials.private_key)
                             .expect("Failed to create session token creator");
-                        let verifier = Verifier::new(&credentials.private_key)
+                        let verifier = PemSessionTokenVerifier::new(&credentials.private_key)
                             .expect("Failed to create session token verifier");
                         (Arc::new(creator), Arc::new(verifier))
                     }

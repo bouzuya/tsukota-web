@@ -17,7 +17,7 @@ use super::claims::SessionTokenClaims;
 
 /// IAM signJwt API を使用したトークン作成エラー
 #[derive(Debug)]
-pub enum IamSessionTokenCreateError {
+pub enum IamSessionTokenCreatorError {
     /// IAM クライアントの作成に失敗
     ClientBuildError(String),
     /// JSON シリアライズエラー
@@ -26,23 +26,23 @@ pub enum IamSessionTokenCreateError {
     SignJwtError(String),
 }
 
-impl std::fmt::Display for IamSessionTokenCreateError {
+impl std::fmt::Display for IamSessionTokenCreatorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IamSessionTokenCreateError::ClientBuildError(e) => {
+            IamSessionTokenCreatorError::ClientBuildError(e) => {
                 write!(f, "Failed to build IAM client: {}", e)
             }
-            IamSessionTokenCreateError::JsonError(e) => {
+            IamSessionTokenCreatorError::JsonError(e) => {
                 write!(f, "JSON serialization error: {}", e)
             }
-            IamSessionTokenCreateError::SignJwtError(e) => {
+            IamSessionTokenCreatorError::SignJwtError(e) => {
                 write!(f, "Failed to sign JWT: {}", e)
             }
         }
     }
 }
 
-impl std::error::Error for IamSessionTokenCreateError {}
+impl std::error::Error for IamSessionTokenCreatorError {}
 
 /// Cloud Run 向け IAM ベースのセッショントークン作成器
 ///
@@ -69,11 +69,11 @@ impl IamSessionTokenCreator {
     }
 
     /// IAM signJwt API を使用して JWT に署名する
-    async fn sign_jwt(&self, payload: &str) -> Result<String, IamSessionTokenCreateError> {
+    async fn sign_jwt(&self, payload: &str) -> Result<String, IamSessionTokenCreatorError> {
         let client = IAMCredentials::builder()
             .build()
             .await
-            .map_err(|e| IamSessionTokenCreateError::ClientBuildError(e.to_string()))?;
+            .map_err(|e| IamSessionTokenCreatorError::ClientBuildError(e.to_string()))?;
 
         let name = format!("projects/-/serviceAccounts/{}", self.service_account_email);
 
@@ -83,7 +83,7 @@ impl IamSessionTokenCreator {
             .set_payload(payload)
             .send()
             .await
-            .map_err(|e| IamSessionTokenCreateError::SignJwtError(e.to_string()))?;
+            .map_err(|e| IamSessionTokenCreatorError::SignJwtError(e.to_string()))?;
 
         Ok(response.signed_jwt)
     }
@@ -102,13 +102,13 @@ impl IamSessionTokenCreator {
         &self,
         user_id: &str,
         now: u64,
-    ) -> Result<String, IamSessionTokenCreateError> {
+    ) -> Result<String, IamSessionTokenCreatorError> {
         // クレームを作成
         let claims = SessionTokenClaims::new(user_id.to_owned(), now);
 
         // JWT ペイロードを JSON 文字列に変換
         let payload = serde_json::to_string(&claims)
-            .map_err(|e| IamSessionTokenCreateError::JsonError(e.to_string()))?;
+            .map_err(|e| IamSessionTokenCreatorError::JsonError(e.to_string()))?;
 
         // IAM API で署名
         self.sign_jwt(&payload).await
@@ -130,7 +130,7 @@ impl SessionTokenCreator for IamSessionTokenCreator {
 
 /// IAM 公開鍵を使用したトークン検証エラー
 #[derive(Debug)]
-pub enum IamSessionTokenVerifyError {
+pub enum IamSessionTokenVerifierError {
     /// HTTP リクエストエラー
     HttpError(String),
     /// 公開鍵の取得に失敗
@@ -143,29 +143,29 @@ pub enum IamSessionTokenVerifyError {
     KeyIdNotFound(String),
 }
 
-impl std::fmt::Display for IamSessionTokenVerifyError {
+impl std::fmt::Display for IamSessionTokenVerifierError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IamSessionTokenVerifyError::HttpError(e) => {
+            IamSessionTokenVerifierError::HttpError(e) => {
                 write!(f, "HTTP request error: {}", e)
             }
-            IamSessionTokenVerifyError::FetchPublicKeyError(e) => {
+            IamSessionTokenVerifierError::FetchPublicKeyError(e) => {
                 write!(f, "Failed to fetch public key: {}", e)
             }
-            IamSessionTokenVerifyError::JwkParseError(e) => {
+            IamSessionTokenVerifierError::JwkParseError(e) => {
                 write!(f, "Failed to parse JWK: {}", e)
             }
-            IamSessionTokenVerifyError::JwtDecodeError(e) => {
+            IamSessionTokenVerifierError::JwtDecodeError(e) => {
                 write!(f, "JWT decode error: {}", e)
             }
-            IamSessionTokenVerifyError::KeyIdNotFound(kid) => {
+            IamSessionTokenVerifierError::KeyIdNotFound(kid) => {
                 write!(f, "Key ID not found: {}", kid)
             }
         }
     }
 }
 
-impl std::error::Error for IamSessionTokenVerifyError {}
+impl std::error::Error for IamSessionTokenVerifierError {}
 
 /// JWK レスポンスの構造体
 #[derive(Debug, serde::Deserialize)]
@@ -225,7 +225,7 @@ impl IamSessionTokenVerifier {
     }
 
     /// Google の JWK エンドポイントから公開鍵を取得する
-    async fn fetch_jwk_set(&self) -> Result<Vec<Jwk>, IamSessionTokenVerifyError> {
+    async fn fetch_jwk_set(&self) -> Result<Vec<Jwk>, IamSessionTokenVerifierError> {
         let url = format!(
             "https://www.googleapis.com/service_accounts/v1/metadata/jwk/{}",
             urlencoding::encode(&self.service_account_email)
@@ -236,10 +236,10 @@ impl IamSessionTokenVerifier {
             .get(&url)
             .send()
             .await
-            .map_err(|e| IamSessionTokenVerifyError::HttpError(e.to_string()))?;
+            .map_err(|e| IamSessionTokenVerifierError::HttpError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(IamSessionTokenVerifyError::FetchPublicKeyError(format!(
+            return Err(IamSessionTokenVerifierError::FetchPublicKeyError(format!(
                 "HTTP status: {}",
                 response.status()
             )));
@@ -248,13 +248,13 @@ impl IamSessionTokenVerifier {
         let jwk_set: JwkSet = response
             .json()
             .await
-            .map_err(|e| IamSessionTokenVerifyError::FetchPublicKeyError(e.to_string()))?;
+            .map_err(|e| IamSessionTokenVerifierError::FetchPublicKeyError(e.to_string()))?;
 
         Ok(jwk_set.keys)
     }
 
     /// キャッシュから JWK を取得するか、新しく取得してキャッシュする
-    async fn get_jwk_set(&self) -> Result<Vec<Jwk>, IamSessionTokenVerifyError> {
+    async fn get_jwk_set(&self) -> Result<Vec<Jwk>, IamSessionTokenVerifierError> {
         // キャッシュをチェック
         {
             let cache = self.jwk_cache.read().unwrap();
@@ -281,21 +281,21 @@ impl IamSessionTokenVerifier {
     }
 
     /// JWT ヘッダーからキー ID を取得する
-    fn get_key_id_from_token(token: &str) -> Result<String, IamSessionTokenVerifyError> {
+    fn get_key_id_from_token(token: &str) -> Result<String, IamSessionTokenVerifierError> {
         let header = jsonwebtoken::decode_header(token)
-            .map_err(|e| IamSessionTokenVerifyError::JwtDecodeError(e.to_string()))?;
+            .map_err(|e| IamSessionTokenVerifierError::JwtDecodeError(e.to_string()))?;
 
-        header
-            .kid
-            .ok_or_else(|| IamSessionTokenVerifyError::KeyIdNotFound("No kid in header".to_owned()))
+        header.kid.ok_or_else(|| {
+            IamSessionTokenVerifierError::KeyIdNotFound("No kid in header".to_owned())
+        })
     }
 
     /// JWK から DecodingKey を作成する
     fn create_decoding_key(
         jwk: &Jwk,
-    ) -> Result<jsonwebtoken::DecodingKey, IamSessionTokenVerifyError> {
+    ) -> Result<jsonwebtoken::DecodingKey, IamSessionTokenVerifierError> {
         jsonwebtoken::DecodingKey::from_rsa_components(&jwk.n, &jwk.e)
-            .map_err(|e| IamSessionTokenVerifyError::JwkParseError(e.to_string()))
+            .map_err(|e| IamSessionTokenVerifierError::JwkParseError(e.to_string()))
     }
 
     /// トークンを検証してユーザー ID を取得する（非同期版）
@@ -309,7 +309,7 @@ impl IamSessionTokenVerifier {
     /// # Returns
     ///
     /// トークンに含まれるユーザー ID
-    pub async fn verify_async(&self, token: &str) -> Result<String, IamSessionTokenVerifyError> {
+    pub async fn verify_async(&self, token: &str) -> Result<String, IamSessionTokenVerifierError> {
         // JWT ヘッダーからキー ID を取得
         let kid = Self::get_key_id_from_token(token)?;
 
@@ -318,7 +318,7 @@ impl IamSessionTokenVerifier {
 
         // キー ID に対応する JWK を取得
         let jwk = jwk_set.iter().find(|k| k.kid == kid).ok_or_else(|| {
-            IamSessionTokenVerifyError::KeyIdNotFound(format!("Key ID '{}' not found", kid))
+            IamSessionTokenVerifierError::KeyIdNotFound(format!("Key ID '{}' not found", kid))
         })?;
 
         // JWK から DecodingKey を作成
@@ -333,7 +333,7 @@ impl IamSessionTokenVerifier {
 
         let token_data =
             jsonwebtoken::decode::<SessionTokenClaims>(token, &decoding_key, &validation)
-                .map_err(|e| IamSessionTokenVerifyError::JwtDecodeError(e.to_string()))?;
+                .map_err(|e| IamSessionTokenVerifierError::JwtDecodeError(e.to_string()))?;
 
         Ok(token_data.claims.user_id().to_owned())
     }

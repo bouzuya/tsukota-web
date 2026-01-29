@@ -5,31 +5,31 @@ use super::claims::SessionTokenClaims;
 
 /// トークン作成エラー
 #[derive(Debug)]
-pub enum CreateError {
+pub enum PemSessionTokenCreatorError {
     /// JWT エンコードに失敗
     JwtEncodingError(jsonwebtoken::errors::Error),
 }
 
-impl std::fmt::Display for CreateError {
+impl std::fmt::Display for PemSessionTokenCreatorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CreateError::JwtEncodingError(e) => {
+            PemSessionTokenCreatorError::JwtEncodingError(e) => {
                 write!(f, "JWT encoding error: {}", e)
             }
         }
     }
 }
 
-impl std::error::Error for CreateError {}
+impl std::error::Error for PemSessionTokenCreatorError {}
 
 /// セッショントークン作成器
 #[derive(Clone)]
-pub struct Creator {
+pub struct PemSessionTokenCreator {
     encoding_key: jsonwebtoken::EncodingKey,
 }
 
-impl Creator {
-    /// 新しい Creator インスタンスを作成する
+impl PemSessionTokenCreator {
+    /// 新しいインスタンスを作成する
     ///
     /// # Arguments
     ///
@@ -49,7 +49,7 @@ impl Creator {
     /// # Returns
     ///
     /// JWT 形式のセッショントークン
-    pub fn create(&self, user_id: &str, now: u64) -> Result<String, CreateError> {
+    pub fn create(&self, user_id: &str, now: u64) -> Result<String, PemSessionTokenCreatorError> {
         // クレームを作成
         let claims = SessionTokenClaims::new(user_id.to_owned(), now);
 
@@ -58,12 +58,12 @@ impl Creator {
 
         // トークンをエンコード
         jsonwebtoken::encode(&header, &claims, &self.encoding_key)
-            .map_err(CreateError::JwtEncodingError)
+            .map_err(PemSessionTokenCreatorError::JwtEncodingError)
     }
 }
 
 #[async_trait::async_trait]
-impl SessionTokenCreator for Creator {
+impl SessionTokenCreator for PemSessionTokenCreator {
     async fn create(
         &self,
         user_id: &str,
@@ -76,31 +76,31 @@ impl SessionTokenCreator for Creator {
 
 /// トークン検証エラー
 #[derive(Debug)]
-pub enum VerifyError {
+pub enum PemSessionTokenVerifierError {
     /// JWT デコードに失敗
     JwtDecodeError(jsonwebtoken::errors::Error),
 }
 
-impl std::fmt::Display for VerifyError {
+impl std::fmt::Display for PemSessionTokenVerifierError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            VerifyError::JwtDecodeError(e) => {
+            PemSessionTokenVerifierError::JwtDecodeError(e) => {
                 write!(f, "JWT decode error: {}", e)
             }
         }
     }
 }
 
-impl std::error::Error for VerifyError {}
+impl std::error::Error for PemSessionTokenVerifierError {}
 
 /// JWT トークンの検証器
 #[derive(Clone)]
-pub struct Verifier {
+pub struct PemSessionTokenVerifier {
     decoding_key: jsonwebtoken::DecodingKey,
 }
 
-impl Verifier {
-    /// 新しい Verifier インスタンスを作成する
+impl PemSessionTokenVerifier {
+    /// 新しいインスタンスを作成する
     ///
     /// # Arguments
     ///
@@ -139,7 +139,7 @@ impl Verifier {
     /// トークンを検証してユーザー ID を取得する
     ///
     /// exp, aud, iss を検証する
-    pub fn verify(&self, token: &str) -> Result<String, VerifyError> {
+    pub fn verify(&self, token: &str) -> Result<String, PemSessionTokenVerifierError> {
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&[SessionTokenClaims::AUDIENCE]);
         validation.set_issuer(&[SessionTokenClaims::ISSUER]);
@@ -148,14 +148,14 @@ impl Verifier {
 
         let token_data =
             jsonwebtoken::decode::<SessionTokenClaims>(token, &self.decoding_key, &validation)
-                .map_err(VerifyError::JwtDecodeError)?;
+                .map_err(PemSessionTokenVerifierError::JwtDecodeError)?;
 
         Ok(token_data.claims.user_id().to_owned())
     }
 }
 
 #[async_trait::async_trait]
-impl SessionTokenVerifier for Verifier {
+impl SessionTokenVerifier for PemSessionTokenVerifier {
     async fn verify(
         &self,
         token: &str,
@@ -212,7 +212,7 @@ XHoL8lz5DpxcSiLilKDCKxo=
 
     #[test]
     fn test_create_success() -> anyhow::Result<()> {
-        let creator = Creator::new(TEST_PRIVATE_KEY_PEM)?;
+        let creator = PemSessionTokenCreator::new(TEST_PRIVATE_KEY_PEM)?;
         let user_id = "user123";
         let now = 1700000000_u64;
 
@@ -244,8 +244,8 @@ XHoL8lz5DpxcSiLilKDCKxo=
 
     #[test]
     fn test_create_and_verify() -> anyhow::Result<()> {
-        let creator = Creator::new(TEST_PRIVATE_KEY_PEM)?;
-        let verifier = Verifier::new(TEST_PRIVATE_KEY_PEM)?;
+        let creator = PemSessionTokenCreator::new(TEST_PRIVATE_KEY_PEM)?;
+        let verifier = PemSessionTokenVerifier::new(TEST_PRIVATE_KEY_PEM)?;
 
         let user_id = "test_user_123";
         let now = std::time::SystemTime::now()
