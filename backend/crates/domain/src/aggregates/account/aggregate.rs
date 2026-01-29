@@ -1,7 +1,7 @@
 use super::commands::AccountCommand;
 use super::events::AccountEvent;
 use super::events::AccountEventCommonProps;
-use super::events::TransactionProps;
+use super::events::AccountEventTransactionProps;
 use crate::value_objects::AccountId;
 use crate::value_objects::CategoryId;
 use crate::value_objects::TransactionId;
@@ -514,7 +514,7 @@ impl Account {
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionAdded {
             transaction_id: transaction_id.to_string(),
-            props: TransactionProps {
+            props: AccountEventTransactionProps {
                 amount,
                 category_id: category_id.to_string(),
                 comment,
@@ -563,7 +563,7 @@ impl Account {
         let common = Self::create_common_props(id);
         Ok(vec![AccountEvent::TransactionUpdated {
             transaction_id: transaction_id.to_string(),
-            props: TransactionProps {
+            props: AccountEventTransactionProps {
                 amount,
                 category_id: category_id.to_string(),
                 comment,

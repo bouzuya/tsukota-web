@@ -11,7 +11,7 @@ pub struct AccountEventCommonProps {
 /// 取引のプロパティ
 #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TransactionProps {
+pub struct AccountEventTransactionProps {
     pub amount: String,
     pub category_id: String,
     pub comment: String,
@@ -94,7 +94,7 @@ pub enum AccountEvent {
         #[serde(flatten)]
         common: AccountEventCommonProps,
         #[serde(flatten)]
-        props: TransactionProps,
+        props: AccountEventTransactionProps,
         transaction_id: String,
     },
 
@@ -112,7 +112,7 @@ pub enum AccountEvent {
         #[serde(flatten)]
         common: AccountEventCommonProps,
         #[serde(flatten)]
-        props: TransactionProps,
+        props: AccountEventTransactionProps,
         transaction_id: String,
     },
 }
@@ -130,8 +130,8 @@ mod tests {
         }
     }
 
-    fn create_transaction_props() -> TransactionProps {
-        TransactionProps {
+    fn create_transaction_props() -> AccountEventTransactionProps {
+        AccountEventTransactionProps {
             amount: "1000".to_string(),
             category_id: "cat-123".to_string(),
             comment: "Test transaction".to_string(),
@@ -395,7 +395,7 @@ mod tests {
     fn test_transaction_updated_serialization() -> anyhow::Result<()> {
         let event = AccountEvent::TransactionUpdated {
             common: create_common_props(),
-            props: TransactionProps {
+            props: AccountEventTransactionProps {
                 amount: "2000".to_string(),
                 category_id: "cat-456".to_string(),
                 comment: "Updated transaction".to_string(),
