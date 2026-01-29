@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAtom } from "jotai";
-import { getAccounts, createAccount } from "../api/accounts";
+import { getAccounts } from "../api/getAccounts";
+import { createAccount } from "../api/createAccount";
 import { accountsAtom, accountsLoadingAtom } from "../atoms/accounts";
 import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";

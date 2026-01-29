@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAtomValue } from "jotai";
-import { getAccount, updateAccount, deleteAccount } from "../api/accounts";
-import { getUser } from "../api/users";
+import { getAccount } from "../api/getAccount";
+import { updateAccount } from "../api/updateAccount";
+import { deleteAccount } from "../api/deleteAccount";
+import { getUser } from "../api/getUser";
 import { currentUserAtom } from "../atoms/auth";
 import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";

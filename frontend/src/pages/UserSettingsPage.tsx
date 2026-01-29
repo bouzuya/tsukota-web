@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { updateUser } from "../api/users";
+import { updateUser } from "../api/updateUser";
 import { currentUserAtom } from "../atoms/auth";
 import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";

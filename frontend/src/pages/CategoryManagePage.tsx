@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAtom } from "jotai";
-import {
-	getCategories,
-	addCategory,
-	updateCategory,
-	deleteCategory,
-} from "../api/categories";
+import { getCategories } from "../api/getCategories";
+import { addCategory } from "../api/addCategory";
+import { updateCategory } from "../api/updateCategory";
+import { deleteCategory } from "../api/deleteCategory";
 import { categoriesAtom, categoriesLoadingAtom } from "../atoms/categories";
 import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";

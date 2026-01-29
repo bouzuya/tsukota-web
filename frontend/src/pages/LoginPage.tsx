@@ -9,7 +9,7 @@ import {
 	setDeviceId,
 	setDeviceSecret,
 } from "../atoms/auth";
-import { createSessionToken } from "../api/auth";
+import { createSessionToken } from "../api/createSessionToken";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 import { PageLoader } from "../components/LoadingSpinner";

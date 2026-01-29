@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAtom } from "jotai";
-import {
-	addTransaction,
-	updateTransaction,
-	deleteTransaction,
-	getTransactions,
-} from "../api/transactions";
-import { getCategories } from "../api/categories";
+import { addTransaction } from "../api/addTransaction";
+import { updateTransaction } from "../api/updateTransaction";
+import { deleteTransaction } from "../api/deleteTransaction";
+import { getTransactions } from "../api/getTransactions";
+import { getCategories } from "../api/getCategories";
 import { categoriesAtom, activeCategoriesAtom } from "../atoms/categories";
 import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";

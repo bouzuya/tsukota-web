@@ -1,8 +1,8 @@
 import { useEffect, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
-import { getTransactions } from "../api/transactions";
-import { getCategories } from "../api/categories";
+import { getTransactions } from "../api/getTransactions";
+import { getCategories } from "../api/getCategories";
 import { selectedAccountIdAtom } from "../atoms/accounts";
 import { categoriesAtom } from "../atoms/categories";
 import { Layout } from "../components/Layout";
