@@ -39,3 +39,4 @@ Dockerfile
 # Misc
 *.log
 .DS_Store
+.env
