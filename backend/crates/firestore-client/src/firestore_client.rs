@@ -5,7 +5,7 @@ pub struct Transaction(pub(crate) Vec<u8>);
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
-pub struct Error(#[from] E);
+pub struct FirestoreClientError(#[from] E);
 
 #[derive(Debug, thiserror::Error)]
 enum E {
@@ -64,7 +64,7 @@ pub struct FirestoreClient {
 
 /// Functions
 impl FirestoreClient {
-    pub async fn connect(database_name: path::DatabaseName) -> Result<Self, Error> {
+    pub async fn connect(database_name: path::DatabaseName) -> Result<Self, FirestoreClientError> {
         let channel = tonic::transport::Channel::from_static("https://firestore.googleapis.com")
             .tls_config(tonic::transport::ClientTlsConfig::new().with_webpki_roots())
             .map_err(E::TlsConfig)?
@@ -82,7 +82,7 @@ impl FirestoreClient {
         })
     }
 
-    pub async fn connect_with_emulator() -> Result<Self, Error> {
+    pub async fn connect_with_emulator() -> Result<Self, FirestoreClientError> {
         let database_name = path::DatabaseName::from_project_id("demo-project").unwrap();
         let channel = tonic::transport::Channel::from_static("http://firebase:8080")
             .connect()
@@ -98,7 +98,7 @@ impl FirestoreClient {
 
 /// Methods
 impl FirestoreClient {
-    pub async fn begin_transaction(&self) -> Result<Transaction, Error> {
+    pub async fn begin_transaction(&self) -> Result<Transaction, FirestoreClientError> {
         let mut client = self.client().await?;
         let google::firestore::v1::BeginTransactionRequest {
             database: _,
@@ -122,7 +122,7 @@ impl FirestoreClient {
         &self,
         Transaction(transaction): &Transaction,
         writes: Vec<google::firestore::v1::Write>,
-    ) -> Result<google::firestore::v1::CommitResponse, Error> {
+    ) -> Result<google::firestore::v1::CommitResponse, FirestoreClientError> {
         let mut client = self.client().await?;
         let request = google::firestore::v1::CommitRequest {
             database: self.database_name.to_string(),
@@ -140,7 +140,7 @@ impl FirestoreClient {
         &self,
         document_path: path::DocumentPath,
         value: google::firestore::v1::Value,
-    ) -> Result<google::firestore::v1::Document, Error> {
+    ) -> Result<google::firestore::v1::Document, FirestoreClientError> {
         let document_name = self
             .database_name
             .doc(document_path)
@@ -178,7 +178,7 @@ impl FirestoreClient {
     pub fn deserialize<T>(
         &self,
         fields: std::collections::HashMap<String, google::firestore::v1::Value>,
-    ) -> Result<T, Error>
+    ) -> Result<T, FirestoreClientError>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -193,7 +193,7 @@ impl FirestoreClient {
     pub async fn get_document(
         &self,
         document_path: path::DocumentPath,
-    ) -> Result<Option<google::firestore::v1::Document>, Error> {
+    ) -> Result<Option<google::firestore::v1::Document>, FirestoreClientError> {
         self.get_document_impl(document_path, None).await
     }
 
@@ -201,7 +201,7 @@ impl FirestoreClient {
         &self,
         document_path: path::DocumentPath,
         transaction: &Transaction,
-    ) -> Result<Option<google::firestore::v1::Document>, Error> {
+    ) -> Result<Option<google::firestore::v1::Document>, FirestoreClientError> {
         self.get_document_impl(document_path, Some(transaction))
             .await
     }
@@ -210,7 +210,7 @@ impl FirestoreClient {
         &self,
         collection_path: path::CollectionPath,
         page_token: Option<String>,
-    ) -> Result<google::firestore::v1::ListDocumentsResponse, Error> {
+    ) -> Result<google::firestore::v1::ListDocumentsResponse, FirestoreClientError> {
         let collection_name = self
             .database_name
             .collection(collection_path)
@@ -246,7 +246,10 @@ impl FirestoreClient {
             .into_inner())
     }
 
-    pub async fn rollback(&self, Transaction(transaction): &Transaction) -> Result<(), Error> {
+    pub async fn rollback(
+        &self,
+        Transaction(transaction): &Transaction,
+    ) -> Result<(), FirestoreClientError> {
         let mut client = self.client().await?;
         let request = google::firestore::v1::RollbackRequest {
             database: self.database_name.to_string(),
@@ -256,7 +259,10 @@ impl FirestoreClient {
         Ok(())
     }
 
-    pub fn serialize<T>(&self, value: &T) -> Result<google::firestore::v1::Value, Error>
+    pub fn serialize<T>(
+        &self,
+        value: &T,
+    ) -> Result<google::firestore::v1::Value, FirestoreClientError>
     where
         T: serde::Serialize,
     {
@@ -369,7 +375,7 @@ impl FirestoreClient {
         &self,
         document_path: path::DocumentPath,
         value: google::firestore::v1::Value,
-    ) -> Result<google::firestore::v1::Document, Error> {
+    ) -> Result<google::firestore::v1::Document, FirestoreClientError> {
         let document_name = self
             .database_name
             .doc(document_path)
@@ -403,7 +409,7 @@ impl FirestoreClient {
         &self,
         document_path: path::DocumentPath,
         value: google::firestore::v1::Value,
-    ) -> Result<google::firestore::v1::Document, Error> {
+    ) -> Result<google::firestore::v1::Document, FirestoreClientError> {
         let document_name = self
             .database_name
             .doc(document_path)
@@ -446,7 +452,7 @@ impl FirestoreClient {
                 impl FnMut(tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status>,
             >,
         >,
-        Error,
+        FirestoreClientError,
     > {
         let metadata = match &self.credentials {
             Some(credentials) => {
@@ -501,7 +507,7 @@ impl FirestoreClient {
         &self,
         document_path: path::DocumentPath,
         transaction: Option<&Transaction>,
-    ) -> Result<Option<google::firestore::v1::Document>, Error> {
+    ) -> Result<Option<google::firestore::v1::Document>, FirestoreClientError> {
         let document_name = self
             .database_name
             .doc(document_path)

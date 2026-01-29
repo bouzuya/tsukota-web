@@ -14,7 +14,7 @@ enum E {
     InvalidPath(String),
 
     #[error("firestore client: {0}")]
-    FirestoreClient(#[from] firestore_client::Error),
+    FirestoreClient(#[from] firestore_client::FirestoreClientError),
 }
 
 impl From<E> for ApplicationError {
