@@ -1,7 +1,7 @@
 pub use firestore_path as path;
 pub use googleapis_tonic_google_firestore_v1::google;
 
-pub struct Transaction(pub(crate) Vec<u8>);
+pub struct FirestoreTransaction(pub(crate) Vec<u8>);
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
@@ -98,7 +98,7 @@ impl FirestoreClient {
 
 /// Methods
 impl FirestoreClient {
-    pub async fn begin_transaction(&self) -> Result<Transaction, FirestoreClientError> {
+    pub async fn begin_transaction(&self) -> Result<FirestoreTransaction, FirestoreClientError> {
         let mut client = self.client().await?;
         let google::firestore::v1::BeginTransactionRequest {
             database: _,
@@ -108,7 +108,7 @@ impl FirestoreClient {
             database: self.database_name.to_string(),
             options,
         };
-        Ok(Transaction(
+        Ok(FirestoreTransaction(
             client
                 .begin_transaction(request)
                 .await
@@ -120,7 +120,7 @@ impl FirestoreClient {
 
     pub async fn commit(
         &self,
-        Transaction(transaction): &Transaction,
+        FirestoreTransaction(transaction): &FirestoreTransaction,
         writes: Vec<google::firestore::v1::Write>,
     ) -> Result<google::firestore::v1::CommitResponse, FirestoreClientError> {
         let mut client = self.client().await?;
@@ -200,7 +200,7 @@ impl FirestoreClient {
     pub async fn get_document_with_tx(
         &self,
         document_path: path::DocumentPath,
-        transaction: &Transaction,
+        transaction: &FirestoreTransaction,
     ) -> Result<Option<google::firestore::v1::Document>, FirestoreClientError> {
         self.get_document_impl(document_path, Some(transaction))
             .await
@@ -248,7 +248,7 @@ impl FirestoreClient {
 
     pub async fn rollback(
         &self,
-        Transaction(transaction): &Transaction,
+        FirestoreTransaction(transaction): &FirestoreTransaction,
     ) -> Result<(), FirestoreClientError> {
         let mut client = self.client().await?;
         let request = google::firestore::v1::RollbackRequest {
@@ -506,7 +506,7 @@ impl FirestoreClient {
     async fn get_document_impl(
         &self,
         document_path: path::DocumentPath,
-        transaction: Option<&Transaction>,
+        transaction: Option<&FirestoreTransaction>,
     ) -> Result<Option<google::firestore::v1::Document>, FirestoreClientError> {
         let document_name = self
             .database_name
@@ -518,7 +518,7 @@ impl FirestoreClient {
             mask,
             name: _,
         } = Default::default();
-        let consistency_selector = transaction.map(|Transaction(tx)| {
+        let consistency_selector = transaction.map(|FirestoreTransaction(tx)| {
             google::firestore::v1::get_document_request::ConsistencySelector::Transaction(
                 tx.to_owned(),
             )
