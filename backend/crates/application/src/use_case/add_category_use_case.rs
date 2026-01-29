@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use domain::account::Account;
-use domain::account::AccountCommand;
-use domain::account::AccountId;
-use domain::account::CategoryId;
+use domain::Account;
+use domain::AccountCommand;
+use domain::AccountId;
+use domain::CategoryId;
 
 use crate::UserId;
 use crate::error::ApplicationError;

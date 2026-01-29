@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use domain::account::Account;
-use domain::account::AccountCommand;
-use domain::account::AccountId;
+use domain::Account;
+use domain::AccountCommand;
+use domain::AccountId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
@@ -33,7 +33,7 @@ impl RemoveOwnerUseCase {
             .map_err(|_| ApplicationError::InvalidRequest("Invalid account ID".to_string()))?;
 
         // Parse user ID to remove
-        let owner_id_to_remove: domain::account::UserId = request
+        let owner_id_to_remove: domain::UserId = request
             .user_id
             .parse()
             .map_err(|_| ApplicationError::InvalidRequest("Invalid user ID".to_string()))?;

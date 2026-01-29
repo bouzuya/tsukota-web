@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use domain::account::Account;
-use domain::account::AccountCommand;
-use domain::account::AccountId;
+use domain::Account;
+use domain::AccountCommand;
+use domain::AccountId;
 
 use crate::UserId;
 use crate::error::ApplicationError;
@@ -39,7 +39,7 @@ impl AddOwnerUseCase {
         let aggregate = Account::from_events(events);
 
         // Parse user ID to add as owner
-        let owner_id: domain::account::UserId = request
+        let owner_id: domain::UserId = request
             .user_id
             .parse()
             .map_err(|_| ApplicationError::InvalidRequest("Invalid user ID".to_string()))?;

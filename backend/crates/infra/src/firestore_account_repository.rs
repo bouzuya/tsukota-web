@@ -1,8 +1,8 @@
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
 use async_trait::async_trait;
-use domain::account::AccountEvent;
-use domain::account::AccountId;
+use domain::AccountEvent;
+use domain::AccountId;
 use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;

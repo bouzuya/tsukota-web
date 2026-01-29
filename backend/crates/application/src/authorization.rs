@@ -1,4 +1,4 @@
-use domain::account::UserId;
+use domain::UserId;
 
 use crate::error::ApplicationError;
 use crate::view::AccountView;

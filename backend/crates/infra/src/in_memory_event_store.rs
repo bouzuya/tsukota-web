@@ -4,8 +4,8 @@ use std::sync::Arc;
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
 use async_trait::async_trait;
-use domain::account::AccountEvent;
-use domain::account::AccountId;
+use domain::AccountEvent;
+use domain::AccountId;
 use tokio::sync::RwLock;
 
 /// In-memory event store for development and testing

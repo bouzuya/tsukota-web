@@ -10,11 +10,11 @@ use application::view::CategoryView;
 use application::view::PaginatedList;
 use application::view::TransactionView;
 use async_trait::async_trait;
-use domain::account::Account;
-use domain::account::AccountEvent;
-use domain::account::AccountId;
-use domain::account::TransactionId;
-use domain::account::UserId;
+use domain::Account;
+use domain::AccountEvent;
+use domain::AccountId;
+use domain::TransactionId;
+use domain::UserId;
 use tokio::sync::RwLock;
 
 /// In-memory projection for development and testing

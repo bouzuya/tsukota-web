@@ -1,4 +1,4 @@
-use domain::account::AccountError;
+use domain::AccountError;
 
 /// Application layer errors
 #[derive(Debug, thiserror::Error)]

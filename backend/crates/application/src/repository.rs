@@ -1,10 +1,10 @@
 use async_trait::async_trait;
+use domain::AccountEvent;
+use domain::AccountId;
 use domain::DeviceEvent;
 use domain::DeviceId;
 use domain::UserEvent;
 use domain::UserId;
-use domain::account::AccountEvent;
-use domain::account::AccountId;
 
 use crate::error::ApplicationError;
 

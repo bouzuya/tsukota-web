@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use domain::account::AccountId;
-use domain::account::TransactionId;
-use domain::account::UserId;
+use domain::AccountId;
+use domain::TransactionId;
+use domain::UserId;
 
 use crate::error::ApplicationError;
 use crate::view::AccountView;

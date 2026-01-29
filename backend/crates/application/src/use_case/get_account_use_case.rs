@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use domain::account::AccountId;
+use domain::AccountId;
 
 use crate::UserId;
 use crate::authorization::verify_owner;

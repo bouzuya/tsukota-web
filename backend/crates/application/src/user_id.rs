@@ -4,7 +4,7 @@
 /// executing a use case. It is separate from the domain's UserId to maintain
 /// architectural boundaries.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct UserId(domain::account::UserId);
+pub struct UserId(domain::UserId);
 
 /// Error when parsing UserId
 #[derive(Debug, thiserror::Error)]
@@ -13,7 +13,7 @@ pub struct ParseUserIdError;
 
 impl UserId {
     /// Convert to domain UserId
-    pub fn to_domain(&self) -> domain::account::UserId {
+    pub fn to_domain(&self) -> domain::UserId {
         self.0
     }
 }
@@ -22,7 +22,7 @@ impl std::str::FromStr for UserId {
     type Err = ParseUserIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        domain::account::UserId::from_str(s)
+        domain::UserId::from_str(s)
             .map(Self)
             .map_err(|_| ParseUserIdError)
     }
