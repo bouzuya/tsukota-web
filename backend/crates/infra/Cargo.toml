@@ -8,8 +8,8 @@ version.workspace = true
 [dependencies]
 application.workspace = true
 async-trait.workspace = true
-domain = { path = "../domain" }
-firestore-client = { path = "../firestore-client" }
+domain.workspace = true
+firestore-client.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

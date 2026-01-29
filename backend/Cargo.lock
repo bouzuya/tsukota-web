@@ -27,7 +27,6 @@ dependencies = [
  "axum",
  "base64",
  "google-cloud-iam-credentials-v1",
- "infra",
  "jsonwebtoken",
  "reqwest",
  "rsa",

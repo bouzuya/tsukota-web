@@ -10,8 +10,8 @@ name = "tsukota-server"
 path = "src/main.rs"
 
 [dependencies]
-api = { path = "../api" }
-application = { path = "../application" }
+api.workspace = true
+application.workspace = true
 async-trait.workspace = true
-infra = { path = "../infra" }
+infra.workspace = true
 tokio.workspace = true
