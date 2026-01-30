@@ -19,14 +19,14 @@ impl fmt::Debug for DeviceSecret {
 /// DeviceSecret のパースエラー
 #[derive(Debug, thiserror::Error)]
 #[error("DeviceSecret must be at least {MIN_LENGTH} bytes")]
-pub struct ParseDeviceSecretError;
+pub struct DeviceSecretError;
 
 impl FromStr for DeviceSecret {
-    type Err = ParseDeviceSecretError;
+    type Err = DeviceSecretError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() < MIN_LENGTH {
-            return Err(ParseDeviceSecretError);
+            return Err(DeviceSecretError);
         }
         Ok(Self(s.to_string()))
     }

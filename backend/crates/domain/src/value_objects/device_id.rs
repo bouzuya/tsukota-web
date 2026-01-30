@@ -8,7 +8,7 @@ pub struct DeviceId(uuid::Uuid);
 /// DeviceId のパースエラー
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid DeviceId format")]
-pub struct ParseDeviceIdError;
+pub struct DeviceIdError;
 
 impl DeviceId {
     /// 新しい DeviceId を生成する
@@ -18,12 +18,12 @@ impl DeviceId {
 }
 
 impl FromStr for DeviceId {
-    type Err = ParseDeviceIdError;
+    type Err = DeviceIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         uuid::Uuid::parse_str(s)
             .map(Self)
-            .map_err(|_| ParseDeviceIdError)
+            .map_err(|_| DeviceIdError)
     }
 }
 

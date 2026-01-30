@@ -9,7 +9,7 @@ pub struct UserId(domain::UserId);
 /// Error when parsing UserId
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid UserId format")]
-pub struct ParseUserIdError;
+pub struct UserIdError;
 
 impl UserId {
     /// Convert to domain UserId
@@ -19,12 +19,12 @@ impl UserId {
 }
 
 impl std::str::FromStr for UserId {
-    type Err = ParseUserIdError;
+    type Err = UserIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         domain::UserId::from_str(s)
             .map(Self)
-            .map_err(|_| ParseUserIdError)
+            .map_err(|_| UserIdError)
     }
 }
 

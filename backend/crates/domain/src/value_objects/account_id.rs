@@ -8,7 +8,7 @@ pub struct AccountId(uuid::Uuid);
 /// AccountId のパースエラー
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid AccountId format")]
-pub struct ParseAccountIdError;
+pub struct AccountIdError;
 
 impl AccountId {
     /// 新しい AccountId を生成する
@@ -18,12 +18,12 @@ impl AccountId {
 }
 
 impl FromStr for AccountId {
-    type Err = ParseAccountIdError;
+    type Err = AccountIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         uuid::Uuid::parse_str(s)
             .map(Self)
-            .map_err(|_| ParseAccountIdError)
+            .map_err(|_| AccountIdError)
     }
 }
 

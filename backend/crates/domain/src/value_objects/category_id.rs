@@ -8,7 +8,7 @@ pub struct CategoryId(uuid::Uuid);
 /// CategoryId のパースエラー
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid CategoryId format")]
-pub struct ParseCategoryIdError;
+pub struct CategoryIdError;
 
 impl CategoryId {
     /// 新しい CategoryId を生成する
@@ -18,12 +18,12 @@ impl CategoryId {
 }
 
 impl FromStr for CategoryId {
-    type Err = ParseCategoryIdError;
+    type Err = CategoryIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         uuid::Uuid::parse_str(s)
             .map(Self)
-            .map_err(|_| ParseCategoryIdError)
+            .map_err(|_| CategoryIdError)
     }
 }
 

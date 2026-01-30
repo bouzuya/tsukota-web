@@ -8,7 +8,7 @@ pub struct UserId(uuid::Uuid);
 /// UserId のパースエラー
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid UserId format")]
-pub struct ParseUserIdError;
+pub struct UserIdError;
 
 impl UserId {
     /// 新しい UserId を生成する
@@ -18,12 +18,10 @@ impl UserId {
 }
 
 impl FromStr for UserId {
-    type Err = ParseUserIdError;
+    type Err = UserIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        uuid::Uuid::parse_str(s)
-            .map(Self)
-            .map_err(|_| ParseUserIdError)
+        uuid::Uuid::parse_str(s).map(Self).map_err(|_| UserIdError)
     }
 }
 

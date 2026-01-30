@@ -8,7 +8,7 @@ pub struct TransactionId(uuid::Uuid);
 /// TransactionId のパースエラー
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid TransactionId format")]
-pub struct ParseTransactionIdError;
+pub struct TransactionIdError;
 
 impl TransactionId {
     /// 新しい TransactionId を生成する
@@ -18,12 +18,12 @@ impl TransactionId {
 }
 
 impl FromStr for TransactionId {
-    type Err = ParseTransactionIdError;
+    type Err = TransactionIdError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         uuid::Uuid::parse_str(s)
             .map(Self)
-            .map_err(|_| ParseTransactionIdError)
+            .map_err(|_| TransactionIdError)
     }
 }
 
