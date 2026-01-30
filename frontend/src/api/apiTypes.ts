@@ -128,11 +128,6 @@ export interface ApiDeleteTransactionCommand {
 	transaction_id: string;
 }
 
-export interface ApiUpdateUserCommand {
-	user_id: string;
-	display_name: string;
-}
-
 // Authentication
 export interface ApiCreateSessionTokenCommand {
 	device_id: string;
