@@ -1,10 +1,9 @@
 use axum::Json;
-use serde::Serialize;
 
 use crate::error::ApiError;
 use crate::extractor::AuthUser;
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 pub struct GetMeResponse {
     user_id: String,
 }
