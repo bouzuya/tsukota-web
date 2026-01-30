@@ -49,7 +49,7 @@ pub enum AccountError {
     EmptyAmount,
 }
 
-/// カテゴリの状態
+/// 区分の状態
 #[derive(Clone, Debug, PartialEq)]
 pub struct Category {
     pub id: CategoryId,
@@ -80,7 +80,7 @@ pub enum Account {
         name: String,
         /// オーナーのセット
         owners: BTreeSet<UserId>,
-        /// カテゴリのマップ
+        /// 区分のマップ
         categories: BTreeMap<CategoryId, Category>,
         /// 取引のマップ
         transactions: BTreeMap<TransactionId, Transaction>,
@@ -501,7 +501,7 @@ impl Account {
             return Err(AccountError::EmptyAmount);
         }
 
-        // カテゴリの存在確認（削除されていても既存の取引では使用可能）
+        // 区分の存在確認（削除されていても既存の取引では使用可能）
         categories
             .get(&category_id)
             .ok_or(AccountError::CategoryNotFound)?;
@@ -550,7 +550,7 @@ impl Account {
             return Err(AccountError::EmptyAmount);
         }
 
-        // カテゴリの存在確認
+        // 区分の存在確認
         categories
             .get(&category_id)
             .ok_or(AccountError::CategoryNotFound)?;

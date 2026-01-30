@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-/// カテゴリ ID の Value Object
+/// 区分 ID の Value Object
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CategoryId(uuid::Uuid);
 

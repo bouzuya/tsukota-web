@@ -25,19 +25,19 @@ pub enum AccountCommand {
     /// オーナーを削除する
     RemoveOwner { owner: UserId },
 
-    /// カテゴリを追加する
+    /// 区分を追加する
     AddCategory {
         category_id: CategoryId,
         name: String,
     },
 
-    /// カテゴリ名を変更する
+    /// 区分名を変更する
     UpdateCategory {
         category_id: CategoryId,
         name: String,
     },
 
-    /// カテゴリを削除する（論理削除）
+    /// 区分を削除する（論理削除）
     DeleteCategory { category_id: CategoryId },
 
     /// 取引を追加する

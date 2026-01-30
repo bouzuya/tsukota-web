@@ -46,7 +46,7 @@ pub enum AccountEvent {
         name: String,
     },
 
-    /// カテゴリが追加された
+    /// 区分が追加された
     #[serde(rename_all = "camelCase")]
     CategoryAdded {
         category_id: String,
@@ -55,7 +55,7 @@ pub enum AccountEvent {
         name: String,
     },
 
-    /// カテゴリが削除された
+    /// 区分が削除された
     #[serde(rename_all = "camelCase")]
     CategoryDeleted {
         category_id: String,
@@ -63,7 +63,7 @@ pub enum AccountEvent {
         common: AccountEventCommonProps,
     },
 
-    /// カテゴリ名が変更された
+    /// 区分名が変更された
     #[serde(rename_all = "camelCase")]
     CategoryUpdated {
         category_id: String,

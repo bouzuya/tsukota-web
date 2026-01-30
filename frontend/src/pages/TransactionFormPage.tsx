@@ -164,11 +164,11 @@ export function TransactionFormPage() {
 						/>
 
 						<Select
-							label="カテゴリ"
+							label="区分"
 							value={categoryId}
 							onChange={(e) => setCategoryId(e.target.value)}
 							options={categoryOptions}
-							placeholder="カテゴリを選択"
+							placeholder="区分を選択"
 							required
 						/>
 

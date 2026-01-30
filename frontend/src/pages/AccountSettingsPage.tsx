@@ -156,7 +156,7 @@ export function AccountSettingsPage() {
 						危険な操作
 					</h2>
 					<p className="text-gray-600 mb-4">
-						アカウントを削除すると、すべての取引データとカテゴリが削除されます。この操作は取り消せません。
+						アカウントを削除すると、すべての取引データと区分が削除されます。この操作は取り消せません。
 					</p>
 					<Button variant="danger" onClick={() => setShowDeleteModal(true)}>
 						アカウントを削除

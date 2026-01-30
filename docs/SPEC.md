@@ -36,21 +36,21 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 - 複数ユーザーでのアカウント共有
 - 複数オーナーによる共同管理
 - 共有オーナーの招待・管理 (※初期バージョンでは保留、DB直接操作で対応)
-- すべてのオーナーが同等の権限を持つ: アカウント削除、オーナー追加・削除、収支・カテゴリ管理
+- すべてのオーナーが同等の権限を持つ: アカウント削除、オーナー追加・削除、収支・区分管理
 
 ### 3. 収支記録
 
 - 取引の登録・編集・削除
-- 日付、金額、カテゴリ、コメントの入力
+- 日付、金額、区分、コメントの入力
 - 対応通貨: 日本円のみ
 - すべてのオーナーが編集・削除可能
 
-### 4. カテゴリ管理
+### 4. 区分管理
 
-- オーナーによるカテゴリのカスタマイズ
-- カテゴリの追加・編集・削除 (論理削除)
-- 削除されたカテゴリ: 一覧に非表示、新規取引で選択不可、既存取引の値は維持
-- デフォルトカテゴリなし (オーナーが自身で作成)
+- オーナーによる区分のカスタマイズ
+- 区分の追加・編集・削除 (論理削除)
+- 削除された区分: 一覧に非表示、新規取引で選択不可、既存取引の値は維持
+- デフォルト区分なし (オーナーが自身で作成)
 
 ### 5. データエクスポート
 
@@ -59,7 +59,7 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 ## データモデル
 
 以下のデータモデルは API レスポンスおよび読み取りモデル (Projection) を表します。
-アカウント、カテゴリ、取引の実体はイベントソーシングにより管理されます（詳細は [ARCHITECTURE.md](./ARCHITECTURE.md) 参照）。
+アカウント、区分、取引の実体はイベントソーシングにより管理されます（詳細は [ARCHITECTURE.md](./ARCHITECTURE.md) 参照）。
 
 ### User
 
@@ -81,9 +81,9 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | カテゴリ ID (UUID) |
+| id | string | 区分 ID (UUID) |
 | account_id | string | 所属するアカウント ID |
-| name | string | カテゴリ名 |
+| name | string | 区分名 |
 | created_at | string | 作成日時 (ISO 8601) |
 | deleted_at | string? | 削除日時 (論理削除、ISO 8601) |
 
@@ -94,7 +94,7 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 | id | string | 取引 ID (UUID) |
 | account_id | string | 所属するアカウント ID |
 | amount | string | 金額 (文字列形式) |
-| category_id | string | カテゴリ ID |
+| category_id | string | 区分 ID |
 | date | string | 取引日 (YYYY-MM-DD) |
 | comment | string | コメント |
 | created_at | string | 作成日時 (ISO 8601) |
@@ -158,19 +158,19 @@ API は更新系と参照系で異なるパス設計を採用しています。
 - `POST /commands/remove_owner` - オーナー削除
   - body: `{ "account_id": string, "user_id": string }`
 
-### カテゴリ (参照系)
+### 区分 (参照系)
 
-- `GET /accounts/{account_id}/categories` - カテゴリ一覧取得
+- `GET /accounts/{account_id}/categories` - 区分一覧取得
   - response: `PaginatedList<Category>`
 
-### カテゴリ (更新系)
+### 区分 (更新系)
 
-- `POST /commands/add_category` - カテゴリ作成
+- `POST /commands/add_category` - 区分作成
   - body: `{ "account_id": string, "name": string }`
   - response: `{ "category_id": string }`
-- `POST /commands/update_category` - カテゴリ更新
+- `POST /commands/update_category` - 区分更新
   - body: `{ "account_id": string, "category_id": string, "name": string }`
-- `POST /commands/delete_category` - カテゴリ削除
+- `POST /commands/delete_category` - 区分削除
   - body: `{ "account_id": string, "category_id": string }`
 
 ### 収支記録 (参照系)
@@ -202,7 +202,7 @@ API は更新系と参照系で異なるパス設計を採用しています。
 2. ダッシュボード (アカウント選択)
 3. 収支一覧画面
 4. 収支登録・編集画面
-5. カテゴリ管理画面
+5. 区分管理画面
 6. アカウント設定画面 (オーナー管理含む)
 7. ユーザー設定画面
 

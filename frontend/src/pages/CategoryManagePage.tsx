@@ -124,15 +124,15 @@ export function CategoryManagePage() {
 	return (
 		<Layout>
 			<div className="mb-6 flex justify-between items-center">
-				<h1 className="text-2xl font-bold text-gray-900">カテゴリ管理</h1>
+				<h1 className="text-2xl font-bold text-gray-900">区分管理</h1>
 				<Button onClick={() => setShowAddModal(true)}>追加</Button>
 			</div>
 
 			{activeCategories.length === 0 ? (
 				<div className="bg-white rounded-lg shadow p-8 text-center">
-					<p className="text-gray-600 mb-4">カテゴリがありません</p>
+					<p className="text-gray-600 mb-4">区分がありません</p>
 					<Button onClick={() => setShowAddModal(true)}>
-						最初のカテゴリを追加
+						最初の区分を追加
 					</Button>
 				</div>
 			) : (
@@ -171,7 +171,7 @@ export function CategoryManagePage() {
 					setShowAddModal(false);
 					setCategoryName("");
 				}}
-				title="カテゴリを追加"
+				title="区分を追加"
 				actions={
 					<>
 						<Button
@@ -194,7 +194,7 @@ export function CategoryManagePage() {
 				}
 			>
 				<Input
-					label="カテゴリ名"
+					label="区分名"
 					value={categoryName}
 					onChange={(e) => setCategoryName(e.target.value)}
 					placeholder="例: 食費"
@@ -210,7 +210,7 @@ export function CategoryManagePage() {
 					setSelectedCategory(null);
 					setCategoryName("");
 				}}
-				title="カテゴリを編集"
+				title="区分を編集"
 				actions={
 					<>
 						<Button
@@ -234,7 +234,7 @@ export function CategoryManagePage() {
 				}
 			>
 				<Input
-					label="カテゴリ名"
+					label="区分名"
 					value={categoryName}
 					onChange={(e) => setCategoryName(e.target.value)}
 					autoFocus
@@ -249,8 +249,8 @@ export function CategoryManagePage() {
 					setSelectedCategory(null);
 				}}
 				onConfirm={handleDelete}
-				title="カテゴリを削除"
-				message={`「${selectedCategory?.name}」を削除しますか？このカテゴリは新規取引で選択できなくなりますが、既存の取引には影響しません。`}
+				title="区分を削除"
+				message={`「${selectedCategory?.name}」を削除しますか？この区分は新規取引で選択できなくなりますが、既存の取引には影響しません。`}
 				confirmText="削除"
 				variant="danger"
 			/>

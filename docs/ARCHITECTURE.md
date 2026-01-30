@@ -93,7 +93,7 @@ https://github.com/bouzuya/tsukota/blob/master/packages/account-events/src/accou
 - **イベントストア**: Firestore にアカウントごとのイベントを格納
 - **読み取りモデル (Projection)**: イベントから構築されるビューモデル
   - `Account`: アカウント情報
-  - `Category`: カテゴリ情報
+  - `Category`: 区分情報
   - `Transaction`: 取引情報
 
 SPEC.md に記載されているデータモデルは、この読み取りモデルに相当します。
@@ -122,7 +122,7 @@ https://github.com/bouzuya/tsukota/blob/master/packages/schema/src/schema.ts
   - リフレッシュトークン: 長期有効、HTTPOnly Cookie で管理
 - **認可**: アカウント単位の権限管理
   - オーナー: アカウント削除、メンバー管理
-  - メンバー: 収支・カテゴリの CRUD
+  - メンバー: 収支・区分の CRUD
 
 ### API セキュリティ
 
