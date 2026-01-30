@@ -6,8 +6,15 @@ const MIN_LENGTH: usize = 32;
 
 /// デバイスシークレットの Value Object
 /// 32 バイト以上の文字列であることを保証する
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DeviceSecret(String);
+
+impl fmt::Debug for DeviceSecret {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // セキュリティのため、シークレットの値を隠す
+        f.debug_tuple("DeviceSecret").field(&"[REDACTED]").finish()
+    }
+}
 
 /// DeviceSecret のパースエラー
 #[derive(Debug, thiserror::Error)]
@@ -90,6 +97,16 @@ mod tests {
     fn test_device_secret_with_special_chars() -> anyhow::Result<()> {
         let secret: DeviceSecret = "abc!@#$%^&*()_+-=[]{}|;':\",./<>?".parse()?;
         assert_eq!(secret.to_string(), "abc!@#$%^&*()_+-=[]{}|;':\",./<>?");
+        Ok(())
+    }
+
+    #[test]
+    fn test_device_secret_debug_hides_value() -> anyhow::Result<()> {
+        let secret: DeviceSecret = "super-secret-value-32-bytes-long".parse()?;
+        let debug_output = format!("{:?}", secret);
+        // Debug 出力に実際の値が含まれていないことを確認
+        assert!(!debug_output.contains("super-secret"));
+        assert!(debug_output.contains("REDACTED"));
         Ok(())
     }
 }
