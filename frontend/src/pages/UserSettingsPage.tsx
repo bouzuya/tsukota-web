@@ -31,6 +31,21 @@ export function UserSettingsPage() {
 			<h1 className="text-2xl font-bold text-gray-900 mb-6">ユーザー設定</h1>
 
 			<div className="space-y-6 max-w-lg">
+				{/* User Info */}
+				<div className="bg-white rounded-lg shadow p-6">
+					<h2 className="text-lg font-semibold text-gray-900 mb-4">
+						ユーザー情報
+					</h2>
+					<div>
+						<div className="block text-sm font-medium text-gray-700">
+							User ID
+						</div>
+						<p className="mt-1 text-gray-900 font-mono text-sm break-all">
+							{currentUser.id}
+						</p>
+					</div>
+				</div>
+
 				{/* Device Info */}
 				<div className="bg-white rounded-lg shadow p-6">
 					<h2 className="text-lg font-semibold text-gray-900 mb-4">

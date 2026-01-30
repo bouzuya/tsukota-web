@@ -1,5 +1,5 @@
-import { apiPost } from "./client";
 import type { ApiDeleteTransactionCommand } from "./apiTypes";
+import { apiPost } from "./client";
 
 export interface DeleteTransactionCommand {
 	accountId: string;

@@ -1,12 +1,12 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getMe } from "../api/getMe";
 import {
-	currentUserAtom,
 	authLoadingAtom,
-	isAuthenticatedAtom,
+	currentUserAtom,
 	getAuthToken,
-	getDeviceId,
+	isAuthenticatedAtom,
 	setAuthToken,
 	setDeviceId,
 	setDeviceSecret,
@@ -18,18 +18,23 @@ export function useAuth() {
 	const isAuthenticated = useAtomValue(isAuthenticatedAtom);
 	const navigate = useNavigate();
 
-	const checkAuth = useCallback(() => {
+	const checkAuth = useCallback(async () => {
 		setAuthLoading(true);
 
 		const authToken = getAuthToken();
 		if (authToken) {
-			const deviceId = getDeviceId();
-			setCurrentUser({
-				id: deviceId ?? "unknown",
-				email: "",
-				displayName: deviceId ?? "User",
-				createdAt: new Date().toISOString(),
-			});
+			try {
+				const meResponse = await getMe();
+				setCurrentUser({
+					id: meResponse.userId,
+					email: "",
+					displayName: meResponse.userId,
+					createdAt: new Date().toISOString(),
+				});
+			} catch {
+				// トークンが無効な場合はログアウト状態にする
+				setCurrentUser(null);
+			}
 		} else {
 			setCurrentUser(null);
 		}

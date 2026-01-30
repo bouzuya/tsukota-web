@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
+import { useParams } from "react-router-dom";
 import { Header } from "./Header";
 import { Navigation } from "./Navigation";
-import { useParams } from "react-router-dom";
 
 interface LayoutProps {
 	children: ReactNode;

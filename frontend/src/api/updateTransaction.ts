@@ -1,5 +1,5 @@
-import { apiPost } from "./client";
 import type { ApiUpdateTransactionCommand } from "./apiTypes";
+import { apiPost } from "./client";
 
 export interface UpdateTransactionCommand {
 	accountId: string;

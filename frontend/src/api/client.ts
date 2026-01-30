@@ -1,5 +1,5 @@
-import type { ApiProblemDetails } from "./apiTypes";
 import { getAuthToken } from "../atoms/auth";
+import type { ApiProblemDetails } from "./apiTypes";
 
 export class ApiError extends Error {
 	status: number;

@@ -1,21 +1,20 @@
+import { useAtom, useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAtom } from "jotai";
 import { addTransaction } from "../api/addTransaction";
-import { updateTransaction } from "../api/updateTransaction";
 import { deleteTransaction } from "../api/deleteTransaction";
-import { getTransactions } from "../api/getTransactions";
 import { getCategories } from "../api/getCategories";
-import { categoriesAtom, activeCategoriesAtom } from "../atoms/categories";
-import { Layout } from "../components/Layout";
+import { getTransactions } from "../api/getTransactions";
+import { updateTransaction } from "../api/updateTransaction";
+import { activeCategoriesAtom, categoriesAtom } from "../atoms/categories";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
-import { Select } from "../components/Select";
-import { ConfirmModal } from "../components/Modal";
+import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { ConfirmModal } from "../components/Modal";
+import { Select } from "../components/Select";
 import { useRequireAuth } from "../hooks/useAuth";
 import { getTodayString } from "../utils/date";
-import { useAtomValue } from "jotai";
 
 export function TransactionFormPage() {
 	const { id, txId } = useParams<{ id: string; txId?: string }>();

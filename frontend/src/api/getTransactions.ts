@@ -1,8 +1,8 @@
+import type { ApiPaginatedResponse, ApiTransaction } from "./apiTypes";
 import { apiGet } from "./client";
-import type { ApiTransaction, ApiPaginatedResponse } from "./apiTypes";
-import type { Transaction, PaginatedResponse } from "./types";
-import { toTransaction } from "./toTransaction";
 import { toPaginatedResponse } from "./toPaginatedResponse";
+import { toTransaction } from "./toTransaction";
+import type { PaginatedResponse, Transaction } from "./types";
 
 export async function getTransactions(
 	accountId: string,

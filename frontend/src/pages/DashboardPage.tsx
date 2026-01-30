@@ -1,14 +1,14 @@
+import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAtom } from "jotai";
-import { getAccounts } from "../api/getAccounts";
 import { createAccount } from "../api/createAccount";
+import { getAccounts } from "../api/getAccounts";
 import { accountsAtom, accountsLoadingAtom } from "../atoms/accounts";
-import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
-import { Modal } from "../components/Modal";
+import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { Modal } from "../components/Modal";
 import { useRequireAuth } from "../hooks/useAuth";
 
 export function DashboardPage() {

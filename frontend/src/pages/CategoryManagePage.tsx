@@ -1,18 +1,18 @@
+import { useAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useAtom } from "jotai";
-import { getCategories } from "../api/getCategories";
 import { addCategory } from "../api/addCategory";
-import { updateCategory } from "../api/updateCategory";
 import { deleteCategory } from "../api/deleteCategory";
+import { getCategories } from "../api/getCategories";
+import type { Category } from "../api/types";
+import { updateCategory } from "../api/updateCategory";
 import { categoriesAtom, categoriesLoadingAtom } from "../atoms/categories";
-import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
-import { Modal, ConfirmModal } from "../components/Modal";
+import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { ConfirmModal, Modal } from "../components/Modal";
 import { useRequireAuth } from "../hooks/useAuth";
-import type { Category } from "../api/types";
 
 export function CategoryManagePage() {
 	const { id } = useParams<{ id: string }>();

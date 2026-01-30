@@ -1,18 +1,18 @@
+import { useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAtomValue } from "jotai";
-import { getAccount } from "../api/getAccount";
-import { updateAccount } from "../api/updateAccount";
 import { deleteAccount } from "../api/deleteAccount";
+import { getAccount } from "../api/getAccount";
 import { getUser } from "../api/getUser";
+import type { Account, User } from "../api/types";
+import { updateAccount } from "../api/updateAccount";
 import { currentUserAtom } from "../atoms/auth";
-import { Layout } from "../components/Layout";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
-import { ConfirmModal } from "../components/Modal";
+import { Layout } from "../components/Layout";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { ConfirmModal } from "../components/Modal";
 import { useRequireAuth } from "../hooks/useAuth";
-import type { Account, User } from "../api/types";
 
 export function AccountSettingsPage() {
 	const { id } = useParams<{ id: string }>();

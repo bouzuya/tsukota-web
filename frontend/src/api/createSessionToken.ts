@@ -1,8 +1,8 @@
-import { apiPost } from "./client";
 import type {
 	ApiCreateSessionTokenCommand,
 	ApiCreateSessionTokenResponse,
 } from "./apiTypes";
+import { apiPost } from "./client";
 
 export interface CreateSessionTokenParams {
 	deviceId: string;

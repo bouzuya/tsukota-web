@@ -6,10 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": [
-			"**",
-			"!!**/dist"
-		]
+		"includes": ["**", "!!**/dist"]
 	},
 	"formatter": {
 		"enabled": true
@@ -22,9 +19,7 @@
 				"noUnknownAtRules": {
 					"level": "error",
 					"options": {
-						"ignore": [
-							"tailwind"
-						]
+						"ignore": ["tailwind"]
 					}
 				}
 			}

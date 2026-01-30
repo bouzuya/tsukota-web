@@ -1,7 +1,7 @@
-import { apiGet } from "./client";
 import type { ApiAccount } from "./apiTypes";
-import type { Account } from "./types";
+import { apiGet } from "./client";
 import { toAccount } from "./toAccount";
+import type { Account } from "./types";
 
 export async function getAccount(accountId: string): Promise<Account> {
 	const response = await apiGet<ApiAccount>(`/accounts/${accountId}`);

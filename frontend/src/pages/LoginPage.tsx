@@ -2,6 +2,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createSessionToken } from "../api/createSessionToken";
+import { getMe } from "../api/getMe";
 import {
 	authLoadingAtom,
 	currentUserAtom,
@@ -54,11 +55,12 @@ export function LoginPage() {
 			setDeviceId(deviceId);
 			setDeviceSecret(deviceSecret);
 
-			// ユーザー情報を設定（トークンからは取得できないため、device_id を使用）
+			// ユーザー情報を取得
+			const meResponse = await getMe();
 			setCurrentUser({
-				id: deviceId,
+				id: meResponse.userId,
 				email: "",
-				displayName: deviceId,
+				displayName: meResponse.userId,
 				createdAt: new Date().toISOString(),
 			});
 

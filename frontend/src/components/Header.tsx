@@ -18,9 +18,10 @@ export function Header() {
 						<div className="flex items-center gap-4">
 							<Link
 								to="/settings"
-								className="text-sm text-gray-600 hover:text-gray-900"
+								className="text-sm text-gray-600 hover:text-gray-900 font-mono"
+								title={currentUser.id}
 							>
-								{currentUser.displayName}
+								{currentUser.id.slice(0, 8)}...
 							</Link>
 						</div>
 					)}

@@ -1,5 +1,5 @@
-import { apiPost } from "./client";
 import type { ApiUpdateCategoryCommand } from "./apiTypes";
+import { apiPost } from "./client";
 
 export interface UpdateCategoryCommand {
 	accountId: string;

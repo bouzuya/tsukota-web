@@ -1,15 +1,15 @@
-import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
-import { useAuth } from "./hooks/useAuth";
-import { isAuthenticatedAtom, authLoadingAtom } from "./atoms/auth";
+import { useEffect } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { authLoadingAtom, isAuthenticatedAtom } from "./atoms/auth";
 import { PageLoader } from "./components/LoadingSpinner";
-import { LoginPage } from "./pages/LoginPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { TransactionListPage } from "./pages/TransactionListPage";
-import { TransactionFormPage } from "./pages/TransactionFormPage";
-import { CategoryManagePage } from "./pages/CategoryManagePage";
+import { useAuth } from "./hooks/useAuth";
 import { AccountSettingsPage } from "./pages/AccountSettingsPage";
+import { CategoryManagePage } from "./pages/CategoryManagePage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { LoginPage } from "./pages/LoginPage";
+import { TransactionFormPage } from "./pages/TransactionFormPage";
+import { TransactionListPage } from "./pages/TransactionListPage";
 import { UserSettingsPage } from "./pages/UserSettingsPage";
 
 function AppRoutes() {

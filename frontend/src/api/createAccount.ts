@@ -1,7 +1,10 @@
+import type {
+	ApiCreateAccountCommand,
+	ApiCreateAccountResponse,
+} from "./apiTypes";
 import { apiPost } from "./client";
-import type { ApiCreateAccountCommand, ApiCreateAccountResponse } from "./apiTypes";
-import type { CreateAccountResponse } from "./types";
 import { toCreateAccountResponse } from "./toCreateAccountResponse";
+import type { CreateAccountResponse } from "./types";
 
 export interface CreateAccountCommand {
 	name: string;
