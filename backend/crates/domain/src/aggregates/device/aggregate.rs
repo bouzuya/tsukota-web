@@ -149,7 +149,9 @@ mod tests {
     fn test_create_device() -> anyhow::Result<()> {
         let device = Device::new();
         let device_id = DeviceId::generate();
-        let device_secret: DeviceSecret = "test-secret".parse()?;
+        // 32 バイト以上のシークレット
+        let secret_value = "test-secret-value-32-bytes-long!";
+        let device_secret: DeviceSecret = secret_value.parse()?;
         let command = DeviceCommand::CreateDevice {
             device_id,
             device_secret: device_secret.clone(),
@@ -165,7 +167,7 @@ mod tests {
                 ..
             } => {
                 // encrypted_secret は bcrypt ハッシュであることを確認
-                assert!(bcrypt::verify("test-secret", encrypted_secret)?);
+                assert!(bcrypt::verify(secret_value, encrypted_secret)?);
                 // user_id は有効な UUID であることを確認
                 assert!(user_id.parse::<UserId>().is_ok());
                 Ok(())
@@ -223,7 +225,8 @@ mod tests {
         });
 
         let new_device_id = DeviceId::generate();
-        let new_device_secret: DeviceSecret = "new-secret".parse()?;
+        // 32 バイト以上のシークレット
+        let new_device_secret: DeviceSecret = "new-secret-value-32-bytes-long!!".parse()?;
         let command = DeviceCommand::CreateDevice {
             device_id: new_device_id,
             device_secret: new_device_secret,
