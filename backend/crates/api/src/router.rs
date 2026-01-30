@@ -53,6 +53,7 @@ pub fn create_router(state: AppState, public_dir: &Path, base_path: &str) -> Rou
             "/commands/update_transaction",
             post(handler::update_transaction),
         )
+        .route("/me", get(handler::get_me))
         .with_state(state);
 
     if base_path.is_empty() {
