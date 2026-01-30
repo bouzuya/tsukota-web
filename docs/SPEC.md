@@ -16,7 +16,7 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 | フロントエンド | React + Vite (SPA) |
 | バックエンド | Rust + axum |
 | データベース | Firestore |
-| 認証 | Google OAuth + JWT |
+| 認証 | デバイス認証 + JWT |
 | 状態管理 | jotai |
 | CSS | Tailwind CSS |
 | デプロイ | Cloud Run / Docker (ローカル) |
@@ -27,8 +27,8 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 
 ### 1. ユーザー認証
 
-- Google OAuth によるログイン
-- ログアウト機能
+- デバイス ID とデバイスシークレットによるサインイン
+- サインアウト機能
 
 ### 2. アカウント管理
 
@@ -61,14 +61,11 @@ tsukota-web は、複数ユーザーで共有可能なアカウント・支出�
 以下のデータモデルは API レスポンスおよび読み取りモデル (Projection) を表します。
 アカウント、カテゴリ、取引の実体はイベントソーシングにより管理されます（詳細は [ARCHITECTURE.md](./ARCHITECTURE.md) 参照）。
 
-### User (※未実装)
+### User
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| id | string | ユーザー ID (Firebase Auth UID) |
-| email | string | メールアドレス |
-| display_name | string | 表示名 |
-| created_at | string | 作成日時 (ISO 8601) |
+| id | string | ユーザー ID (UUID) |
 
 ### Account (アカウント)
 
@@ -128,19 +125,17 @@ API は更新系と参照系で異なるパス設計を採用しています。
 | `add_transaction` | 201 | `{ "transaction_id": string }` |
 | その他 (update/delete) | 204 | 空 |
 
-### 認証 (※未実装)
+### 認証
 
-- `GET /auth/google` - Google OAuth 開始
-- `GET /auth/callback` - OAuth コールバック
-- `POST /auth/logout` - ログアウト
-- `GET /auth/me` - 現在のユーザー情報取得
-- `POST /auth/refresh` - トークンリフレッシュ
+- `POST /commands/create_session_token` - セッショントークン作成
+  - body: `{ "device_id": string, "device_secret": string }`
+  - response: `{ "session_token": string }`
+  - 備考: device_id は UUID v4 形式、device_secret は 32 バイト以上の文字列
 
-### ユーザー (※未実装)
+### ユーザー
 
-- `GET /users/{id}` - ユーザー情報取得
-- `POST /commands/update_user` - ユーザー情報更新
-  - body: `{ "user_id": string, "display_name": string }`
+- `GET /me` - 現在のユーザー情報取得
+  - response: `{ "user_id": string }`
 
 ### アカウント (参照系)
 
@@ -203,7 +198,7 @@ API は更新系と参照系で異なるパス設計を採用しています。
 
 ## 画面一覧
 
-1. ログイン画面
+1. サインイン画面
 2. ダッシュボード (アカウント選択)
 3. 収支一覧画面
 4. 収支登録・編集画面
