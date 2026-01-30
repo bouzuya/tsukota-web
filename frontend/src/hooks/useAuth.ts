@@ -32,7 +32,7 @@ export function useAuth() {
 					createdAt: new Date().toISOString(),
 				});
 			} catch {
-				// トークンが無効な場合はログアウト状態にする
+				// トークンが無効な場合はサインアウト状態にする
 				setCurrentUser(null);
 			}
 		} else {

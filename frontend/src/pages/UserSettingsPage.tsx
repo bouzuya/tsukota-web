@@ -86,13 +86,13 @@ export function UserSettingsPage() {
 				{/* Logout */}
 				<div className="bg-white rounded-lg shadow p-6">
 					<h2 className="text-lg font-semibold text-gray-900 mb-4">
-						ログアウト
+						サインアウト
 					</h2>
 					<p className="text-gray-600 mb-4">
-						ログアウトすると、再度ログインするまでアプリを使用できません。
+						サインアウトすると、再度サインインするまでアプリを使用できません。
 					</p>
 					<Button variant="secondary" onClick={logout}>
-						ログアウト
+						サインアウト
 					</Button>
 				</div>
 			</div>
