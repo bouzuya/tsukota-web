@@ -6,7 +6,7 @@ resolver = "3"
 authors = ["bouzuya"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
-version = "0.0.0"
+version = "1.0.0"
 
 [workspace.dependencies]
 anyhow = "1"
