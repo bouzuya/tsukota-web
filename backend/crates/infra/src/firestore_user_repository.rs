@@ -38,19 +38,19 @@ impl FirestoreUserRepository {
     }
 
     /// Get the path to a user event stream document: `aggregates/user/event_streams/{user_id}`
-    fn event_stream_path(user_id: &UserId) -> Result<DocumentPath, E> {
+    fn event_stream_document_path(user_id: &UserId) -> Result<DocumentPath, E> {
         let path_str = format!("aggregates/user/event_streams/{}", user_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to the events collection: `aggregates/user/event_streams/{user_id}/events`
-    fn events_collection_path(user_id: &UserId) -> Result<CollectionPath, E> {
+    fn event_collection_path(user_id: &UserId) -> Result<CollectionPath, E> {
         let path_str = format!("aggregates/user/event_streams/{}/events", user_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to an event document: `aggregates/user/event_streams/{user_id}/events/{event_id}`
-    fn event_path(user_id: &UserId, event_id: &str) -> Result<DocumentPath, E> {
+    fn event_document_path(user_id: &UserId, event_id: &str) -> Result<DocumentPath, E> {
         let path_str = format!(
             "aggregates/user/event_streams/{}/events/{}",
             user_id, event_id
@@ -59,7 +59,7 @@ impl FirestoreUserRepository {
     }
 
     /// Get the path to a user document: `users/{user_id}`
-    fn user_path(user_id: &UserId) -> Result<DocumentPath, E> {
+    fn query_user_document_path(user_id: &UserId) -> Result<DocumentPath, E> {
         let path_str = format!("users/{}", user_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
@@ -67,18 +67,21 @@ impl FirestoreUserRepository {
     /// Extract event ID from a UserEvent
     fn get_event_id(event: &UserEvent) -> &str {
         match event {
-            UserEvent::UserCreated { common, .. } => &common.id,
+            UserEvent::AccountAdded { common, .. }
+            | UserEvent::AccountRemoved { common, .. }
+            | UserEvent::UserCreated { common, .. } => &common.id,
         }
     }
 
     /// Extract the `at` timestamp from a UserEvent
     fn get_event_at(event: &UserEvent) -> &str {
         match event {
-            UserEvent::UserCreated { common, .. } => &common.at,
+            UserEvent::AccountAdded { common, .. }
+            | UserEvent::AccountRemoved { common, .. }
+            | UserEvent::UserCreated { common, .. } => &common.at,
         }
     }
 }
-
 
 #[async_trait]
 impl UserRepository for FirestoreUserRepository {
@@ -99,7 +102,7 @@ impl UserRepository for FirestoreUserRepository {
 
 impl FirestoreUserRepository {
     async fn load_events_impl(&self, user_id: &UserId) -> Result<Vec<UserEvent>, E> {
-        let collection_path = Self::events_collection_path(user_id)?;
+        let collection_path = Self::event_collection_path(user_id)?;
 
         let mut all_events = Vec::new();
         let mut page_token: Option<String> = None;
@@ -132,49 +135,54 @@ impl FirestoreUserRepository {
             return Ok(());
         }
 
-        // Begin transaction
         let transaction = self.client.begin_transaction().await?;
+        let mut writes = Vec::new();
 
-        // Read current event stream document (for optimistic locking)
-        let event_stream_path = Self::event_stream_path(user_id)?;
-        let existing_stream = self
-            .client
-            .get_document_with_tx(event_stream_path.clone(), &transaction)
+        // ========================================
+        // aggregates/user/* (イベントストア)
+        // ========================================
+        self.build_aggregate_writes(user_id, &events, &transaction, &mut writes)
             .await?;
 
-        // Get the last event to update the event stream
+        // ========================================
+        // users/* (クエリ用コレクション)
+        // ========================================
+        self.build_query_user_writes(user_id, &events, &transaction, &mut writes)
+            .await?;
+
+        self.client.commit(&transaction, writes).await?;
+
+        Ok(())
+    }
+
+    /// `aggregates/user/*` への書き込みを構築する
+    async fn build_aggregate_writes(
+        &self,
+        user_id: &UserId,
+        events: &[UserEvent],
+        transaction: &firestore_client::FirestoreTransaction,
+        writes: &mut Vec<firestore_client::google::firestore::v1::Write>,
+    ) -> Result<(), E> {
+        // イベントドキュメントの書き込み
+        for event in events {
+            let event_id = Self::get_event_id(event);
+            let event_path = Self::event_document_path(user_id, event_id)?;
+            let event_value = self.client.serialize(event)?;
+            writes.push(self.client.build_create_write(event_path, event_value));
+        }
+
+        // イベントストリームドキュメントの更新 (排他制御のために get_document_with_tx を使用)
+        let event_stream_path = Self::event_stream_document_path(user_id)?;
+        let existing_stream = self
+            .client
+            .get_document_with_tx(event_stream_path.clone(), transaction)
+            .await?;
+
         let last_event = events.last().expect("events is non-empty");
         let last_event_at = Self::get_event_at(last_event);
 
-        // Build writes for all events
-        let mut writes = Vec::new();
-
-        for event in &events {
-            let event_id = Self::get_event_id(event);
-
-            // Write to aggregates/user/event_streams/{user_id}/events/{event_id}
-            let event_path = Self::event_path(user_id, event_id)?;
-            let event_value = self.client.serialize(event)?;
-            writes.push(self.client.build_create_write(event_path, event_value));
-
-            // Write to users/{user_id} for UserCreated event
-            match event {
-                UserEvent::UserCreated { .. } => {
-                    let user_doc = QueryUserDocumentData {
-                        account_ids: vec![],
-                        id: user_id.to_string(),
-                    };
-                    let user_path = Self::user_path(user_id)?;
-                    let user_value = self.client.serialize(&user_doc)?;
-                    writes.push(self.client.build_create_write(user_path, user_value));
-                }
-            }
-        }
-
-        // Build event stream document write based on whether this is a new or existing user
         match existing_stream {
             None => {
-                // New user
                 let event_stream = UserEventStreamDocumentData {
                     id: user_id.to_string(),
                     updated_at: last_event_at.to_string(),
@@ -184,7 +192,6 @@ impl FirestoreUserRepository {
                 writes.push(self.client.build_create_write(event_stream_path, value));
             }
             Some(existing_doc) => {
-                // Existing user - update the event stream
                 let mut event_stream: UserEventStreamDocumentData =
                     self.client.deserialize(existing_doc.fields)?;
 
@@ -195,8 +202,90 @@ impl FirestoreUserRepository {
             }
         }
 
-        // Commit transaction
-        self.client.commit(&transaction, writes).await?;
+        Ok(())
+    }
+
+    /// `users/*` への書き込みを構築する
+    async fn build_query_user_writes(
+        &self,
+        user_id: &UserId,
+        events: &[UserEvent],
+        transaction: &firestore_client::FirestoreTransaction,
+        writes: &mut Vec<firestore_client::google::firestore::v1::Write>,
+    ) -> Result<(), E> {
+        let user_path = Self::query_user_document_path(user_id)?;
+
+        // UserCreated イベントがある場合は新規作成
+        let has_user_created = events
+            .iter()
+            .any(|e| matches!(e, UserEvent::UserCreated { .. }));
+
+        if has_user_created {
+            // 新規ユーザー作成: account_ids は後続のイベントで更新
+            let mut account_ids = Vec::new();
+
+            // 同じバッチ内の AccountAdded イベントを処理
+            for event in events {
+                match event {
+                    UserEvent::AccountAdded { account_id, .. } => {
+                        if !account_ids.contains(account_id) {
+                            account_ids.push(account_id.clone());
+                        }
+                    }
+                    UserEvent::AccountRemoved { account_id, .. } => {
+                        account_ids.retain(|id| id != account_id);
+                    }
+                    UserEvent::UserCreated { .. } => {}
+                }
+            }
+
+            let user_doc = QueryUserDocumentData {
+                account_ids,
+                id: user_id.to_string(),
+            };
+            let user_value = self.client.serialize(&user_doc)?;
+            writes.push(self.client.build_create_write(user_path, user_value));
+        } else {
+            // 既存ユーザー: AccountAdded / AccountRemoved イベントを処理
+            let has_account_changes = events.iter().any(|e| {
+                matches!(
+                    e,
+                    UserEvent::AccountAdded { .. } | UserEvent::AccountRemoved { .. }
+                )
+            });
+
+            if has_account_changes {
+                let existing_user = self
+                    .client
+                    .get_document_with_tx(user_path.clone(), transaction)
+                    .await?;
+
+                let mut user_doc = match existing_user {
+                    Some(doc) => self.client.deserialize::<QueryUserDocumentData>(doc.fields)?,
+                    None => QueryUserDocumentData {
+                        account_ids: vec![],
+                        id: user_id.to_string(),
+                    },
+                };
+
+                for event in events {
+                    match event {
+                        UserEvent::AccountAdded { account_id, .. } => {
+                            if !user_doc.account_ids.contains(account_id) {
+                                user_doc.account_ids.push(account_id.clone());
+                            }
+                        }
+                        UserEvent::AccountRemoved { account_id, .. } => {
+                            user_doc.account_ids.retain(|id| id != account_id);
+                        }
+                        UserEvent::UserCreated { .. } => {}
+                    }
+                }
+
+                let user_value = self.client.serialize(&user_doc)?;
+                writes.push(self.client.build_update_write(user_path, user_value));
+            }
+        }
 
         Ok(())
     }
