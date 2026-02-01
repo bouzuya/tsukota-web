@@ -1,3 +1,5 @@
+use crate::schema::DeviceEventStreamDocumentData;
+use crate::schema::QueryDeviceDocumentData;
 use application::error::ApplicationError;
 use application::repository::DeviceRepository;
 use async_trait::async_trait;
@@ -75,23 +77,6 @@ impl FirestoreDeviceRepository {
             DeviceEvent::DeviceCreated { common, .. } => &common.at,
         }
     }
-}
-
-/// Device event stream document schema
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DeviceEventStreamDocumentData {
-    id: String,
-    updated_at: String,
-}
-
-/// Device document schema
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DeviceDocumentData {
-    id: String,
-    encrypted_secret: String,
-    uid: String,
 }
 
 #[async_trait]
@@ -185,7 +170,7 @@ impl FirestoreDeviceRepository {
                     user_id,
                     ..
                 } => {
-                    let device_doc = DeviceDocumentData {
+                    let device_doc = QueryDeviceDocumentData {
                         id: device_id.to_string(),
                         encrypted_secret: encrypted_secret.clone(),
                         uid: user_id.clone(),

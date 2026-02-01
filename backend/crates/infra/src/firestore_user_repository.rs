@@ -1,3 +1,5 @@
+use crate::schema::QueryUserDocumentData;
+use crate::schema::UserEventStreamDocumentData;
 use application::error::ApplicationError;
 use application::repository::UserRepository;
 use async_trait::async_trait;
@@ -77,21 +79,6 @@ impl FirestoreUserRepository {
     }
 }
 
-/// User event stream document schema
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct UserEventStreamDocumentData {
-    id: String,
-    updated_at: String,
-}
-
-/// User document schema
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct UserDocumentData {
-    account_ids: Vec<String>,
-    id: String,
-}
 
 #[async_trait]
 impl UserRepository for FirestoreUserRepository {
@@ -173,7 +160,7 @@ impl FirestoreUserRepository {
             // Write to users/{user_id} for UserCreated event
             match event {
                 UserEvent::UserCreated { .. } => {
-                    let user_doc = UserDocumentData {
+                    let user_doc = QueryUserDocumentData {
                         account_ids: vec![],
                         id: user_id.to_string(),
                     };

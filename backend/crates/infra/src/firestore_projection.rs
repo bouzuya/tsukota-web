@@ -1,3 +1,4 @@
+use crate::schema::QueryUserDocumentData;
 use application::error::ApplicationError;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
@@ -238,14 +239,6 @@ impl FirestoreProjection {
     }
 }
 
-/// User document schema
-#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct UserDocument {
-    id: String,
-    account_ids: Vec<String>,
-}
-
 #[async_trait]
 impl AccountProjection for FirestoreProjection {
     async fn get_account(
@@ -277,7 +270,7 @@ impl AccountProjection for FirestoreProjection {
 
         let account_ids = match user_doc {
             Some(doc) => {
-                let user: UserDocument = self
+                let user: QueryUserDocumentData = self
                     .client
                     .deserialize(doc.fields)
                     .map_err(|e| ApplicationError::Repository(e.to_string()))?;

@@ -1,3 +1,5 @@
+use crate::schema::AccountEventStreamDocumentData;
+use crate::schema::QueryUserDocumentData;
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
 use async_trait::async_trait;
@@ -101,25 +103,6 @@ impl FirestoreAccountRepository {
             | AccountEvent::TransactionUpdated { common, .. } => &common.at,
         }
     }
-}
-
-/// Event stream document schema
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct EventStreamDocument {
-    id: String,
-    last_event_id: String,
-    owners: Vec<String>,
-    protocol_version: u32,
-    updated_at: String,
-}
-
-/// User document schema
-#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct UserDocument {
-    id: String,
-    account_ids: Vec<String>,
 }
 
 #[async_trait]
@@ -266,7 +249,7 @@ impl FirestoreAccountRepository {
                     | AccountEvent::TransactionUpdated { .. } => vec![],
                 };
 
-                let event_stream = EventStreamDocument {
+                let event_stream = AccountEventStreamDocumentData {
                     id: account_id.to_string(),
                     last_event_id: last_event_id.to_string(),
                     owners,
@@ -279,7 +262,7 @@ impl FirestoreAccountRepository {
             }
             Some(existing_doc) => {
                 // Existing account - update the event stream
-                let mut event_stream: EventStreamDocument =
+                let mut event_stream: AccountEventStreamDocumentData =
                     self.client.deserialize(existing_doc.fields)?;
 
                 // Update owners based on events
@@ -324,8 +307,10 @@ impl FirestoreAccountRepository {
                 .await?;
 
             let mut user_doc = match existing_user {
-                Some(doc) => self.client.deserialize::<UserDocument>(doc.fields)?,
-                None => UserDocument {
+                Some(doc) => self
+                    .client
+                    .deserialize::<QueryUserDocumentData>(doc.fields)?,
+                None => QueryUserDocumentData {
                     id: uid.clone(),
                     account_ids: vec![],
                 },
