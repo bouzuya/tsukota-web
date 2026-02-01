@@ -1,11 +1,15 @@
 use crate::schema::AccountEventStreamDocumentData;
 use crate::schema::QueryAccountDocumentData;
-use crate::schema::QueryUserDocumentData;
+use crate::FirestoreUserRepository;
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
+use application::repository::UserRepository;
 use async_trait::async_trait;
 use domain::AccountEvent;
 use domain::AccountId;
+use domain::User;
+use domain::UserCommand;
+use domain::UserId;
 use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;
@@ -18,6 +22,9 @@ enum E {
 
     #[error("firestore client: {0}")]
     FirestoreClient(#[from] firestore_client::FirestoreClientError),
+
+    #[error("user: {0}")]
+    User(String),
 }
 
 impl From<E> for ApplicationError {
@@ -30,12 +37,17 @@ impl From<E> for ApplicationError {
 #[derive(Clone)]
 pub struct FirestoreAccountRepository {
     client: FirestoreClient,
+    user_repository: FirestoreUserRepository,
 }
 
 impl FirestoreAccountRepository {
     /// Create a new FirestoreAccountRepository with the given client
     pub fn new(client: FirestoreClient) -> Self {
-        Self { client }
+        let user_repository = FirestoreUserRepository::new(client.clone());
+        Self {
+            client,
+            user_repository,
+        }
     }
 
     /// Get the path to an event stream document: `aggregates/account/event_streams/{account_id}`
@@ -71,12 +83,6 @@ impl FirestoreAccountRepository {
         event_id: &str,
     ) -> Result<DocumentPath, E> {
         let path_str = format!("accounts/{}/events/{}", account_id, event_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
-    }
-
-    /// Get the path to a query user document: `users/{uid}`
-    fn query_user_document_path(uid: &str) -> Result<DocumentPath, E> {
-        let path_str = format!("users/{}", uid);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
@@ -174,6 +180,9 @@ impl FirestoreAccountRepository {
             return Ok(());
         }
 
+        // オーナー変更を収集 (User 集約の更新に使用)
+        let user_updates = self.collect_user_updates(&events);
+
         let transaction = self.client.begin_transaction().await?;
         let mut writes = Vec::new();
 
@@ -189,13 +198,104 @@ impl FirestoreAccountRepository {
         self.build_query_account_writes(account_id, &events, &transaction, &mut writes)
             .await?;
 
+        self.client.commit(&transaction, writes).await?;
+
         // ========================================
-        // users/* (クエリ用コレクション - 本来は別の集約だが簡素化のため)
+        // User 集約の更新 (別トランザクション)
         // ========================================
-        self.build_query_user_writes(account_id, &events, &transaction, &mut writes)
+        self.update_user_aggregates(account_id, user_updates)
             .await?;
 
-        self.client.commit(&transaction, writes).await?;
+        Ok(())
+    }
+
+    /// AccountEvent からオーナー変更を収集する
+    fn collect_user_updates(&self, events: &[AccountEvent]) -> Vec<(UserId, UserUpdateAction)> {
+        let mut updates = Vec::new();
+
+        for event in events {
+            match event {
+                AccountEvent::AccountCreated { owners, .. } => {
+                    for owner in owners {
+                        if let Ok(user_id) = owner.parse::<UserId>() {
+                            updates.push((user_id, UserUpdateAction::AddAccount));
+                        }
+                    }
+                }
+                AccountEvent::OwnerAdded { owner, .. } => {
+                    if let Ok(user_id) = owner.parse::<UserId>() {
+                        updates.push((user_id, UserUpdateAction::AddAccount));
+                    }
+                }
+                AccountEvent::OwnerRemoved { owner, .. } => {
+                    if let Ok(user_id) = owner.parse::<UserId>() {
+                        updates.push((user_id, UserUpdateAction::RemoveAccount));
+                    }
+                }
+                AccountEvent::AccountDeleted { .. }
+                | AccountEvent::AccountUpdated { .. }
+                | AccountEvent::CategoryAdded { .. }
+                | AccountEvent::CategoryDeleted { .. }
+                | AccountEvent::CategoryUpdated { .. }
+                | AccountEvent::TransactionAdded { .. }
+                | AccountEvent::TransactionDeleted { .. }
+                | AccountEvent::TransactionUpdated { .. } => {}
+            }
+        }
+
+        updates
+    }
+
+    /// User 集約を更新する (別トランザクション)
+    async fn update_user_aggregates(
+        &self,
+        account_id: &AccountId,
+        user_updates: Vec<(UserId, UserUpdateAction)>,
+    ) -> Result<(), E> {
+        for (user_id, action) in user_updates {
+            // User 集約を読み込み
+            let user_events = self
+                .user_repository
+                .load_events(&user_id)
+                .await
+                .map_err(|e| E::User(e.to_string()))?;
+            let user = User::from_events(user_events);
+
+            // コマンドを実行
+            let command = match action {
+                UserUpdateAction::AddAccount => UserCommand::AddAccount {
+                    user_id,
+                    account_id: *account_id,
+                },
+                UserUpdateAction::RemoveAccount => UserCommand::RemoveAccount {
+                    user_id,
+                    account_id: *account_id,
+                },
+            };
+
+            let new_events = match user.handle_command(command) {
+                Ok(events) => events,
+                Err(domain::UserError::AccountAlreadyAdded) => {
+                    // 既に追加済み - スキップ
+                    continue;
+                }
+                Err(domain::UserError::AccountNotFound) => {
+                    // 既に削除済み - スキップ
+                    continue;
+                }
+                Err(e) => {
+                    return Err(E::User(e.to_string()));
+                }
+            };
+
+            // 新しいイベントを保存
+            if !new_events.is_empty() {
+                self.user_repository
+                    .save_events(&user_id, new_events)
+                    .await
+                    .map_err(|e| E::User(e.to_string()))?;
+            }
+        }
 
         Ok(())
     }
@@ -369,78 +469,6 @@ impl FirestoreAccountRepository {
         Ok(())
     }
 
-    /// `users/*` への書き込みを構築する
-    async fn build_query_user_writes(
-        &self,
-        account_id: &AccountId,
-        events: &[AccountEvent],
-        transaction: &firestore_client::FirestoreTransaction,
-        writes: &mut Vec<firestore_client::google::firestore::v1::Write>,
-    ) -> Result<(), E> {
-        // オーナー変更を収集
-        let mut user_updates: std::collections::HashMap<String, UserUpdateAction> =
-            std::collections::HashMap::new();
-
-        for event in events {
-            match event {
-                AccountEvent::AccountCreated { owners, .. } => {
-                    for owner in owners {
-                        user_updates.insert(owner.clone(), UserUpdateAction::AddAccount);
-                    }
-                }
-                AccountEvent::OwnerAdded { owner, .. } => {
-                    user_updates.insert(owner.clone(), UserUpdateAction::AddAccount);
-                }
-                AccountEvent::OwnerRemoved { owner, .. } => {
-                    user_updates.insert(owner.clone(), UserUpdateAction::RemoveAccount);
-                }
-                AccountEvent::AccountDeleted { .. }
-                | AccountEvent::AccountUpdated { .. }
-                | AccountEvent::CategoryAdded { .. }
-                | AccountEvent::CategoryDeleted { .. }
-                | AccountEvent::CategoryUpdated { .. }
-                | AccountEvent::TransactionAdded { .. }
-                | AccountEvent::TransactionDeleted { .. }
-                | AccountEvent::TransactionUpdated { .. } => {}
-            }
-        }
-
-        // ユーザードキュメントを更新
-        for (uid, action) in user_updates {
-            let user_path = Self::query_user_document_path(&uid)?;
-            let existing_user = self
-                .client
-                .get_document_with_tx(user_path.clone(), transaction)
-                .await?;
-
-            let mut user_doc = match existing_user {
-                Some(doc) => self
-                    .client
-                    .deserialize::<QueryUserDocumentData>(doc.fields)?,
-                None => QueryUserDocumentData {
-                    account_ids: vec![],
-                    id: uid.clone(),
-                },
-            };
-
-            let account_id_str = account_id.to_string();
-            match action {
-                UserUpdateAction::AddAccount => {
-                    if !user_doc.account_ids.contains(&account_id_str) {
-                        user_doc.account_ids.push(account_id_str);
-                    }
-                }
-                UserUpdateAction::RemoveAccount => {
-                    user_doc.account_ids.retain(|id| id != &account_id_str);
-                }
-            }
-
-            let value = self.client.serialize(&user_doc)?;
-            writes.push(self.client.build_set_write(user_path, value));
-        }
-
-        Ok(())
-    }
 }
 
 /// Action to perform on a user document
