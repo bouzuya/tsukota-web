@@ -27,6 +27,16 @@ pub struct UserEventStreamDocumentData {
     pub updated_at: String,
 }
 
+/// Account ドキュメント (`accounts/{account_id}`)
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryAccountDocumentData {
+    pub deleted_at: Option<String>,
+    pub id: String,
+    pub name: String,
+    pub owners: Vec<String>,
+}
+
 /// Device ドキュメント (`devices/{device_id}`)
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
