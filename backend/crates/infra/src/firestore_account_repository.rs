@@ -1,6 +1,6 @@
+use crate::FirestoreUserRepository;
 use crate::schema::AccountEventStreamDocumentData;
 use crate::schema::QueryAccountDocumentData;
-use crate::FirestoreUserRepository;
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
 use application::repository::UserRepository;
@@ -468,7 +468,6 @@ impl FirestoreAccountRepository {
 
         Ok(())
     }
-
 }
 
 /// Action to perform on a user document

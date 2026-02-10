@@ -261,7 +261,9 @@ impl FirestoreUserRepository {
                     .await?;
 
                 let mut user_doc = match existing_user {
-                    Some(doc) => self.client.deserialize::<QueryUserDocumentData>(doc.fields)?,
+                    Some(doc) => self
+                        .client
+                        .deserialize::<QueryUserDocumentData>(doc.fields)?,
                     None => QueryUserDocumentData {
                         account_ids: vec![],
                         id: user_id.to_string(),

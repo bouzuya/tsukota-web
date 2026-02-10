@@ -271,7 +271,10 @@ mod tests {
         }
 
         // アカウントを追加
-        let events = user.handle_command(UserCommand::AddAccount { user_id, account_id })?;
+        let events = user.handle_command(UserCommand::AddAccount {
+            user_id,
+            account_id,
+        })?;
         assert_eq!(events.len(), 1);
 
         match &events[0] {
@@ -310,13 +313,19 @@ mod tests {
             user.apply_event(&event);
         }
 
-        let events = user.handle_command(UserCommand::AddAccount { user_id, account_id })?;
+        let events = user.handle_command(UserCommand::AddAccount {
+            user_id,
+            account_id,
+        })?;
         for event in events {
             user.apply_event(&event);
         }
 
         // 同じアカウントを再度追加しようとする
-        let result = user.handle_command(UserCommand::AddAccount { user_id, account_id });
+        let result = user.handle_command(UserCommand::AddAccount {
+            user_id,
+            account_id,
+        });
         match result {
             Err(UserError::AccountAlreadyAdded) => Ok(()),
             Err(_) | Ok(_) => anyhow::bail!("Expected AccountAlreadyAdded error"),
@@ -336,13 +345,19 @@ mod tests {
         }
 
         // アカウントを追加
-        let events = user.handle_command(UserCommand::AddAccount { user_id, account_id })?;
+        let events = user.handle_command(UserCommand::AddAccount {
+            user_id,
+            account_id,
+        })?;
         for event in events {
             user.apply_event(&event);
         }
 
         // アカウントを削除
-        let events = user.handle_command(UserCommand::RemoveAccount { user_id, account_id })?;
+        let events = user.handle_command(UserCommand::RemoveAccount {
+            user_id,
+            account_id,
+        })?;
         assert_eq!(events.len(), 1);
 
         match &events[0] {
@@ -382,7 +397,10 @@ mod tests {
         }
 
         // 存在しないアカウントを削除しようとする
-        let result = user.handle_command(UserCommand::RemoveAccount { user_id, account_id });
+        let result = user.handle_command(UserCommand::RemoveAccount {
+            user_id,
+            account_id,
+        });
         match result {
             Err(UserError::AccountNotFound) => Ok(()),
             Err(_) | Ok(_) => anyhow::bail!("Expected AccountNotFound error"),
@@ -395,7 +413,10 @@ mod tests {
         let user_id = UserId::generate();
         let account_id = AccountId::generate();
 
-        let result = user.handle_command(UserCommand::AddAccount { user_id, account_id });
+        let result = user.handle_command(UserCommand::AddAccount {
+            user_id,
+            account_id,
+        });
         match result {
             Err(UserError::UserNotFound) => Ok(()),
             Err(_) | Ok(_) => anyhow::bail!("Expected UserNotFound error"),
