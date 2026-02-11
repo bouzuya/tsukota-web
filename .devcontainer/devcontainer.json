@@ -2,13 +2,13 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"GitHub.copilot-chat"
+				"GitHub.copilot-chat",
+				"anthropic.claude-code"
 			]
 		}
 	},
 	"dockerComposeFile": "../compose.yaml",
 	"features": {
-		"ghcr.io/anthropics/devcontainer-features/claude-code:1": {},
 		"ghcr.io/devcontainers/features/common-utils:2": {
 			"username": "vscode",
 			"uid": 1000,
@@ -20,6 +20,7 @@
 		},
 		"ghcr.io/devcontainers/features/rust:1": {}
 	},
+	"postCreateCommand": "curl -fsSL https://claude.ai/install.sh | bash",
 	"name": "tsukota-web",
 	"remoteUser": "vscode",
 	"service": "workspace",
