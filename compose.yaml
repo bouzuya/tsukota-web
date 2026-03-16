@@ -1,4 +1,9 @@
 services:
+  firebase:
+    build: ./firebase
+    volumes:
+      - ./firebase:/firebase
+
   workspace:
     command: sleep infinity
     environment:
@@ -8,11 +13,3 @@ services:
       - .:/workspaces/tsukota-web:cached
       - ~/.claude:/home/vscode/.claude
       - ~/.copilot:/home/vscode/.copilot
-
-  firebase:
-    build: ./firebase
-    ports:
-      - "4000:4000"
-      - "8080:8080"
-    volumes:
-      - ./firebase:/firebase
