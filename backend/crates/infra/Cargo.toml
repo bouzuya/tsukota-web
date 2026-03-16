@@ -8,6 +8,7 @@ version.workspace = true
 [dependencies]
 application.workspace = true
 async-trait.workspace = true
+bouzuya-firestore-client.workspace = true
 domain.workspace = true
 firestore-client.workspace = true
 google-cloud-iam-credentials-v1 = "1"

@@ -72,7 +72,7 @@ async fn main() {
 
     println!("{:?}", env);
 
-    let _firestore = Firestore::new(FirestoreOptions {
+    let firestore = Firestore::new(FirestoreOptions {
         project_id: env.project_id.clone(),
     })
     .expect("Failed to initialize Firestore");
@@ -89,7 +89,7 @@ async fn main() {
 
     // Create repositories with Arc<dyn T>
     let account_repository: Arc<dyn AccountRepository> =
-        Arc::new(FirestoreAccountRepository::new(firestore_client.clone()));
+        Arc::new(FirestoreAccountRepository::new(firestore_client.clone(), firestore));
     let device_repository: Arc<dyn DeviceRepository> =
         Arc::new(FirestoreDeviceRepository::new(firestore_client.clone()));
     let user_repository: Arc<dyn UserRepository> =

@@ -1308,6 +1308,7 @@ dependencies = [
  "anyhow",
  "application",
  "async-trait",
+ "bouzuya-firestore-client",
  "domain",
  "firestore-client",
  "google-cloud-iam-credentials-v1",

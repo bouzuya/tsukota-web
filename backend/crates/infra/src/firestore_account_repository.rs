@@ -5,6 +5,7 @@ use application::error::ApplicationError;
 use application::repository::AccountRepository;
 use application::repository::UserRepository;
 use async_trait::async_trait;
+use bouzuya_firestore_client::Firestore;
 use domain::AccountEvent;
 use domain::AccountId;
 use domain::User;
@@ -37,15 +38,17 @@ impl From<E> for ApplicationError {
 #[derive(Clone)]
 pub struct FirestoreAccountRepository {
     client: FirestoreClient,
+    firestore: Firestore,
     user_repository: FirestoreUserRepository,
 }
 
 impl FirestoreAccountRepository {
     /// Create a new FirestoreAccountRepository with the given client
-    pub fn new(client: FirestoreClient) -> Self {
+    pub fn new(client: FirestoreClient, firestore: Firestore) -> Self {
         let user_repository = FirestoreUserRepository::new(client.clone());
         Self {
             client,
+            firestore,
             user_repository,
         }
     }
