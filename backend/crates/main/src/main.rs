@@ -10,6 +10,8 @@ use application::projection::TransactionProjection;
 use application::repository::AccountRepository;
 use application::repository::DeviceRepository;
 use application::repository::UserRepository;
+use bouzuya_firestore_client::Firestore;
+use bouzuya_firestore_client::FirestoreOptions;
 use infra::FirestoreAccountRepository;
 use infra::FirestoreClient;
 use infra::FirestoreDeviceRepository;
@@ -69,6 +71,11 @@ async fn main() {
     let env = Env::from_env().expect("Failed to load environment variables");
 
     println!("{:?}", env);
+
+    let _firestore = Firestore::new(FirestoreOptions {
+        project_id: env.project_id.clone(),
+    })
+    .expect("Failed to initialize Firestore");
 
     // Initialize Firestore client
     let firestore_client = match env.project_id {
