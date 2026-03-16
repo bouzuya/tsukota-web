@@ -479,3 +479,85 @@ enum UserUpdateAction {
     AddAccount,
     RemoveAccount,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use application::repository::AccountRepository;
+    use bouzuya_firestore_client::FirestoreOptions;
+    use domain::AccountEventCommonProps;
+
+    /// テスト用のリポジトリを生成する
+    async fn setup_repository() -> anyhow::Result<FirestoreAccountRepository> {
+        let client = FirestoreClient::connect_with_emulator().await?;
+        let firestore = Firestore::new(FirestoreOptions {
+            project_id: Some("demo-project".to_string()),
+        })?;
+        Ok(FirestoreAccountRepository::new(client, firestore))
+    }
+
+    /// テスト用の AccountCreated イベントを生成する
+    fn account_created_event(account_id: &AccountId, event_id: &str, at: &str) -> AccountEvent {
+        AccountEvent::AccountCreated {
+            common: AccountEventCommonProps {
+                account_id: account_id.to_string(),
+                at: at.to_string(),
+                id: event_id.to_string(),
+                protocol_version: 3,
+            },
+            name: "テストアカウント".to_string(),
+            // オーナーを空にしてユーザー集約の更新を回避する
+            owners: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn test_load_events_empty() -> anyhow::Result<()> {
+        let repo = setup_repository().await?;
+        let account_id = AccountId::generate();
+
+        let events = repo.load_events(&account_id).await?;
+
+        assert_eq!(events, vec![]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_load_events_single_event() -> anyhow::Result<()> {
+        let repo = setup_repository().await?;
+        let account_id = AccountId::generate();
+        let event = account_created_event(&account_id, "evt-001", "2024-01-01T00:00:00Z");
+
+        repo.save_events(&account_id, vec![event.clone()]).await?;
+        let loaded = repo.load_events(&account_id).await?;
+
+        assert_eq!(loaded, vec![event]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_load_events_sorted_by_at() -> anyhow::Result<()> {
+        let repo = setup_repository().await?;
+        let account_id = AccountId::generate();
+        let event1 = account_created_event(&account_id, "evt-001", "2024-01-01T00:00:00Z");
+        let event2 = AccountEvent::AccountUpdated {
+            common: AccountEventCommonProps {
+                account_id: account_id.to_string(),
+                at: "2024-01-02T00:00:00Z".to_string(),
+                id: "evt-002".to_string(),
+                protocol_version: 3,
+            },
+            name: "更新後アカウント".to_string(),
+        };
+
+        repo.save_events(&account_id, vec![event1.clone()]).await?;
+        repo.save_events(&account_id, vec![event2.clone()]).await?;
+
+        let loaded = repo.load_events(&account_id).await?;
+
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded[0], event1);
+        assert_eq!(loaded[1], event2);
+        Ok(())
+    }
+}
