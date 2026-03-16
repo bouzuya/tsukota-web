@@ -10,6 +10,7 @@ version = "1.0.0"
 
 [workspace.dependencies]
 anyhow = "1"
+bouzuya-firestore-client = { git = "https://github.com/bouzuya/bouzuya-firestore-client" }
 api = { path = "crates/api" }
 application = { path = "crates/application" }
 async-trait = "0.1"
