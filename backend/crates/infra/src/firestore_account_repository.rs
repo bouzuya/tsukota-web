@@ -21,6 +21,9 @@ enum E {
     #[error("invalid path: {0}")]
     InvalidPath(String),
 
+    #[error("bouzuya firestore client: {0}")]
+    BouzuyaFirestoreClient(#[from] bouzuya_firestore_client::Error),
+
     #[error("firestore client: {0}")]
     FirestoreClient(#[from] firestore_client::FirestoreClientError),
 
@@ -147,25 +150,15 @@ impl AccountRepository for FirestoreAccountRepository {
 impl FirestoreAccountRepository {
     async fn load_events_impl(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
         let collection_path = Self::event_collection_path(account_id)?;
+        let collection_ref = self.firestore.collection(collection_path.to_string())?;
+        let document_refs = collection_ref.list_documents().await?;
 
         let mut all_events = Vec::new();
-        let mut page_token: Option<String> = None;
-
-        loop {
-            let response = self
-                .client
-                .list_documents(collection_path.clone(), page_token)
-                .await?;
-
-            for doc in response.documents {
-                let event: AccountEvent = self.client.deserialize(doc.fields)?;
-                all_events.push(event);
+        for document_ref in document_refs {
+            let snapshot = document_ref.get().await?;
+            if let Some(event) = snapshot.data::<AccountEvent>() {
+                all_events.push(event?);
             }
-
-            if response.next_page_token.is_empty() {
-                break;
-            }
-            page_token = Some(response.next_page_token);
         }
 
         // Sort events by their `at` timestamp to ensure correct ordering
