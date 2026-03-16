@@ -5,4 +5,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN npm install -g firebase-tools && \
     firebase setup:emulators:firestore
 WORKDIR /firebase
-CMD ["firebase", "emulators:start", "--only", "firestore"]
+CMD ["firebase", "emulators:start", "--only", "firestore", "--project", "demo-project"]
