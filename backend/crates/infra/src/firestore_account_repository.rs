@@ -21,8 +21,17 @@ enum E {
     #[error("invalid path: {0}")]
     InvalidPath(String),
 
-    #[error("bouzuya firestore client: {0}")]
-    BouzuyaFirestoreClient(#[from] bouzuya_firestore_client::Error),
+    #[error("event deserialize for account {0}")]
+    EventDeserialize(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("event not found for account {0}")]
+    EventNotFound(AccountId),
+
+    #[error("get event document for account {0}")]
+    GetEventDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("list event documents for account {0}")]
+    ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
 
     #[error("firestore client: {0}")]
     FirestoreClient(#[from] firestore_client::FirestoreClientError),
@@ -150,15 +159,30 @@ impl AccountRepository for FirestoreAccountRepository {
 impl FirestoreAccountRepository {
     async fn load_events_impl(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
         let collection_path = Self::event_collection_path(account_id)?;
-        let collection_ref = self.firestore.collection(collection_path.to_string())?;
-        let document_refs = collection_ref.list_documents().await?;
+        let collection_ref = self
+            .firestore
+            .collection(collection_path.to_string())
+            .expect("invalid collection path");
+        let document_refs = collection_ref
+            .list_documents()
+            .await
+            .map_err(|e| E::ListEventDocuments(account_id.clone(), e))?;
+
+        let snapshots = futures::future::join_all(
+            document_refs
+                .into_iter()
+                .map(|it| async move { it.get().await }),
+        )
+        .await;
 
         let mut all_events = Vec::new();
-        for document_ref in document_refs {
-            let snapshot = document_ref.get().await?;
-            if let Some(event) = snapshot.data::<AccountEvent>() {
-                all_events.push(event?);
-            }
+        for snapshot in snapshots {
+            let snapshot = snapshot.map_err(|e| E::GetEventDocument(account_id.clone(), e))?;
+            let event = snapshot
+                .data::<AccountEvent>()
+                .ok_or_else(|| E::EventNotFound(account_id.clone()))?
+                .map_err(|e| E::EventDeserialize(account_id.clone(), e))?;
+            all_events.push(event);
         }
 
         // Sort events by their `at` timestamp to ensure correct ordering

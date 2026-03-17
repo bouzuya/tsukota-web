@@ -8,6 +8,7 @@ version.workspace = true
 [dependencies]
 application.workspace = true
 async-trait.workspace = true
+futures = "0.3"
 bouzuya-firestore-client.workspace = true
 domain.workspace = true
 firestore-client.workspace = true
