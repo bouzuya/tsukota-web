@@ -76,24 +76,36 @@ async fn main() {
 
     println!("{:?}", env);
 
+    // Firestore uses FIRESTORE_EMULATOR_HOST if set
     let firestore = Firestore::new(FirestoreOptions {
         project_id: env.project_id.clone(),
     })
     .expect("Failed to initialize Firestore");
 
-    // Initialize Firestore client
-    let firestore_client = match env.project_id {
-        None => FirestoreClient::connect_with_emulator().await.unwrap(),
-        Some(project_id) => {
+    let firestore_client = match (env.firestore_emulator_host, env.project_id) {
+        (None, None) => {
+            eprintln!("ERROR: Either FIRESTORE_EMULATOR_HOST or PROJECT_ID must be set");
+            std::process::exit(1);
+        }
+        (None, Some(project_id)) => {
             FirestoreClient::connect(infra::DatabaseName::from_project_id(project_id).unwrap())
                 .await
                 .unwrap()
         }
+        (Some(_emulator_host), None) => FirestoreClient::connect_with_emulator().await.unwrap(),
+        (Some(_), Some(_)) => {
+            eprintln!(
+                "ERROR: Both FIRESTORE_EMULATOR_HOST and PROJECT_ID cannot be set at the same time"
+            );
+            std::process::exit(1);
+        }
     };
 
     // Create repositories with Arc<dyn T>
-    let account_repository: Arc<dyn AccountRepository> =
-        Arc::new(FirestoreAccountRepository::new(firestore_client.clone(), firestore));
+    let account_repository: Arc<dyn AccountRepository> = Arc::new(FirestoreAccountRepository::new(
+        firestore_client.clone(),
+        firestore,
+    ));
     let device_repository: Arc<dyn DeviceRepository> =
         Arc::new(FirestoreDeviceRepository::new(firestore_client.clone()));
     let user_repository: Arc<dyn UserRepository> =
