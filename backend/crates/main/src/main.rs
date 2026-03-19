@@ -33,8 +33,8 @@ struct Env {
     port: u16,
     /// Firestore エミュレーターのホスト (例: "localhost:8080")
     firestore_emulator_host: Option<String>,
-    /// Firestore の接続先 プロジェクト ID (None のときは Firebase Emulator)
-    project_id: Option<String>,
+    /// Firestore の接続先 プロジェクト ID
+    project_id: String,
     /// 静的ファイルのディレクトリ
     public_dir: PathBuf,
     /// 署名に使用するサービスアカウントのメールアドレス
@@ -50,7 +50,7 @@ impl Env {
             .and_then(|s| s.parse::<u16>().ok())
             .unwrap_or(3000);
         let firestore_emulator_host = std::env::var("FIRESTORE_EMULATOR_HOST").ok();
-        let project_id = std::env::var("PROJECT_ID").ok();
+        let project_id = std::env::var("PROJECT_ID").ok().ok_or("PROJECT_ID not set")?;
         let public_dir = std::env::var("PUBLIC_DIR")
             .ok()
             .map(PathBuf::from)
@@ -78,27 +78,17 @@ async fn main() {
 
     // Firestore uses FIRESTORE_EMULATOR_HOST if set
     let firestore = Firestore::new(FirestoreOptions {
-        project_id: env.project_id.clone(),
+        project_id: Some(env.project_id.clone()),
     })
     .expect("Failed to initialize Firestore");
 
-    let firestore_client = match (env.firestore_emulator_host, env.project_id) {
-        (None, None) => {
-            eprintln!("ERROR: Either FIRESTORE_EMULATOR_HOST or PROJECT_ID must be set");
-            std::process::exit(1);
-        }
-        (None, Some(project_id)) => {
-            FirestoreClient::connect(infra::DatabaseName::from_project_id(project_id).unwrap())
+    let firestore_client = match env.firestore_emulator_host {
+        None => {
+            FirestoreClient::connect(infra::DatabaseName::from_project_id(env.project_id).unwrap())
                 .await
                 .unwrap()
         }
-        (Some(_emulator_host), None) => FirestoreClient::connect_with_emulator().await.unwrap(),
-        (Some(_), Some(_)) => {
-            eprintln!(
-                "ERROR: Both FIRESTORE_EMULATOR_HOST and PROJECT_ID cannot be set at the same time"
-            );
-            std::process::exit(1);
-        }
+        Some(_emulator_host) => FirestoreClient::connect_with_emulator().await.unwrap(),
     };
 
     // Create repositories with Arc<dyn T>
