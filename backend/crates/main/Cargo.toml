@@ -9,6 +9,10 @@ version.workspace = true
 name = "tsukota-server"
 path = "src/main.rs"
 
+[dev-dependencies]
+anyhow.workspace = true
+temp-env = "0.3"
+
 [dependencies]
 api.workspace = true
 application.workspace = true

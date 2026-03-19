@@ -1,5 +1,6 @@
-use std::path::PathBuf;
 use std::sync::Arc;
+
+mod env;
 
 use api::AppState;
 use application::SessionTokenCreator;
@@ -12,6 +13,7 @@ use application::repository::DeviceRepository;
 use application::repository::UserRepository;
 use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::FirestoreOptions;
+use env::Env;
 use infra::FirestoreAccountRepository;
 use infra::FirestoreClient;
 use infra::FirestoreDeviceRepository;
@@ -22,53 +24,6 @@ use infra::IamSessionTokenVerifier;
 use infra::PemSessionTokenCreator;
 use infra::PemSessionTokenVerifier;
 use infra::ServiceAccountCredentials;
-
-#[derive(Debug)]
-struct Env {
-    /// ベースパス (デフォルト: "")
-    base_path: String,
-    /// Cloud Run では metadata server から取得するので None
-    google_application_credentials: Option<String>,
-    /// ポート番号 (デフォルト: 3000)
-    port: u16,
-    /// Firestore エミュレーターのホスト (例: "localhost:8080")
-    firestore_emulator_host: Option<String>,
-    /// Firestore の接続先 プロジェクト ID
-    project_id: String,
-    /// 静的ファイルのディレクトリ
-    public_dir: PathBuf,
-    /// 署名に使用するサービスアカウントのメールアドレス
-    service_account_email: String,
-}
-
-impl Env {
-    fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
-        let base_path = std::env::var("BASE_PATH").unwrap_or_else(|_| "/lab/tsukota".to_owned());
-        let google_application_credentials = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-        let port = std::env::var("PORT")
-            .ok()
-            .and_then(|s| s.parse::<u16>().ok())
-            .unwrap_or(3000);
-        let firestore_emulator_host = std::env::var("FIRESTORE_EMULATOR_HOST").ok();
-        let project_id = std::env::var("PROJECT_ID").ok().ok_or("PROJECT_ID not set")?;
-        let public_dir = std::env::var("PUBLIC_DIR")
-            .ok()
-            .map(PathBuf::from)
-            .ok_or("PUBLIC_DIR not set")?;
-        let service_account_email = std::env::var("SERVICE_ACCOUNT_EMAIL")
-            .ok()
-            .ok_or("SERVICE_ACCOUNT_EMAIL not set")?;
-        Ok(Self {
-            base_path,
-            firestore_emulator_host,
-            google_application_credentials,
-            port,
-            project_id,
-            public_dir,
-            service_account_email,
-        })
-    }
-}
 
 #[tokio::main]
 async fn main() {
