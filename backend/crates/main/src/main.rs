@@ -101,5 +101,5 @@ async fn main() {
     );
 
     // Run the server
-    api::run(state, env.port, &env.public_dir, &env.base_path).await;
+    api::run(state, env.port, env.public_dir.as_deref(), &env.base_path).await;
 }

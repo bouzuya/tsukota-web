@@ -14,9 +14,9 @@ use crate::state::AppState;
 /// # Arguments
 ///
 /// * `state` - アプリケーションステート
-/// * `public_dir` - 静的ファイルを配信するディレクトリ
+/// * `public_dir` - 静的ファイルを配信するディレクトリ（None の場合は静的ファイルを配信しない）
 /// * `base_path` - ベースパス（例: "/api"）
-pub fn create_router(state: AppState, public_dir: &Path, base_path: &str) -> Router<()> {
+pub fn create_router(state: AppState, public_dir: Option<&Path>, base_path: &str) -> Router<()> {
     let api_router = Router::new()
         .route("/accounts", get(handler::list_accounts))
         .route("/accounts/{account_id}", get(handler::get_account))
@@ -56,17 +56,29 @@ pub fn create_router(state: AppState, public_dir: &Path, base_path: &str) -> Rou
         .route("/me", get(handler::get_me))
         .with_state(state);
 
-    if base_path.is_empty() {
-        // ベースパスが空の場合はそのままルートに配置
-        api_router
-            .nest_service("/assets", ServeDir::new(public_dir.join("assets")))
-            .fallback_service(ServeFile::new(public_dir.join("index.html")))
-    } else {
-        // ベースパスがある場合はネストする
-        let assets_path = format!("{}/assets", base_path);
-        Router::new()
-            .nest(base_path, api_router)
-            .nest_service(&assets_path, ServeDir::new(public_dir.join("assets")))
-            .fallback_service(ServeFile::new(public_dir.join("index.html")))
+    match public_dir {
+        None => {
+            // 静的ファイルを配信しない場合はAPIルーターのみ
+            if base_path.is_empty() {
+                api_router
+            } else {
+                Router::new().nest(base_path, api_router)
+            }
+        }
+        Some(public_dir) => {
+            if base_path.is_empty() {
+                // ベースパスが空の場合はそのままルートに配置
+                api_router
+                    .nest_service("/assets", ServeDir::new(public_dir.join("assets")))
+                    .fallback_service(ServeFile::new(public_dir.join("index.html")))
+            } else {
+                // ベースパスがある場合はネストする
+                let assets_path = format!("{}/assets", base_path);
+                Router::new()
+                    .nest(base_path, api_router)
+                    .nest_service(&assets_path, ServeDir::new(public_dir.join("assets")))
+                    .fallback_service(ServeFile::new(public_dir.join("index.html")))
+            }
+        }
     }
 }

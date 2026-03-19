@@ -13,7 +13,7 @@ pub(crate) struct Env {
     /// Firestore の接続先 プロジェクト ID
     pub(crate) project_id: String,
     /// 静的ファイルのディレクトリ
-    pub(crate) public_dir: PathBuf,
+    pub(crate) public_dir: Option<PathBuf>,
     /// 署名に使用するサービスアカウントのメールアドレス
     pub(crate) service_account_email: String,
 }
@@ -30,10 +30,7 @@ impl Env {
         let project_id = std::env::var("PROJECT_ID")
             .ok()
             .ok_or("PROJECT_ID not set")?;
-        let public_dir = std::env::var("PUBLIC_DIR")
-            .ok()
-            .map(PathBuf::from)
-            .ok_or("PUBLIC_DIR not set")?;
+        let public_dir = std::env::var("PUBLIC_DIR").ok().map(PathBuf::from);
         let service_account_email = std::env::var("SERVICE_ACCOUNT_EMAIL")
             .ok()
             .ok_or("SERVICE_ACCOUNT_EMAIL not set")?;
@@ -65,7 +62,7 @@ mod tests {
                 ("GOOGLE_APPLICATION_CREDENTIALS", None),
                 ("PORT", None),
                 ("PROJECT_ID", Some("test-project")),
-                ("PUBLIC_DIR", Some("/tmp")),
+                ("PUBLIC_DIR", None),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
             || {
@@ -76,7 +73,7 @@ mod tests {
                 assert!(env.google_application_credentials.is_none());
                 assert_eq!(env.port, 3000);
                 assert_eq!(env.project_id, "test-project");
-                assert_eq!(env.public_dir, PathBuf::from("/tmp"));
+                assert!(env.public_dir.is_none());
                 assert_eq!(env.service_account_email, "test@example.com");
 
                 Ok(())
@@ -117,7 +114,7 @@ mod tests {
                     Some("localhost:8080".to_owned())
                 );
                 assert_eq!(env.project_id, "my-project");
-                assert_eq!(env.public_dir, PathBuf::from("/var/www"));
+                assert_eq!(env.public_dir, Some(PathBuf::from("/var/www")));
                 assert_eq!(
                     env.service_account_email,
                     "sa@my-project.iam.gserviceaccount.com"
@@ -134,23 +131,6 @@ mod tests {
         temp_env::with_vars(
             [
                 ("PROJECT_ID", None),
-                ("PUBLIC_DIR", Some("/tmp")),
-                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
-            ],
-            || {
-                assert!(Env::from_env().is_err());
-                Ok(())
-            },
-        )
-    }
-
-    /// PUBLIC_DIR が未設定のときエラーになる
-    #[test]
-    fn test_from_env_public_dir未設定() -> anyhow::Result<()> {
-        temp_env::with_vars(
-            [
-                ("PROJECT_ID", Some("test-project")),
-                ("PUBLIC_DIR", None),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
             || {
@@ -166,7 +146,6 @@ mod tests {
         temp_env::with_vars(
             [
                 ("PROJECT_ID", Some("test-project")),
-                ("PUBLIC_DIR", Some("/tmp")),
                 ("SERVICE_ACCOUNT_EMAIL", None),
             ],
             || {
