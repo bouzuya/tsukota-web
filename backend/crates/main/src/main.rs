@@ -43,7 +43,11 @@ async fn main() {
                 .await
                 .unwrap()
         }
-        Some(_emulator_host) => FirestoreClient::connect_with_emulator().await.unwrap(),
+        Some(_emulator_host) => FirestoreClient::connect_with_emulator(
+                infra::DatabaseName::from_project_id(env.project_id).unwrap(),
+            )
+            .await
+            .unwrap(),
     };
 
     // Create repositories with Arc<dyn T>

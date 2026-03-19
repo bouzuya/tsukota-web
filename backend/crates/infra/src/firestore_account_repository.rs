@@ -516,7 +516,10 @@ mod tests {
 
     /// テスト用のリポジトリを生成する
     async fn setup_repository() -> anyhow::Result<FirestoreAccountRepository> {
-        let client = FirestoreClient::connect_with_emulator().await?;
+        let client = FirestoreClient::connect_with_emulator(
+            firestore_client::path::DatabaseName::from_project_id("demo-project").unwrap(),
+        )
+        .await?;
         let firestore = Firestore::new(FirestoreOptions {
             project_id: Some("demo-project".to_string()),
         })?;

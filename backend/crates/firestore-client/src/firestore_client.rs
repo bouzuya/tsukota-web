@@ -82,8 +82,9 @@ impl FirestoreClient {
         })
     }
 
-    pub async fn connect_with_emulator() -> Result<Self, FirestoreClientError> {
-        let database_name = path::DatabaseName::from_project_id("demo-project").unwrap();
+    pub async fn connect_with_emulator(
+        database_name: path::DatabaseName,
+    ) -> Result<Self, FirestoreClientError> {
         let channel = tonic::transport::Channel::from_static("http://firebase:8080")
             .connect()
             .await
@@ -545,7 +546,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_crud() -> anyhow::Result<()> {
-        let client = FirestoreClient::connect_with_emulator().await?;
+        let client = FirestoreClient::connect_with_emulator(
+            path::DatabaseName::from_project_id("demo-project").unwrap(),
+        )
+        .await?;
 
         let document_id =
             <path::DocumentId as std::str::FromStr>::from_str(&uuid::Uuid::new_v4().to_string())?;
@@ -612,7 +616,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_begin_transaction_and_commit() -> anyhow::Result<()> {
-        let client = FirestoreClient::connect_with_emulator().await?;
+        let client = FirestoreClient::connect_with_emulator(
+            path::DatabaseName::from_project_id("demo-project").unwrap(),
+        )
+        .await?;
 
         let document_id =
             <path::DocumentId as std::str::FromStr>::from_str(&uuid::Uuid::new_v4().to_string())?;
@@ -650,7 +657,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_begin_transaction_and_rollback() -> anyhow::Result<()> {
-        let client = FirestoreClient::connect_with_emulator().await?;
+        let client = FirestoreClient::connect_with_emulator(
+            path::DatabaseName::from_project_id("demo-project").unwrap(),
+        )
+        .await?;
 
         // Begin transaction
         let transaction = client.begin_transaction().await?;
