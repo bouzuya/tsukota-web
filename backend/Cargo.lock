@@ -174,7 +174,7 @@ dependencies = [
 [[package]]
 name = "bouzuya-firestore-client"
 version = "0.0.0"
-source = "git+https://github.com/bouzuya/bouzuya-firestore-client#01a3e8d16235aba73ae85569e5d5220cdd157908"
+source = "git+https://github.com/bouzuya/bouzuya-firestore-client?rev=2c49a7730d51fa8262cf801db0d5a4e5aa13c4b2#2c49a7730d51fa8262cf801db0d5a4e5aa13c4b2"
 dependencies = [
  "firestore-path",
  "google-cloud-auth",
@@ -2213,7 +2213,8 @@ dependencies = [
 [[package]]
 name = "serde-firestore-value"
 version = "0.26.1"
-source = "git+https://github.com/bouzuya/serde-firestore-value?branch=master#8ac675702d60ee0c8d48d4c23d691102fc286541"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a21d8035338e52892252037ac2034accaa2afe5ea7b3acae7342fcb67f6135f"
 dependencies = [
  "googleapis-tonic-google-firestore-v1 0.30.0",
  "prost",

@@ -6,6 +6,7 @@ use application::repository::AccountRepository;
 use application::repository::UserRepository;
 use async_trait::async_trait;
 use bouzuya_firestore_client::Firestore;
+use bouzuya_firestore_client::TransactionOptions;
 use domain::AccountEvent;
 use domain::AccountId;
 use domain::User;
@@ -36,6 +37,9 @@ enum E {
     #[error("firestore client: {0}")]
     FirestoreClient(#[from] firestore_client::FirestoreClientError),
 
+    #[error("transaction: {0}")]
+    Transaction(#[source] bouzuya_firestore_client::Error),
+
     #[error("user: {0}")]
     User(String),
 }
@@ -49,7 +53,6 @@ impl From<E> for ApplicationError {
 /// Firestore-based event store implementation
 #[derive(Clone)]
 pub struct FirestoreAccountRepository {
-    client: FirestoreClient,
     firestore: Firestore,
     user_repository: FirestoreUserRepository,
 }
@@ -57,9 +60,8 @@ pub struct FirestoreAccountRepository {
 impl FirestoreAccountRepository {
     /// Create a new FirestoreAccountRepository with the given client
     pub fn new(client: FirestoreClient, firestore: Firestore) -> Self {
-        let user_repository = FirestoreUserRepository::new(client.clone());
+        let user_repository = FirestoreUserRepository::new(client);
         Self {
-            client,
             firestore,
             user_repository,
         }
@@ -203,22 +205,41 @@ impl FirestoreAccountRepository {
         // オーナー変更を収集 (User 集約の更新に使用)
         let user_updates = self.collect_user_updates(&events);
 
-        let transaction = self.client.begin_transaction().await?;
-        let mut writes = Vec::new();
+        let firestore = self.firestore.clone();
+        let account_id_owned = account_id.clone();
+        self.firestore
+            .run_transaction(
+                |transaction| {
+                    Box::pin(async move {
+                        // ========================================
+                        // aggregates/account/* (イベントストア)
+                        // ========================================
+                        Self::build_aggregate_writes_in_tx(
+                            &firestore,
+                            &account_id_owned,
+                            &events,
+                            transaction,
+                        )
+                        .await?;
 
-        // ========================================
-        // aggregates/account/* (イベントストア)
-        // ========================================
-        self.build_aggregate_writes(account_id, &events, &transaction, &mut writes)
-            .await?;
+                        // ========================================
+                        // accounts/* (クエリ用コレクション)
+                        // ========================================
+                        Self::build_query_account_writes_in_tx(
+                            &firestore,
+                            &account_id_owned,
+                            &events,
+                            transaction,
+                        )
+                        .await?;
 
-        // ========================================
-        // accounts/* (クエリ用コレクション)
-        // ========================================
-        self.build_query_account_writes(account_id, &events, &transaction, &mut writes)
-            .await?;
-
-        self.client.commit(&transaction, writes).await?;
+                        Ok(())
+                    })
+                },
+                TransactionOptions::default(),
+            )
+            .await
+            .map_err(E::Transaction)?;
 
         // ========================================
         // User 集約の更新 (別トランザクション)
@@ -320,34 +341,33 @@ impl FirestoreAccountRepository {
         Ok(())
     }
 
-    /// `aggregates/account/*` への書き込みを構築する
-    async fn build_aggregate_writes(
-        &self,
+    /// `aggregates/account/*` への書き込みをトランザクション内で実行する
+    async fn build_aggregate_writes_in_tx(
+        firestore: &Firestore,
         account_id: &AccountId,
         events: &[AccountEvent],
-        transaction: &firestore_client::FirestoreTransaction,
-        writes: &mut Vec<firestore_client::google::firestore::v1::Write>,
-    ) -> Result<(), E> {
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
         // イベントドキュメントの書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let event_path = Self::event_document_path(account_id, event_id)?;
-            let event_value = self.client.serialize(event)?;
-            writes.push(self.client.build_create_write(event_path, event_value));
+            let document_path = Self::event_document_path(account_id, event_id)
+                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+            let document_ref = firestore.doc(document_path.to_string())?;
+            transaction.create(&document_ref, event)?;
         }
 
-        // イベントストリームドキュメントの更新 (排他制御のために get_document_with_tx を使用)
-        let event_stream_path = Self::event_stream_document_path(account_id)?;
-        let existing_stream = self
-            .client
-            .get_document_with_tx(event_stream_path.clone(), transaction)
-            .await?;
+        // イベントストリームドキュメントの更新 (排他制御のために get を使用)
+        let document_path = Self::event_stream_document_path(account_id)
+            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+        let document_ref = firestore.doc(document_path.to_string())?;
+        let document_snapshot = transaction.get(&document_ref).await?;
 
         let last_event = events.last().expect("events is non-empty");
         let last_event_id = Self::get_event_id(last_event);
         let last_event_at = Self::get_event_at(last_event);
 
-        match existing_stream {
+        match document_snapshot.data::<AccountEventStreamDocumentData>() {
             None => {
                 let owners = match &events[0] {
                     AccountEvent::AccountCreated { owners, .. } => owners.clone(),
@@ -363,7 +383,7 @@ impl FirestoreAccountRepository {
                     | AccountEvent::TransactionUpdated { .. } => vec![],
                 };
 
-                let event_stream = AccountEventStreamDocumentData {
+                let document_data = AccountEventStreamDocumentData {
                     id: account_id.to_string(),
                     last_event_id: last_event_id.to_string(),
                     owners,
@@ -371,22 +391,20 @@ impl FirestoreAccountRepository {
                     updated_at: last_event_at.to_string(),
                 };
 
-                let value = self.client.serialize(&event_stream)?;
-                writes.push(self.client.build_create_write(event_stream_path, value));
+                transaction.create(&document_ref, &document_data)?;
             }
-            Some(existing_doc) => {
-                let mut event_stream: AccountEventStreamDocumentData =
-                    self.client.deserialize(existing_doc.fields)?;
+            Some(result) => {
+                let mut document_data: AccountEventStreamDocumentData = result?;
 
                 for event in events {
                     match event {
                         AccountEvent::OwnerAdded { owner, .. } => {
-                            if !event_stream.owners.contains(owner) {
-                                event_stream.owners.push(owner.clone());
+                            if !document_data.owners.contains(owner) {
+                                document_data.owners.push(owner.clone());
                             }
                         }
                         AccountEvent::OwnerRemoved { owner, .. } => {
-                            event_stream.owners.retain(|o| o != owner);
+                            document_data.owners.retain(|o| o != owner);
                         }
                         AccountEvent::AccountCreated { .. }
                         | AccountEvent::AccountDeleted { .. }
@@ -400,76 +418,69 @@ impl FirestoreAccountRepository {
                     }
                 }
 
-                event_stream.last_event_id = last_event_id.to_string();
-                event_stream.updated_at = last_event_at.to_string();
+                document_data.last_event_id = last_event_id.to_string();
+                document_data.updated_at = last_event_at.to_string();
 
-                let value = self.client.serialize(&event_stream)?;
-                writes.push(self.client.build_update_write(event_stream_path, value));
+                transaction.set(&document_ref, &document_data)?;
             }
         }
 
         Ok(())
     }
 
-    /// `accounts/*` への書き込みを構築する
-    async fn build_query_account_writes(
-        &self,
+    /// `accounts/*` への書き込みをトランザクション内で実行する
+    async fn build_query_account_writes_in_tx(
+        firestore: &Firestore,
         account_id: &AccountId,
         events: &[AccountEvent],
-        transaction: &firestore_client::FirestoreTransaction,
-        writes: &mut Vec<firestore_client::google::firestore::v1::Write>,
-    ) -> Result<(), E> {
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
         // accounts/{account_id}/events/{event_id} へのイベント書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let query_event_path = Self::query_event_document_path(account_id, event_id)?;
-            let query_event_value = self.client.serialize(event)?;
-            writes.push(
-                self.client
-                    .build_create_write(query_event_path, query_event_value),
-            );
+            let document_path = Self::query_event_document_path(account_id, event_id)
+                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+            let document_ref = firestore.doc(document_path.to_string())?;
+            transaction.create(&document_ref, event)?;
         }
 
         // accounts/{account_id} へのアカウントドキュメント書き込み
-        let query_account_path = Self::query_account_document_path(account_id)?;
-        let existing_account = self
-            .client
-            .get_document_with_tx(query_account_path.clone(), transaction)
-            .await?;
+        let document_path = Self::query_account_document_path(account_id)
+            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+        let document_ref = firestore.doc(document_path.to_string())?;
+        let document_snapshot = transaction.get(&document_ref).await?;
 
-        match existing_account {
+        match document_snapshot.data::<QueryAccountDocumentData>() {
             None => {
                 // 新規作成 (AccountCreated イベントがある場合のみ)
                 if let Some(AccountEvent::AccountCreated { name, owners, .. }) = events.first() {
-                    let account_doc = QueryAccountDocumentData {
+                    let document_data = QueryAccountDocumentData {
                         deleted_at: None,
                         id: account_id.to_string(),
                         name: name.clone(),
                         owners: owners.clone(),
                     };
-                    let value = self.client.serialize(&account_doc)?;
-                    writes.push(self.client.build_create_write(query_account_path, value));
+                    transaction.create(&document_ref, &document_data)?;
                 }
             }
-            Some(existing_doc) => {
-                let mut account_doc: QueryAccountDocumentData =
-                    self.client.deserialize(existing_doc.fields)?;
+            Some(result) => {
+                let mut document_data: QueryAccountDocumentData = result?;
 
                 for event in events {
                     match event {
                         AccountEvent::AccountUpdated { name, .. } => {
-                            account_doc.name = name.clone();
+                            document_data.name = name.clone();
                         }
                         AccountEvent::AccountDeleted { common, .. } => {
-                            account_doc.deleted_at = Some(common.at.clone());
+                            document_data.deleted_at = Some(common.at.clone());
                         }
                         AccountEvent::OwnerAdded { owner, .. } => {
-                            if !account_doc.owners.contains(owner) {
-                                account_doc.owners.push(owner.clone());
+                            if !document_data.owners.contains(owner) {
+                                document_data.owners.push(owner.clone());
                             }
                         }
                         AccountEvent::OwnerRemoved { owner, .. } => {
-                            account_doc.owners.retain(|o| o != owner);
+                            document_data.owners.retain(|o| o != owner);
                         }
                         AccountEvent::AccountCreated { .. }
                         | AccountEvent::CategoryAdded { .. }
@@ -481,8 +492,7 @@ impl FirestoreAccountRepository {
                     }
                 }
 
-                let value = self.client.serialize(&account_doc)?;
-                writes.push(self.client.build_update_write(query_account_path, value));
+                transaction.set(&document_ref, &document_data)?;
             }
         }
 
