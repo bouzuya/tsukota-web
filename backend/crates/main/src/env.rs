@@ -27,9 +27,10 @@ impl Env {
             .ok()
             .and_then(|s| s.parse::<u16>().ok())
             .unwrap_or(3000);
-        let project_id = std::env::var("PROJECT_ID")
+        let project_id = std::env::var("GOOGLE_CLOUD_PROJECT")
+            .or_else(|_| std::env::var("PROJECT_ID"))
             .ok()
-            .ok_or("PROJECT_ID not set")?;
+            .ok_or("GOOGLE_CLOUD_PROJECT nor PROJECT_ID not set")?;
         let public_dir = std::env::var("PUBLIC_DIR").ok().map(PathBuf::from);
         let service_account_email = std::env::var("SERVICE_ACCOUNT_EMAIL")
             .ok()
@@ -60,6 +61,7 @@ mod tests {
                 ("BASE_PATH", None),
                 ("FIRESTORE_EMULATOR_HOST", None),
                 ("GOOGLE_APPLICATION_CREDENTIALS", None),
+                ("GOOGLE_CLOUD_PROJECT", None),
                 ("PORT", None),
                 ("PROJECT_ID", Some("test-project")),
                 ("PUBLIC_DIR", None),
@@ -92,6 +94,7 @@ mod tests {
                     "GOOGLE_APPLICATION_CREDENTIALS",
                     Some("/path/to/creds.json"),
                 ),
+                ("GOOGLE_CLOUD_PROJECT", None),
                 ("PORT", Some("8000")),
                 ("PROJECT_ID", Some("my-project")),
                 ("PUBLIC_DIR", Some("/var/www")),
@@ -125,11 +128,29 @@ mod tests {
         )
     }
 
-    /// PROJECT_ID が未設定のときエラーになる
+    /// GOOGLE_CLOUD_PROJECT が設定されているとき PROJECT_ID より優先される
+    #[test]
+    fn test_from_env_google_cloud_project優先() -> anyhow::Result<()> {
+        temp_env::with_vars(
+            [
+                ("GOOGLE_CLOUD_PROJECT", Some("gcp-project")),
+                ("PROJECT_ID", Some("other-project")),
+                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
+            ],
+            || {
+                let env = Env::from_env().map_err(|e| anyhow::anyhow!("{e}"))?;
+                assert_eq!(env.project_id, "gcp-project");
+                Ok(())
+            },
+        )
+    }
+
+    /// GOOGLE_CLOUD_PROJECT も PROJECT_ID も未設定のときエラーになる
     #[test]
     fn test_from_env_project_id未設定() -> anyhow::Result<()> {
         temp_env::with_vars(
             [
+                ("GOOGLE_CLOUD_PROJECT", None),
                 ("PROJECT_ID", None),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
