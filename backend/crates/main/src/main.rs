@@ -31,6 +31,8 @@ struct Env {
     google_application_credentials: Option<String>,
     /// ポート番号 (デフォルト: 3000)
     port: u16,
+    /// Firestore エミュレーターのホスト (例: "localhost:8080")
+    firestore_emulator_host: Option<String>,
     /// Firestore の接続先 プロジェクト ID (None のときは Firebase Emulator)
     project_id: Option<String>,
     /// 静的ファイルのディレクトリ
@@ -47,6 +49,7 @@ impl Env {
             .ok()
             .and_then(|s| s.parse::<u16>().ok())
             .unwrap_or(3000);
+        let firestore_emulator_host = std::env::var("FIRESTORE_EMULATOR_HOST").ok();
         let project_id = std::env::var("PROJECT_ID").ok();
         let public_dir = std::env::var("PUBLIC_DIR")
             .ok()
@@ -57,6 +60,7 @@ impl Env {
             .ok_or("SERVICE_ACCOUNT_EMAIL not set")?;
         Ok(Self {
             base_path,
+            firestore_emulator_host,
             google_application_credentials,
             port,
             project_id,
