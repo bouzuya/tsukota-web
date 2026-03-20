@@ -35,6 +35,9 @@ cargo +nightly fmt
 # Lint
 cargo clippy
 
+# テストカバレッジ計測（cargo-llvm-cov を使用）
+cargo llvm-cov --workspace
+
 # ドキュメント生成
 cargo doc --open
 ```
