@@ -119,12 +119,6 @@ api → application → domain
 
 ## 重要なルール
 
-1. **日本語でコメント・ドキュメントを書く**
-2. **Rust**: `mod.rs` を使わない、`BTreeMap`/`BTreeSet` を使う
-3. **テスト**: `anyhow::Result<()>` を返す、`unwrap()` を避ける
-4. **イベントソーシング**: tsukota との互換性を維持する
-
-## プランの保存（Claude Code 用）
-
-- 後で振り返ることを目的としてプランモードの結果を保存する
-- 保存先はプロンプト `prompts/{N}.md` に対してのプランを `prompts/{N}-plan.md` とする
+- 日本語でコメント・ドキュメントを書く、ただしコミットログは英語で書く
+- **テスト**: `anyhow::Result<()>` を返す、`unwrap()` を避ける
+- `@prompts/{N}.md` の形で指示されたときは、その変更のコミットログの案を `@prompts/{N}-commit.md` に作成する
