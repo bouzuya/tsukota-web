@@ -39,26 +39,28 @@ async fn main() {
 
     let firestore_client = match env.firestore_emulator_host {
         None => {
-            FirestoreClient::connect(infra::DatabaseName::from_project_id(env.project_id).unwrap())
-                .await
-                .unwrap()
-        }
-        Some(_emulator_host) => FirestoreClient::connect_with_emulator(
-                infra::DatabaseName::from_project_id(env.project_id).unwrap(),
+            FirestoreClient::connect(
+                infra::DatabaseName::from_project_id(env.project_id)
+                    .expect("Failed to parse project_id as DatabaseName"),
             )
             .await
-            .unwrap(),
+            .expect("Failed to connect to Firestore")
+        }
+        Some(_emulator_host) => FirestoreClient::connect_with_emulator(
+            infra::DatabaseName::from_project_id(env.project_id)
+                .expect("Failed to parse project_id as DatabaseName"),
+        )
+        .await
+        .expect("Failed to connect to Firestore emulator"),
     };
 
     // Create repositories with Arc<dyn T>
-    let account_repository: Arc<dyn AccountRepository> = Arc::new(FirestoreAccountRepository::new(
-        firestore_client.clone(),
-        firestore,
-    ));
+    let account_repository: Arc<dyn AccountRepository> =
+        Arc::new(FirestoreAccountRepository::new(firestore.clone()));
     let device_repository: Arc<dyn DeviceRepository> =
         Arc::new(FirestoreDeviceRepository::new(firestore_client.clone()));
     let user_repository: Arc<dyn UserRepository> =
-        Arc::new(FirestoreUserRepository::new(firestore_client.clone()));
+        Arc::new(FirestoreUserRepository::new(firestore.clone()));
 
     // Create projections with Arc<dyn T>
     let projection = FirestoreProjection::new(firestore_client);

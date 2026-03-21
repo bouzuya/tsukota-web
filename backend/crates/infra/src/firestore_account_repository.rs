@@ -12,7 +12,6 @@ use domain::AccountId;
 use domain::User;
 use domain::UserCommand;
 use domain::UserId;
-use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;
 
@@ -33,9 +32,6 @@ enum E {
 
     #[error("list event documents for account {0}")]
     ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("firestore client: {0}")]
-    FirestoreClient(#[from] firestore_client::FirestoreClientError),
 
     #[error("transaction: {0}")]
     Transaction(#[source] bouzuya_firestore_client::Error),
@@ -58,9 +54,9 @@ pub struct FirestoreAccountRepository {
 }
 
 impl FirestoreAccountRepository {
-    /// Create a new FirestoreAccountRepository with the given client
-    pub fn new(client: FirestoreClient, firestore: Firestore) -> Self {
-        let user_repository = FirestoreUserRepository::new(client);
+    /// Create a new FirestoreAccountRepository with the given firestore instance
+    pub fn new(firestore: Firestore) -> Self {
+        let user_repository = FirestoreUserRepository::new(firestore.clone());
         Self {
             firestore,
             user_repository,
@@ -516,14 +512,10 @@ mod tests {
 
     /// テスト用のリポジトリを生成する
     async fn setup_repository() -> anyhow::Result<FirestoreAccountRepository> {
-        let client = FirestoreClient::connect_with_emulator(
-            firestore_client::path::DatabaseName::from_project_id("demo-project").unwrap(),
-        )
-        .await?;
         let firestore = Firestore::new(FirestoreOptions {
             project_id: Some("demo-project".to_string()),
         })?;
-        Ok(FirestoreAccountRepository::new(client, firestore))
+        Ok(FirestoreAccountRepository::new(firestore))
     }
 
     /// テスト用の AccountCreated イベントを生成する

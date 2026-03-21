@@ -3,9 +3,11 @@ use crate::schema::UserEventStreamDocumentData;
 use application::error::ApplicationError;
 use application::repository::UserRepository;
 use async_trait::async_trait;
+use bouzuya_firestore_client::Firestore;
+use bouzuya_firestore_client::Precondition;
+use bouzuya_firestore_client::TransactionOptions;
 use domain::UserEvent;
 use domain::UserId;
-use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;
 
@@ -15,8 +17,20 @@ enum E {
     #[error("invalid path: {0}")]
     InvalidPath(String),
 
-    #[error("firestore client: {0}")]
-    FirestoreClient(#[from] firestore_client::FirestoreClientError),
+    #[error("event deserialize: {0}")]
+    EventDeserialize(#[source] bouzuya_firestore_client::Error),
+
+    #[error("event not found")]
+    EventNotFound,
+
+    #[error("get event document: {0}")]
+    GetEventDocument(#[source] bouzuya_firestore_client::Error),
+
+    #[error("list event documents: {0}")]
+    ListEventDocuments(#[source] bouzuya_firestore_client::Error),
+
+    #[error("transaction: {0}")]
+    Transaction(#[source] bouzuya_firestore_client::Error),
 }
 
 impl From<E> for ApplicationError {
@@ -28,13 +42,13 @@ impl From<E> for ApplicationError {
 /// Firestore-based user repository implementation
 #[derive(Clone)]
 pub struct FirestoreUserRepository {
-    client: FirestoreClient,
+    firestore: Firestore,
 }
 
 impl FirestoreUserRepository {
-    /// Create a new FirestoreUserRepository with the given client
-    pub fn new(client: FirestoreClient) -> Self {
-        Self { client }
+    /// Create a new FirestoreUserRepository with the given firestore instance
+    pub fn new(firestore: Firestore) -> Self {
+        Self { firestore }
     }
 
     /// Get the path to a user event stream document: `aggregates/user/event_streams/{user_id}`
@@ -103,25 +117,30 @@ impl UserRepository for FirestoreUserRepository {
 impl FirestoreUserRepository {
     async fn load_events_impl(&self, user_id: &UserId) -> Result<Vec<UserEvent>, E> {
         let collection_path = Self::event_collection_path(user_id)?;
+        let collection_ref = self
+            .firestore
+            .collection(collection_path.to_string())
+            .expect("invalid collection path");
+        let document_refs = collection_ref
+            .list_documents()
+            .await
+            .map_err(E::ListEventDocuments)?;
+
+        let snapshots = futures::future::join_all(
+            document_refs
+                .into_iter()
+                .map(|it| async move { it.get().await }),
+        )
+        .await;
 
         let mut all_events = Vec::new();
-        let mut page_token: Option<String> = None;
-
-        loop {
-            let response = self
-                .client
-                .list_documents(collection_path.clone(), page_token)
-                .await?;
-
-            for doc in response.documents {
-                let event: UserEvent = self.client.deserialize(doc.fields)?;
-                all_events.push(event);
-            }
-
-            if response.next_page_token.is_empty() {
-                break;
-            }
-            page_token = Some(response.next_page_token);
+        for snapshot in snapshots {
+            let snapshot = snapshot.map_err(E::GetEventDocument)?;
+            let event = snapshot
+                .data::<UserEvent>()
+                .ok_or(E::EventNotFound)?
+                .map_err(E::EventDeserialize)?;
+            all_events.push(event);
         }
 
         // Sort events by their `at` timestamp to ensure correct ordering
@@ -135,85 +154,105 @@ impl FirestoreUserRepository {
             return Ok(());
         }
 
-        let transaction = self.client.begin_transaction().await?;
-        let mut writes = Vec::new();
+        let firestore = self.firestore.clone();
+        let user_id_owned = user_id.clone();
+        self.firestore
+            .run_transaction(
+                |transaction| {
+                    Box::pin(async move {
+                        // ========================================
+                        // aggregates/user/* (イベントストア)
+                        // ========================================
+                        Self::build_aggregate_writes_in_tx(
+                            &firestore,
+                            &user_id_owned,
+                            &events,
+                            transaction,
+                        )
+                        .await?;
 
-        // ========================================
-        // aggregates/user/* (イベントストア)
-        // ========================================
-        self.build_aggregate_writes(user_id, &events, &transaction, &mut writes)
-            .await?;
+                        // ========================================
+                        // users/* (クエリ用コレクション)
+                        // ========================================
+                        Self::build_query_user_writes_in_tx(
+                            &firestore,
+                            &user_id_owned,
+                            &events,
+                            transaction,
+                        )
+                        .await?;
 
-        // ========================================
-        // users/* (クエリ用コレクション)
-        // ========================================
-        self.build_query_user_writes(user_id, &events, &transaction, &mut writes)
-            .await?;
-
-        self.client.commit(&transaction, writes).await?;
+                        Ok(())
+                    })
+                },
+                TransactionOptions::default(),
+            )
+            .await
+            .map_err(E::Transaction)?;
 
         Ok(())
     }
 
-    /// `aggregates/user/*` への書き込みを構築する
-    async fn build_aggregate_writes(
-        &self,
+    /// `aggregates/user/*` への書き込みをトランザクション内で実行する
+    async fn build_aggregate_writes_in_tx(
+        firestore: &Firestore,
         user_id: &UserId,
         events: &[UserEvent],
-        transaction: &firestore_client::FirestoreTransaction,
-        writes: &mut Vec<firestore_client::google::firestore::v1::Write>,
-    ) -> Result<(), E> {
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
         // イベントドキュメントの書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let event_path = Self::event_document_path(user_id, event_id)?;
-            let event_value = self.client.serialize(event)?;
-            writes.push(self.client.build_create_write(event_path, event_value));
+            let document_path = Self::event_document_path(user_id, event_id)
+                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+            let document_ref = firestore.doc(document_path.to_string())?;
+            transaction.create(&document_ref, event)?;
         }
 
-        // イベントストリームドキュメントの更新 (排他制御のために get_document_with_tx を使用)
-        let event_stream_path = Self::event_stream_document_path(user_id)?;
-        let existing_stream = self
-            .client
-            .get_document_with_tx(event_stream_path.clone(), transaction)
-            .await?;
+        // イベントストリームドキュメントの更新 (排他制御のために get を使用)
+        let event_stream_path = Self::event_stream_document_path(user_id)
+            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+        let document_ref = firestore.doc(event_stream_path.to_string())?;
+        let document_snapshot = transaction.get(&document_ref).await?;
 
         let last_event = events.last().expect("events is non-empty");
         let last_event_at = Self::get_event_at(last_event);
 
-        match existing_stream {
+        match document_snapshot.data::<UserEventStreamDocumentData>() {
             None => {
                 let event_stream = UserEventStreamDocumentData {
                     id: user_id.to_string(),
                     updated_at: last_event_at.to_string(),
                 };
-
-                let value = self.client.serialize(&event_stream)?;
-                writes.push(self.client.build_create_write(event_stream_path, value));
+                transaction.create(&document_ref, &event_stream)?;
             }
-            Some(existing_doc) => {
-                let mut event_stream: UserEventStreamDocumentData =
-                    self.client.deserialize(existing_doc.fields)?;
-
+            Some(result) => {
+                let mut event_stream: UserEventStreamDocumentData = result?;
                 event_stream.updated_at = last_event_at.to_string();
-
-                let value = self.client.serialize(&event_stream)?;
-                writes.push(self.client.build_update_write(event_stream_path, value));
+                transaction.update(
+                    &document_ref,
+                    &event_stream,
+                    Precondition {
+                        exists: Some(true),
+                        last_update_time: None,
+                    },
+                )?;
             }
         }
 
         Ok(())
     }
 
-    /// `users/*` への書き込みを構築する
-    async fn build_query_user_writes(
-        &self,
+    /// `users/*` への書き込みをトランザクション内で実行する
+    async fn build_query_user_writes_in_tx(
+        firestore: &Firestore,
         user_id: &UserId,
         events: &[UserEvent],
-        transaction: &firestore_client::FirestoreTransaction,
-        writes: &mut Vec<firestore_client::google::firestore::v1::Write>,
-    ) -> Result<(), E> {
-        let user_path = Self::query_user_document_path(user_id)?;
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
+        let user_path = Self::query_user_document_path(user_id)
+            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+        let document_ref = firestore.doc(user_path.to_string())?;
 
         // UserCreated イベントがある場合は新規作成
         let has_user_created = events
@@ -243,8 +282,7 @@ impl FirestoreUserRepository {
                 account_ids,
                 id: user_id.to_string(),
             };
-            let user_value = self.client.serialize(&user_doc)?;
-            writes.push(self.client.build_create_write(user_path, user_value));
+            transaction.create(&document_ref, &user_doc)?;
         } else {
             // 既存ユーザー: AccountAdded / AccountRemoved イベントを処理
             let has_account_changes = events.iter().any(|e| {
@@ -255,19 +293,14 @@ impl FirestoreUserRepository {
             });
 
             if has_account_changes {
-                let existing_user = self
-                    .client
-                    .get_document_with_tx(user_path.clone(), transaction)
-                    .await?;
+                let document_snapshot = transaction.get(&document_ref).await?;
 
-                let mut user_doc = match existing_user {
-                    Some(doc) => self
-                        .client
-                        .deserialize::<QueryUserDocumentData>(doc.fields)?,
+                let mut user_doc = match document_snapshot.data::<QueryUserDocumentData>() {
                     None => QueryUserDocumentData {
                         account_ids: vec![],
                         id: user_id.to_string(),
                     },
+                    Some(result) => result?,
                 };
 
                 for event in events {
@@ -284,8 +317,14 @@ impl FirestoreUserRepository {
                     }
                 }
 
-                let user_value = self.client.serialize(&user_doc)?;
-                writes.push(self.client.build_update_write(user_path, user_value));
+                transaction.update(
+                    &document_ref,
+                    &user_doc,
+                    Precondition {
+                        exists: Some(true),
+                        last_update_time: None,
+                    },
+                )?;
             }
         }
 
