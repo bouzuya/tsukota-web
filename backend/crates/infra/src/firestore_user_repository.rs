@@ -23,11 +23,11 @@ enum E {
     #[error("event not found")]
     EventNotFound,
 
-    #[error("get event document: {0}")]
-    GetEventDocument(#[source] bouzuya_firestore_client::Error),
+    #[error("get all event documents for user {0}")]
+    GetAllEventDocuments(UserId, #[source] bouzuya_firestore_client::Error),
 
-    #[error("list event documents: {0}")]
-    ListEventDocuments(#[source] bouzuya_firestore_client::Error),
+    #[error("list event documents for user {0}")]
+    ListEventDocuments(UserId, #[source] bouzuya_firestore_client::Error),
 
     #[error("transaction: {0}")]
     Transaction(#[source] bouzuya_firestore_client::Error),
@@ -124,18 +124,16 @@ impl FirestoreUserRepository {
         let document_refs = collection_ref
             .list_documents()
             .await
-            .map_err(E::ListEventDocuments)?;
+            .map_err(|e| E::ListEventDocuments(user_id.clone(), e))?;
 
-        let snapshots = futures::future::join_all(
-            document_refs
-                .into_iter()
-                .map(|it| async move { it.get().await }),
-        )
-        .await;
+        let snapshots = self
+            .firestore
+            .get_all(document_refs)
+            .await
+            .map_err(|e| E::GetAllEventDocuments(user_id.clone(), e))?;
 
         let mut all_events = Vec::new();
         for snapshot in snapshots {
-            let snapshot = snapshot.map_err(E::GetEventDocument)?;
             let event = snapshot
                 .data::<UserEvent>()
                 .ok_or(E::EventNotFound)?
