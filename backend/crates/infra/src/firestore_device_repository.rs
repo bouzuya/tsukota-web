@@ -3,9 +3,11 @@ use crate::schema::QueryDeviceDocumentData;
 use application::error::ApplicationError;
 use application::repository::DeviceRepository;
 use async_trait::async_trait;
+use bouzuya_firestore_client::Firestore;
+use bouzuya_firestore_client::Precondition;
+use bouzuya_firestore_client::TransactionOptions;
 use domain::DeviceEvent;
 use domain::DeviceId;
-use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;
 
@@ -15,8 +17,20 @@ enum E {
     #[error("invalid path: {0}")]
     InvalidPath(String),
 
-    #[error("firestore client: {0}")]
-    FirestoreClient(#[from] firestore_client::FirestoreClientError),
+    #[error("event deserialize: {0}")]
+    EventDeserialize(#[source] bouzuya_firestore_client::Error),
+
+    #[error("event not found")]
+    EventNotFound,
+
+    #[error("get all event documents: {0}")]
+    GetAllEventDocuments(#[source] bouzuya_firestore_client::Error),
+
+    #[error("list event documents: {0}")]
+    ListEventDocuments(#[source] bouzuya_firestore_client::Error),
+
+    #[error("transaction: {0}")]
+    Transaction(#[source] bouzuya_firestore_client::Error),
 }
 
 impl From<E> for ApplicationError {
@@ -28,29 +42,29 @@ impl From<E> for ApplicationError {
 /// Firestore-based device repository implementation
 #[derive(Clone)]
 pub struct FirestoreDeviceRepository {
-    client: FirestoreClient,
+    firestore: Firestore,
 }
 
 impl FirestoreDeviceRepository {
-    /// Create a new FirestoreDeviceRepository with the given client
-    pub fn new(client: FirestoreClient) -> Self {
-        Self { client }
+    /// Create a new FirestoreDeviceRepository with the given firestore instance
+    pub fn new(firestore: Firestore) -> Self {
+        Self { firestore }
     }
 
     /// Get the path to a device event stream document: `aggregates/device/event_streams/{device_id}`
-    fn event_stream_path(device_id: &DeviceId) -> Result<DocumentPath, E> {
+    fn event_stream_document_path(device_id: &DeviceId) -> Result<DocumentPath, E> {
         let path_str = format!("aggregates/device/event_streams/{}", device_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to the events collection: `aggregates/device/event_streams/{device_id}/events`
-    fn events_collection_path(device_id: &DeviceId) -> Result<CollectionPath, E> {
+    fn event_collection_path(device_id: &DeviceId) -> Result<CollectionPath, E> {
         let path_str = format!("aggregates/device/event_streams/{}/events", device_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
 
     /// Get the path to an event document: `aggregates/device/event_streams/{device_id}/events/{event_id}`
-    fn event_path(device_id: &DeviceId, event_id: &str) -> Result<DocumentPath, E> {
+    fn event_document_path(device_id: &DeviceId, event_id: &str) -> Result<DocumentPath, E> {
         let path_str = format!(
             "aggregates/device/event_streams/{}/events/{}",
             device_id, event_id
@@ -59,7 +73,7 @@ impl FirestoreDeviceRepository {
     }
 
     /// Get the path to a device document: `devices/{device_id}`
-    fn device_path(device_id: &DeviceId) -> Result<DocumentPath, E> {
+    fn query_device_document_path(device_id: &DeviceId) -> Result<DocumentPath, E> {
         let path_str = format!("devices/{}", device_id);
         path_str.parse().map_err(|_| E::InvalidPath(path_str))
     }
@@ -101,26 +115,29 @@ impl DeviceRepository for FirestoreDeviceRepository {
 
 impl FirestoreDeviceRepository {
     async fn load_events_impl(&self, device_id: &DeviceId) -> Result<Vec<DeviceEvent>, E> {
-        let collection_path = Self::events_collection_path(device_id)?;
+        let collection_path = Self::event_collection_path(device_id)?;
+        let collection_ref = self
+            .firestore
+            .collection(collection_path.to_string())
+            .expect("invalid collection path");
+        let document_refs = collection_ref
+            .list_documents()
+            .await
+            .map_err(E::ListEventDocuments)?;
+
+        let snapshots = self
+            .firestore
+            .get_all(document_refs)
+            .await
+            .map_err(E::GetAllEventDocuments)?;
 
         let mut all_events = Vec::new();
-        let mut page_token: Option<String> = None;
-
-        loop {
-            let response = self
-                .client
-                .list_documents(collection_path.clone(), page_token)
-                .await?;
-
-            for doc in response.documents {
-                let event: DeviceEvent = self.client.deserialize(doc.fields)?;
-                all_events.push(event);
-            }
-
-            if response.next_page_token.is_empty() {
-                break;
-            }
-            page_token = Some(response.next_page_token);
+        for snapshot in snapshots {
+            let event = snapshot
+                .data::<DeviceEvent>()
+                .ok_or(E::EventNotFound)?
+                .map_err(E::EventDeserialize)?;
+            all_events.push(event);
         }
 
         // Sort events by their `at` timestamp to ensure correct ordering
@@ -138,32 +155,104 @@ impl FirestoreDeviceRepository {
             return Ok(());
         }
 
-        // Begin transaction
-        let transaction = self.client.begin_transaction().await?;
+        let firestore = self.firestore.clone();
+        let device_id_owned = device_id.clone();
+        self.firestore
+            .run_transaction(
+                |transaction| {
+                    Box::pin(async move {
+                        // ========================================
+                        // aggregates/device/* (イベントストア)
+                        // ========================================
+                        Self::build_aggregate_writes_in_tx(
+                            &firestore,
+                            &device_id_owned,
+                            &events,
+                            transaction,
+                        )
+                        .await?;
 
-        // Read current event stream document (for optimistic locking)
-        let event_stream_path = Self::event_stream_path(device_id)?;
-        let existing_stream = self
-            .client
-            .get_document_with_tx(event_stream_path.clone(), &transaction)
-            .await?;
+                        // ========================================
+                        // devices/* (クエリ用コレクション)
+                        // ========================================
+                        Self::build_query_device_writes_in_tx(
+                            &firestore,
+                            &device_id_owned,
+                            &events,
+                            transaction,
+                        )
+                        .await?;
 
-        // Get the last event to update the event stream
+                        Ok(())
+                    })
+                },
+                TransactionOptions::default(),
+            )
+            .await
+            .map_err(E::Transaction)?;
+
+        Ok(())
+    }
+
+    /// `aggregates/device/*` への書き込みをトランザクション内で実行する
+    async fn build_aggregate_writes_in_tx(
+        firestore: &Firestore,
+        device_id: &DeviceId,
+        events: &[DeviceEvent],
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
+        // イベントストリームドキュメントの読み込み (排他制御のために get を使用)
+        let event_stream_path = Self::event_stream_document_path(device_id)
+            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+        let document_ref = firestore.doc(event_stream_path.to_string())?;
+        let document_snapshot = transaction.get(&document_ref).await?;
+
+        // イベントドキュメントの書き込み
+        for event in events {
+            let event_id = Self::get_event_id(event);
+            let document_path = Self::event_document_path(device_id, event_id)
+                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+            let document_ref = firestore.doc(document_path.to_string())?;
+            transaction.create(&document_ref, event)?;
+        }
+
+        // イベントストリームドキュメントの更新
         let last_event = events.last().expect("events is non-empty");
         let last_event_at = Self::get_event_at(last_event);
 
-        // Build writes for all events
-        let mut writes = Vec::new();
+        match document_snapshot.data::<DeviceEventStreamDocumentData>() {
+            None => {
+                let event_stream = DeviceEventStreamDocumentData {
+                    id: device_id.to_string(),
+                    updated_at: last_event_at.to_string(),
+                };
+                transaction.create(&document_ref, &event_stream)?;
+            }
+            Some(result) => {
+                let mut event_stream: DeviceEventStreamDocumentData = result?;
+                event_stream.updated_at = last_event_at.to_string();
+                transaction.update(
+                    &document_ref,
+                    &event_stream,
+                    Precondition {
+                        exists: Some(true),
+                        last_update_time: None,
+                    },
+                )?;
+            }
+        }
 
-        for event in &events {
-            let event_id = Self::get_event_id(event);
+        Ok(())
+    }
 
-            // Write to aggregates/device/event_streams/{device_id}/events/{event_id}
-            let event_path = Self::event_path(device_id, event_id)?;
-            let event_value = self.client.serialize(event)?;
-            writes.push(self.client.build_create_write(event_path, event_value));
-
-            // Write to devices/{device_id} for DeviceCreated event
+    /// `devices/*` への書き込みをトランザクション内で実行する
+    async fn build_query_device_writes_in_tx(
+        firestore: &Firestore,
+        device_id: &DeviceId,
+        events: &[DeviceEvent],
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
+        for event in events {
             match event {
                 DeviceEvent::DeviceCreated {
                     encrypted_secret,
@@ -175,39 +264,13 @@ impl FirestoreDeviceRepository {
                         encrypted_secret: encrypted_secret.clone(),
                         uid: user_id.clone(),
                     };
-                    let device_path = Self::device_path(device_id)?;
-                    let device_value = self.client.serialize(&device_doc)?;
-                    writes.push(self.client.build_create_write(device_path, device_value));
+                    let device_path = Self::query_device_document_path(device_id)
+                        .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
+                    let document_ref = firestore.doc(device_path.to_string())?;
+                    transaction.create(&document_ref, &device_doc)?;
                 }
             }
         }
-
-        // Build event stream document write based on whether this is a new or existing device
-        match existing_stream {
-            None => {
-                // New device
-                let event_stream = DeviceEventStreamDocumentData {
-                    id: device_id.to_string(),
-                    updated_at: last_event_at.to_string(),
-                };
-
-                let value = self.client.serialize(&event_stream)?;
-                writes.push(self.client.build_create_write(event_stream_path, value));
-            }
-            Some(existing_doc) => {
-                // Existing device - update the event stream
-                let mut event_stream: DeviceEventStreamDocumentData =
-                    self.client.deserialize(existing_doc.fields)?;
-
-                event_stream.updated_at = last_event_at.to_string();
-
-                let value = self.client.serialize(&event_stream)?;
-                writes.push(self.client.build_update_write(event_stream_path, value));
-            }
-        }
-
-        // Commit transaction
-        self.client.commit(&transaction, writes).await?;
 
         Ok(())
     }

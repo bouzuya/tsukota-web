@@ -58,7 +58,7 @@ async fn main() {
     let account_repository: Arc<dyn AccountRepository> =
         Arc::new(FirestoreAccountRepository::new(firestore.clone()));
     let device_repository: Arc<dyn DeviceRepository> =
-        Arc::new(FirestoreDeviceRepository::new(firestore_client.clone()));
+        Arc::new(FirestoreDeviceRepository::new(firestore.clone()));
     let user_repository: Arc<dyn UserRepository> =
         Arc::new(FirestoreUserRepository::new(firestore.clone()));
 
