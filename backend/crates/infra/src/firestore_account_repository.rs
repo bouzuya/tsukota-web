@@ -27,8 +27,8 @@ enum E {
     #[error("event not found for account {0}")]
     EventNotFound(AccountId),
 
-    #[error("get event document for account {0}")]
-    GetEventDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+    #[error("get all event documents for account {0}")]
+    GetAllEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
 
     #[error("list event documents for account {0}")]
     ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
@@ -166,16 +166,14 @@ impl FirestoreAccountRepository {
             .await
             .map_err(|e| E::ListEventDocuments(account_id.clone(), e))?;
 
-        let snapshots = futures::future::join_all(
-            document_refs
-                .into_iter()
-                .map(|it| async move { it.get().await }),
-        )
-        .await;
+        let snapshots = self
+            .firestore
+            .get_all(document_refs)
+            .await
+            .map_err(|e| E::GetAllEventDocuments(account_id.clone(), e))?;
 
         let mut all_events = Vec::new();
         for snapshot in snapshots {
-            let snapshot = snapshot.map_err(|e| E::GetEventDocument(account_id.clone(), e))?;
             let event = snapshot
                 .data::<AccountEvent>()
                 .ok_or_else(|| E::EventNotFound(account_id.clone()))?
