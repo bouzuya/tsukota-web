@@ -15,7 +15,6 @@ use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::FirestoreOptions;
 use env::Env;
 use infra::FirestoreAccountRepository;
-use infra::FirestoreClient;
 use infra::FirestoreDeviceRepository;
 use infra::FirestoreProjection;
 use infra::FirestoreUserRepository;
@@ -37,23 +36,6 @@ async fn main() {
     })
     .expect("Failed to initialize Firestore");
 
-    let firestore_client = match env.firestore_emulator_host {
-        None => {
-            FirestoreClient::connect(
-                infra::DatabaseName::from_project_id(env.project_id)
-                    .expect("Failed to parse project_id as DatabaseName"),
-            )
-            .await
-            .expect("Failed to connect to Firestore")
-        }
-        Some(_emulator_host) => FirestoreClient::connect_with_emulator(
-            infra::DatabaseName::from_project_id(env.project_id)
-                .expect("Failed to parse project_id as DatabaseName"),
-        )
-        .await
-        .expect("Failed to connect to Firestore emulator"),
-    };
-
     // Create repositories with Arc<dyn T>
     let account_repository: Arc<dyn AccountRepository> =
         Arc::new(FirestoreAccountRepository::new(firestore.clone()));
@@ -63,7 +45,7 @@ async fn main() {
         Arc::new(FirestoreUserRepository::new(firestore.clone()));
 
     // Create projections with Arc<dyn T>
-    let projection = FirestoreProjection::new(firestore_client);
+    let projection = FirestoreProjection::new(firestore.clone());
     let account_projection: Arc<dyn AccountProjection> = Arc::new(projection.clone());
     let category_projection: Arc<dyn CategoryProjection> = Arc::new(projection.clone());
     let transaction_projection: Arc<dyn TransactionProjection> = Arc::new(projection);

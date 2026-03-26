@@ -20,4 +20,3 @@ pub enum DeviceEvent {
         user_id: String,
     },
 }
-

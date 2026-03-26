@@ -8,12 +8,12 @@ use application::view::CategoryView;
 use application::view::PaginatedList;
 use application::view::TransactionView;
 use async_trait::async_trait;
+use bouzuya_firestore_client::Firestore;
 use domain::Account;
 use domain::AccountEvent;
 use domain::AccountId;
 use domain::TransactionId;
 use domain::UserId;
-use firestore_client::FirestoreClient;
 use firestore_client::path::CollectionPath;
 use firestore_client::path::DocumentPath;
 
@@ -23,8 +23,17 @@ enum E {
     #[error("invalid path: {0}")]
     InvalidPath(String),
 
-    #[error("firestore client: {0}")]
-    FirestoreClient(#[from] firestore_client::FirestoreClientError),
+    #[error("event deserialize for account {0}")]
+    EventDeserialize(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("event not found for account {0}")]
+    EventNotFound(AccountId),
+
+    #[error("get all event documents for account {0}")]
+    GetAllEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("list event documents for account {0}")]
+    ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
 }
 
 impl From<E> for ApplicationError {
@@ -38,13 +47,13 @@ impl From<E> for ApplicationError {
 /// This projection reads events from Firestore and rebuilds views on demand.
 #[derive(Clone)]
 pub struct FirestoreProjection {
-    client: FirestoreClient,
+    firestore: Firestore,
 }
 
 impl FirestoreProjection {
-    /// Create a new FirestoreProjection with the given client
-    pub fn new(client: FirestoreClient) -> Self {
-        Self { client }
+    /// Create a new FirestoreProjection with the given Firestore instance
+    pub fn new(firestore: Firestore) -> Self {
+        Self { firestore }
     }
 
     /// Get the path to the events collection: `accounts/{accountId}/events`
@@ -79,25 +88,28 @@ impl FirestoreProjection {
     /// Load all events for an account from Firestore
     async fn load_events(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
         let collection_path = Self::events_collection_path(account_id)?;
+        let collection_ref = self
+            .firestore
+            .collection(collection_path.to_string())
+            .expect("invalid collection path");
+        let document_refs = collection_ref
+            .list_documents()
+            .await
+            .map_err(|e| E::ListEventDocuments(account_id.clone(), e))?;
+
+        let snapshots = self
+            .firestore
+            .get_all(document_refs)
+            .await
+            .map_err(|e| E::GetAllEventDocuments(account_id.clone(), e))?;
 
         let mut all_events = Vec::new();
-        let mut page_token: Option<String> = None;
-
-        loop {
-            let response = self
-                .client
-                .list_documents(collection_path.clone(), page_token)
-                .await?;
-
-            for doc in response.documents {
-                let event: AccountEvent = self.client.deserialize(doc.fields)?;
-                all_events.push(event);
-            }
-
-            if response.next_page_token.is_empty() {
-                break;
-            }
-            page_token = Some(response.next_page_token);
+        for snapshot in snapshots {
+            let event = snapshot
+                .data::<AccountEvent>()
+                .ok_or_else(|| E::EventNotFound(account_id.clone()))?
+                .map_err(|e| E::EventDeserialize(account_id.clone(), e))?;
+            all_events.push(event);
         }
 
         // Sort events by their `at` timestamp to ensure correct ordering
@@ -262,20 +274,22 @@ impl AccountProjection for FirestoreProjection {
     async fn list_accounts(&self, owner_id: &UserId) -> Result<Vec<AccountView>, ApplicationError> {
         // Get user document to find account IDs
         let user_path = Self::user_path(&owner_id.to_string()).map_err(ApplicationError::from)?;
-        let user_doc = self
-            .client
-            .get_document(user_path)
-            .await
+        let document_ref = self
+            .firestore
+            .doc(user_path.to_string())
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+        let snapshots = self.firestore.get_all(vec![document_ref]).await.map_err(
+            |e: bouzuya_firestore_client::Error| ApplicationError::Repository(e.to_string()),
+        )?;
 
-        let account_ids = match user_doc {
-            Some(doc) => {
-                let user: QueryUserDocumentData = self
-                    .client
-                    .deserialize(doc.fields)
-                    .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-                user.account_ids
-            }
+        let account_ids = match snapshots.into_iter().next() {
+            Some(snapshot) => match snapshot.data::<QueryUserDocumentData>() {
+                Some(result) => {
+                    let user = result.map_err(|e| ApplicationError::Repository(e.to_string()))?;
+                    user.account_ids
+                }
+                None => vec![],
+            },
             None => vec![],
         };
 
