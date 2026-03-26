@@ -10,7 +10,6 @@ application.workspace = true
 async-trait.workspace = true
 bouzuya-firestore-client.workspace = true
 domain.workspace = true
-firestore-client.workspace = true
 google-cloud-iam-credentials-v1 = "1"
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 reqwest = { version = "0.12", default-features = false, features = [

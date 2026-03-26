@@ -16,7 +16,6 @@ application = { path = "crates/application" }
 async-trait = "0.1"
 date-time = { path = "crates/date-time" }
 domain = { path = "crates/domain" }
-firestore-client = { path = "crates/firestore-client" }
 infra = { path = "crates/infra" }
 mockall = "0.12"
 serde = { version = "1", features = ["derive"] }

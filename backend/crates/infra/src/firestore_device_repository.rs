@@ -8,15 +8,10 @@ use bouzuya_firestore_client::Precondition;
 use bouzuya_firestore_client::TransactionOptions;
 use domain::DeviceEvent;
 use domain::DeviceId;
-use firestore_client::path::CollectionPath;
-use firestore_client::path::DocumentPath;
 
 /// Internal error type for FirestoreDeviceRepository operations
 #[derive(Debug, thiserror::Error)]
 enum E {
-    #[error("invalid path: {0}")]
-    InvalidPath(String),
-
     #[error("event deserialize: {0}")]
     EventDeserialize(#[source] bouzuya_firestore_client::Error),
 
@@ -52,30 +47,26 @@ impl FirestoreDeviceRepository {
     }
 
     /// Get the path to a device event stream document: `aggregates/device/event_streams/{device_id}`
-    fn event_stream_document_path(device_id: &DeviceId) -> Result<DocumentPath, E> {
-        let path_str = format!("aggregates/device/event_streams/{}", device_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn event_stream_document_path(device_id: &DeviceId) -> String {
+        format!("aggregates/device/event_streams/{}", device_id)
     }
 
     /// Get the path to the events collection: `aggregates/device/event_streams/{device_id}/events`
-    fn event_collection_path(device_id: &DeviceId) -> Result<CollectionPath, E> {
-        let path_str = format!("aggregates/device/event_streams/{}/events", device_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn event_collection_path(device_id: &DeviceId) -> String {
+        format!("aggregates/device/event_streams/{}/events", device_id)
     }
 
     /// Get the path to an event document: `aggregates/device/event_streams/{device_id}/events/{event_id}`
-    fn event_document_path(device_id: &DeviceId, event_id: &str) -> Result<DocumentPath, E> {
-        let path_str = format!(
+    fn event_document_path(device_id: &DeviceId, event_id: &str) -> String {
+        format!(
             "aggregates/device/event_streams/{}/events/{}",
             device_id, event_id
-        );
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+        )
     }
 
     /// Get the path to a device document: `devices/{device_id}`
-    fn query_device_document_path(device_id: &DeviceId) -> Result<DocumentPath, E> {
-        let path_str = format!("devices/{}", device_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn query_device_document_path(device_id: &DeviceId) -> String {
+        format!("devices/{}", device_id)
     }
 
     /// Extract event ID from a DeviceEvent
@@ -115,10 +106,10 @@ impl DeviceRepository for FirestoreDeviceRepository {
 
 impl FirestoreDeviceRepository {
     async fn load_events_impl(&self, device_id: &DeviceId) -> Result<Vec<DeviceEvent>, E> {
-        let collection_path = Self::event_collection_path(device_id)?;
+        let collection_path = Self::event_collection_path(device_id);
         let collection_ref = self
             .firestore
-            .collection(collection_path.to_string())
+            .collection(collection_path)
             .expect("invalid collection path");
         let document_refs = collection_ref
             .list_documents()
@@ -202,17 +193,15 @@ impl FirestoreDeviceRepository {
         transaction: &mut bouzuya_firestore_client::Transaction,
     ) -> Result<(), bouzuya_firestore_client::Error> {
         // イベントストリームドキュメントの読み込み (排他制御のために get を使用)
-        let event_stream_path = Self::event_stream_document_path(device_id)
-            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-        let document_ref = firestore.doc(event_stream_path.to_string())?;
+        let event_stream_path = Self::event_stream_document_path(device_id);
+        let document_ref = firestore.doc(event_stream_path)?;
         let document_snapshot = transaction.get(&document_ref).await?;
 
         // イベントドキュメントの書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let document_path = Self::event_document_path(device_id, event_id)
-                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-            let document_ref = firestore.doc(document_path.to_string())?;
+            let document_path = Self::event_document_path(device_id, event_id);
+            let document_ref = firestore.doc(document_path)?;
             transaction.create(&document_ref, event)?;
         }
 
@@ -264,9 +253,8 @@ impl FirestoreDeviceRepository {
                         encrypted_secret: encrypted_secret.clone(),
                         uid: user_id.clone(),
                     };
-                    let device_path = Self::query_device_document_path(device_id)
-                        .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-                    let document_ref = firestore.doc(device_path.to_string())?;
+                    let device_path = Self::query_device_document_path(device_id);
+                    let document_ref = firestore.doc(device_path)?;
                     transaction.create(&document_ref, &device_doc)?;
                 }
             }

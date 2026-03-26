@@ -12,15 +12,10 @@ use domain::AccountId;
 use domain::User;
 use domain::UserCommand;
 use domain::UserId;
-use firestore_client::path::CollectionPath;
-use firestore_client::path::DocumentPath;
 
 /// Internal error type for FirestoreAccountRepository operations
 #[derive(Debug, thiserror::Error)]
 enum E {
-    #[error("invalid path: {0}")]
-    InvalidPath(String),
-
     #[error("event deserialize for account {0}")]
     EventDeserialize(AccountId, #[source] bouzuya_firestore_client::Error),
 
@@ -64,39 +59,31 @@ impl FirestoreAccountRepository {
     }
 
     /// Get the path to an event stream document: `aggregates/account/event_streams/{account_id}`
-    fn event_stream_document_path(account_id: &AccountId) -> Result<DocumentPath, E> {
-        let path_str = format!("aggregates/account/event_streams/{}", account_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn event_stream_document_path(account_id: &AccountId) -> String {
+        format!("aggregates/account/event_streams/{}", account_id)
     }
 
     /// Get the path to the events collection: `aggregates/account/event_streams/{account_id}/events`
-    fn event_collection_path(account_id: &AccountId) -> Result<CollectionPath, E> {
-        let path_str = format!("aggregates/account/event_streams/{}/events", account_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn event_collection_path(account_id: &AccountId) -> String {
+        format!("aggregates/account/event_streams/{}/events", account_id)
     }
 
     /// Get the path to an event document: `aggregates/account/event_streams/{account_id}/events/{eventId}`
-    fn event_document_path(account_id: &AccountId, event_id: &str) -> Result<DocumentPath, E> {
-        let path_str = format!(
+    fn event_document_path(account_id: &AccountId, event_id: &str) -> String {
+        format!(
             "aggregates/account/event_streams/{}/events/{}",
             account_id, event_id
-        );
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+        )
     }
 
     /// Get the path to a query account document: `accounts/{account_id}`
-    fn query_account_document_path(account_id: &AccountId) -> Result<DocumentPath, E> {
-        let path_str = format!("accounts/{}", account_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn query_account_document_path(account_id: &AccountId) -> String {
+        format!("accounts/{}", account_id)
     }
 
     /// Get the path to a query event document: `accounts/{account_id}/events/{event_id}`
-    fn query_event_document_path(
-        account_id: &AccountId,
-        event_id: &str,
-    ) -> Result<DocumentPath, E> {
-        let path_str = format!("accounts/{}/events/{}", account_id, event_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn query_event_document_path(account_id: &AccountId, event_id: &str) -> String {
+        format!("accounts/{}/events/{}", account_id, event_id)
     }
 
     /// Extract event ID from an AccountEvent
@@ -156,10 +143,10 @@ impl AccountRepository for FirestoreAccountRepository {
 
 impl FirestoreAccountRepository {
     async fn load_events_impl(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
-        let collection_path = Self::event_collection_path(account_id)?;
+        let collection_path = Self::event_collection_path(account_id);
         let collection_ref = self
             .firestore
-            .collection(collection_path.to_string())
+            .collection(collection_path)
             .expect("invalid collection path");
         let document_refs = collection_ref
             .list_documents()
@@ -345,16 +332,14 @@ impl FirestoreAccountRepository {
         // イベントドキュメントの書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let document_path = Self::event_document_path(account_id, event_id)
-                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-            let document_ref = firestore.doc(document_path.to_string())?;
+            let document_path = Self::event_document_path(account_id, event_id);
+            let document_ref = firestore.doc(document_path)?;
             transaction.create(&document_ref, event)?;
         }
 
         // イベントストリームドキュメントの更新 (排他制御のために get を使用)
-        let document_path = Self::event_stream_document_path(account_id)
-            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-        let document_ref = firestore.doc(document_path.to_string())?;
+        let document_path = Self::event_stream_document_path(account_id);
+        let document_ref = firestore.doc(document_path)?;
         let document_snapshot = transaction.get(&document_ref).await?;
 
         let last_event = events.last().expect("events is non-empty");
@@ -432,16 +417,14 @@ impl FirestoreAccountRepository {
         // accounts/{account_id}/events/{event_id} へのイベント書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let document_path = Self::query_event_document_path(account_id, event_id)
-                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-            let document_ref = firestore.doc(document_path.to_string())?;
+            let document_path = Self::query_event_document_path(account_id, event_id);
+            let document_ref = firestore.doc(document_path)?;
             transaction.create(&document_ref, event)?;
         }
 
         // accounts/{account_id} へのアカウントドキュメント書き込み
-        let document_path = Self::query_account_document_path(account_id)
-            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-        let document_ref = firestore.doc(document_path.to_string())?;
+        let document_path = Self::query_account_document_path(account_id);
+        let document_ref = firestore.doc(document_path)?;
         let document_snapshot = transaction.get(&document_ref).await?;
 
         match document_snapshot.data::<QueryAccountDocumentData>() {

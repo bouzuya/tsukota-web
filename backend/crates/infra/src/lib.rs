@@ -10,8 +10,6 @@ pub mod schema;
 mod service_account_credentials;
 
 pub use firestore_account_repository::FirestoreAccountRepository;
-pub use firestore_client::FirestoreClient;
-pub use firestore_client::path::DatabaseName;
 pub use firestore_device_repository::FirestoreDeviceRepository;
 pub use firestore_projection::FirestoreProjection;
 pub use firestore_user_repository::FirestoreUserRepository;

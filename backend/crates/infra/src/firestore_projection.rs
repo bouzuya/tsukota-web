@@ -14,15 +14,10 @@ use domain::AccountEvent;
 use domain::AccountId;
 use domain::TransactionId;
 use domain::UserId;
-use firestore_client::path::CollectionPath;
-use firestore_client::path::DocumentPath;
 
 /// Internal error type for FirestoreProjection operations
 #[derive(Debug, thiserror::Error)]
 enum E {
-    #[error("invalid path: {0}")]
-    InvalidPath(String),
-
     #[error("event deserialize for account {0}")]
     EventDeserialize(AccountId, #[source] bouzuya_firestore_client::Error),
 
@@ -57,15 +52,13 @@ impl FirestoreProjection {
     }
 
     /// Get the path to the events collection: `accounts/{accountId}/events`
-    fn events_collection_path(account_id: &AccountId) -> Result<CollectionPath, E> {
-        let path_str = format!("accounts/{}/events", account_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn events_collection_path(account_id: &AccountId) -> String {
+        format!("accounts/{}/events", account_id)
     }
 
     /// Get the path to a user document: `users/{uid}`
-    fn user_path(uid: &str) -> Result<DocumentPath, E> {
-        let path_str = format!("users/{}", uid);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn user_path(uid: &str) -> String {
+        format!("users/{}", uid)
     }
 
     /// Extract the `at` timestamp from an AccountEvent
@@ -87,10 +80,10 @@ impl FirestoreProjection {
 
     /// Load all events for an account from Firestore
     async fn load_events(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
-        let collection_path = Self::events_collection_path(account_id)?;
+        let collection_path = Self::events_collection_path(account_id);
         let collection_ref = self
             .firestore
-            .collection(collection_path.to_string())
+            .collection(collection_path)
             .expect("invalid collection path");
         let document_refs = collection_ref
             .list_documents()
@@ -273,10 +266,10 @@ impl AccountProjection for FirestoreProjection {
 
     async fn list_accounts(&self, owner_id: &UserId) -> Result<Vec<AccountView>, ApplicationError> {
         // Get user document to find account IDs
-        let user_path = Self::user_path(&owner_id.to_string()).map_err(ApplicationError::from)?;
+        let user_path = Self::user_path(&owner_id.to_string());
         let document_ref = self
             .firestore
-            .doc(user_path.to_string())
+            .doc(user_path)
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
         let snapshots = self.firestore.get_all(vec![document_ref]).await.map_err(
             |e: bouzuya_firestore_client::Error| ApplicationError::Repository(e.to_string()),

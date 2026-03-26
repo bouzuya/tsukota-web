@@ -8,15 +8,10 @@ use bouzuya_firestore_client::Precondition;
 use bouzuya_firestore_client::TransactionOptions;
 use domain::UserEvent;
 use domain::UserId;
-use firestore_client::path::CollectionPath;
-use firestore_client::path::DocumentPath;
 
 /// Internal error type for FirestoreUserRepository operations
 #[derive(Debug, thiserror::Error)]
 enum E {
-    #[error("invalid path: {0}")]
-    InvalidPath(String),
-
     #[error("event deserialize: {0}")]
     EventDeserialize(#[source] bouzuya_firestore_client::Error),
 
@@ -52,30 +47,26 @@ impl FirestoreUserRepository {
     }
 
     /// Get the path to a user event stream document: `aggregates/user/event_streams/{user_id}`
-    fn event_stream_document_path(user_id: &UserId) -> Result<DocumentPath, E> {
-        let path_str = format!("aggregates/user/event_streams/{}", user_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn event_stream_document_path(user_id: &UserId) -> String {
+        format!("aggregates/user/event_streams/{}", user_id)
     }
 
     /// Get the path to the events collection: `aggregates/user/event_streams/{user_id}/events`
-    fn event_collection_path(user_id: &UserId) -> Result<CollectionPath, E> {
-        let path_str = format!("aggregates/user/event_streams/{}/events", user_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn event_collection_path(user_id: &UserId) -> String {
+        format!("aggregates/user/event_streams/{}/events", user_id)
     }
 
     /// Get the path to an event document: `aggregates/user/event_streams/{user_id}/events/{event_id}`
-    fn event_document_path(user_id: &UserId, event_id: &str) -> Result<DocumentPath, E> {
-        let path_str = format!(
+    fn event_document_path(user_id: &UserId, event_id: &str) -> String {
+        format!(
             "aggregates/user/event_streams/{}/events/{}",
             user_id, event_id
-        );
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+        )
     }
 
     /// Get the path to a user document: `users/{user_id}`
-    fn query_user_document_path(user_id: &UserId) -> Result<DocumentPath, E> {
-        let path_str = format!("users/{}", user_id);
-        path_str.parse().map_err(|_| E::InvalidPath(path_str))
+    fn query_user_document_path(user_id: &UserId) -> String {
+        format!("users/{}", user_id)
     }
 
     /// Extract event ID from a UserEvent
@@ -116,10 +107,10 @@ impl UserRepository for FirestoreUserRepository {
 
 impl FirestoreUserRepository {
     async fn load_events_impl(&self, user_id: &UserId) -> Result<Vec<UserEvent>, E> {
-        let collection_path = Self::event_collection_path(user_id)?;
+        let collection_path = Self::event_collection_path(user_id);
         let collection_ref = self
             .firestore
-            .collection(collection_path.to_string())
+            .collection(collection_path)
             .expect("invalid collection path");
         let document_refs = collection_ref
             .list_documents()
@@ -201,16 +192,14 @@ impl FirestoreUserRepository {
         // イベントドキュメントの書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let document_path = Self::event_document_path(user_id, event_id)
-                .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-            let document_ref = firestore.doc(document_path.to_string())?;
+            let document_path = Self::event_document_path(user_id, event_id);
+            let document_ref = firestore.doc(document_path)?;
             transaction.create(&document_ref, event)?;
         }
 
         // イベントストリームドキュメントの更新 (排他制御のために get を使用)
-        let event_stream_path = Self::event_stream_document_path(user_id)
-            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-        let document_ref = firestore.doc(event_stream_path.to_string())?;
+        let event_stream_path = Self::event_stream_document_path(user_id);
+        let document_ref = firestore.doc(event_stream_path)?;
         let document_snapshot = transaction.get(&document_ref).await?;
 
         let last_event = events.last().expect("events is non-empty");
@@ -248,9 +237,8 @@ impl FirestoreUserRepository {
         events: &[UserEvent],
         transaction: &mut bouzuya_firestore_client::Transaction,
     ) -> Result<(), bouzuya_firestore_client::Error> {
-        let user_path = Self::query_user_document_path(user_id)
-            .map_err(|e| bouzuya_firestore_client::Error::custom(e))?;
-        let document_ref = firestore.doc(user_path.to_string())?;
+        let user_path = Self::query_user_document_path(user_id);
+        let document_ref = firestore.doc(user_path)?;
 
         // UserCreated イベントがある場合は新規作成
         let has_user_created = events
