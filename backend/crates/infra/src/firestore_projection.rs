@@ -18,14 +18,35 @@ use domain::UserId;
 /// Internal error type for FirestoreProjection operations
 #[derive(Debug, thiserror::Error)]
 enum E {
-    #[error("event deserialize for account {0}")]
-    EventDeserialize(AccountId, #[source] bouzuya_firestore_client::Error),
+    #[error("account not found: {0}")]
+    AccountNotFound(AccountId),
+
+    #[error("deserialize account for account {0}")]
+    DeserializeAccount(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("deserialize event for account {0}")]
+    DeserializeEvent(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("deserialize user for user {0}")]
+    DeserializeUser(UserId, #[source] bouzuya_firestore_client::Error),
 
     #[error("event not found for account {0}")]
     EventNotFound(AccountId),
 
+    #[error("get account document for account {0}")]
+    GetAccountDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+
     #[error("get all event documents for account {0}")]
     GetAllEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("get user document for user {0}")]
+    GetUserDocument(UserId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid account document path for account {0}")]
+    InvalidAccountDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid user document path: {0}")]
+    InvalidUserDocumentPath(UserId, #[source] bouzuya_firestore_client::Error),
 
     #[error("list event documents for account {0}")]
     ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
@@ -106,7 +127,7 @@ impl FirestoreProjection {
             let event = snapshot
                 .data::<AccountEvent>()
                 .ok_or_else(|| E::EventNotFound(account_id.clone()))?
-                .map_err(|e| E::EventDeserialize(account_id.clone(), e))?;
+                .map_err(|e| E::DeserializeEvent(account_id.clone(), e))?;
             all_events.push(event);
         }
 
@@ -276,18 +297,16 @@ impl AccountProjection for FirestoreProjection {
         let document_ref = self
             .firestore
             .doc(Self::account_document_path(account_id))
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+            .map_err(|e| E::InvalidAccountDocumentPath(*account_id, e))?;
         let snapshot = document_ref
             .get()
             .await
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+            .map_err(|e| E::GetAccountDocument(*account_id, e))?;
         let account_doc = snapshot
             .data::<crate::schema::QueryAccountDocumentData>()
             .transpose()
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?
-            .ok_or_else(|| {
-                ApplicationError::AccountNotFound(format!("Account {} not found", account_id))
-            })?;
+            .map_err(|e| E::DeserializeAccount(*account_id, e))?
+            .ok_or_else(|| E::AccountNotFound(*account_id))?;
 
         Ok(account_doc.owners)
     }
@@ -298,21 +317,18 @@ impl AccountProjection for FirestoreProjection {
         let document_ref = self
             .firestore
             .doc(user_path)
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+            .map_err(|e| E::InvalidUserDocumentPath(*owner_id, e))?;
         let snapshot = document_ref
             .get()
             .await
-            .map_err(|e: bouzuya_firestore_client::Error| {
-                ApplicationError::Repository(e.to_string())
-            })?;
+            .map_err(|e| E::GetUserDocument(*owner_id, e))?;
 
-        let account_ids = match snapshot.data::<QueryUserDocumentData>() {
-            Some(result) => {
-                let user = result.map_err(|e| ApplicationError::Repository(e.to_string()))?;
-                user.account_ids
-            }
-            None => vec![],
-        };
+        let account_ids = snapshot
+            .data::<QueryUserDocumentData>()
+            .transpose()
+            .map_err(|e| E::DeserializeUser(*owner_id, e))?
+            .map(|data| data.account_ids)
+            .unwrap_or_default();
 
         // Load each account
         let mut accounts = Vec::new();
