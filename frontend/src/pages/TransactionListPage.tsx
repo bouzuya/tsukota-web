@@ -80,7 +80,7 @@ export function TransactionListPage() {
 				</Link>
 			</div>
 
-			{loading && transactions.length === 0 ? (
+			{transactions === null ? (
 				<div className="flex items-center justify-center py-12">
 					<LoadingSpinner size="lg" />
 				</div>
