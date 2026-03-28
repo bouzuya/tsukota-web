@@ -1,10 +1,10 @@
 import { useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { addOwner } from "../api/addOwner";
 import { deleteAccount } from "../api/deleteAccount";
 import { getAccount } from "../api/getAccount";
-import { getUser } from "../api/getUser";
-import type { Account, User } from "../api/types";
+import type { Account } from "../api/types";
 import { updateAccount } from "../api/updateAccount";
 import { currentUserAtom } from "../atoms/auth";
 import { Button } from "../components/Button";
@@ -21,11 +21,14 @@ export function AccountSettingsPage() {
 	const currentUser = useAtomValue(currentUserAtom);
 
 	const [account, setAccount] = useState<Account | null>(null);
-	const [owners, setOwners] = useState<User[]>([]);
+	const [ownerIds, setOwnerIds] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [accountName, setAccountName] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [showDeleteModal, setShowDeleteModal] = useState(false);
+	const [newOwnerUserId, setNewOwnerUserId] = useState("");
+	const [addingOwner, setAddingOwner] = useState(false);
+	const [addOwnerError, setAddOwnerError] = useState<string | null>(null);
 
 	useEffect(() => {
 		async function fetchData() {
@@ -36,11 +39,7 @@ export function AccountSettingsPage() {
 				const acc = await getAccount(id);
 				setAccount(acc);
 				setAccountName(acc.name);
-
-				// Fetch owner details
-				const ownerPromises = acc.ownerIds.map((ownerId) => getUser(ownerId));
-				const ownerData = await Promise.all(ownerPromises);
-				setOwners(ownerData);
+				setOwnerIds(acc.ownerIds);
 			} finally {
 				setLoading(false);
 			}
@@ -57,6 +56,24 @@ export function AccountSettingsPage() {
 			setAccount({ ...account, name: accountName.trim() });
 		} finally {
 			setSaving(false);
+		}
+	};
+
+	const handleAddOwner = async () => {
+		if (!id || !newOwnerUserId.trim()) return;
+
+		setAddingOwner(true);
+		setAddOwnerError(null);
+		try {
+			await addOwner({ accountId: id, userId: newOwnerUserId.trim() });
+			setOwnerIds([...ownerIds, newOwnerUserId.trim()]);
+			setNewOwnerUserId("");
+		} catch {
+			setAddOwnerError(
+				"オーナーの追加に失敗しました。ユーザー ID を確認してください。",
+			);
+		} finally {
+			setAddingOwner(false);
 		}
 	};
 
@@ -126,18 +143,17 @@ export function AccountSettingsPage() {
 						オーナー一覧
 					</h2>
 					<div className="space-y-2">
-						{owners.map((owner) => (
+						{ownerIds.map((ownerId) => (
 							<div
-								key={owner.id}
+								key={ownerId}
 								className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded"
 							>
 								<div>
 									<p className="font-medium text-gray-900">
-										{owner.displayName}
+										{ownerId}
 									</p>
-									<p className="text-sm text-gray-500">{owner.email}</p>
 								</div>
-								{owner.id === currentUser?.id && (
+								{ownerId === currentUser?.id && (
 									<span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
 										あなた
 									</span>
@@ -145,9 +161,31 @@ export function AccountSettingsPage() {
 							</div>
 						))}
 					</div>
-					<p className="mt-4 text-sm text-gray-500">
-						オーナーの追加・削除は現在準備中です。
-					</p>
+					<div className="mt-4">
+						<h3 className="text-sm font-medium text-gray-700 mb-2">
+							オーナーを追加
+						</h3>
+						<div className="flex gap-3">
+							<Input
+								value={newOwnerUserId}
+								onChange={(e) => {
+									setNewOwnerUserId(e.target.value);
+									setAddOwnerError(null);
+								}}
+								placeholder="ユーザー ID"
+								className="flex-1"
+							/>
+							<Button
+								onClick={handleAddOwner}
+								disabled={addingOwner || !newOwnerUserId.trim()}
+							>
+								{addingOwner ? "追加中..." : "追加"}
+							</Button>
+						</div>
+						{addOwnerError && (
+							<p className="mt-1 text-sm text-red-600">{addOwnerError}</p>
+						)}
+					</div>
 				</div>
 
 				{/* Delete Account */}
