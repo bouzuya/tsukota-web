@@ -277,16 +277,12 @@ impl AccountProjection for FirestoreProjection {
             .firestore
             .doc(Self::account_document_path(account_id))
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-        let snapshots = self
-            .firestore
-            .get_all([document_ref])
+        let snapshot = document_ref
+            .get()
             .await
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-
-        let account_doc = snapshots
-            .into_iter()
-            .next()
-            .and_then(|s| s.data::<crate::schema::QueryAccountDocumentData>())
+        let account_doc = snapshot
+            .data::<crate::schema::QueryAccountDocumentData>()
             .transpose()
             .map_err(|e| ApplicationError::Repository(e.to_string()))?
             .ok_or_else(|| {
@@ -303,18 +299,18 @@ impl AccountProjection for FirestoreProjection {
             .firestore
             .doc(user_path)
             .map_err(|e| ApplicationError::Repository(e.to_string()))?;
-        let snapshots = self.firestore.get_all(vec![document_ref]).await.map_err(
-            |e: bouzuya_firestore_client::Error| ApplicationError::Repository(e.to_string()),
-        )?;
+        let snapshot = document_ref
+            .get()
+            .await
+            .map_err(|e: bouzuya_firestore_client::Error| {
+                ApplicationError::Repository(e.to_string())
+            })?;
 
-        let account_ids = match snapshots.into_iter().next() {
-            Some(snapshot) => match snapshot.data::<QueryUserDocumentData>() {
-                Some(result) => {
-                    let user = result.map_err(|e| ApplicationError::Repository(e.to_string()))?;
-                    user.account_ids
-                }
-                None => vec![],
-            },
+        let account_ids = match snapshot.data::<QueryUserDocumentData>() {
+            Some(result) => {
+                let user = result.map_err(|e| ApplicationError::Repository(e.to_string()))?;
+                user.account_ids
+            }
             None => vec![],
         };
 
