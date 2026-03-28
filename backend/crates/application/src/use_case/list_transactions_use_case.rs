@@ -39,17 +39,12 @@ impl ListTransactionsUseCase {
             .map_err(|_| ApplicationError::InvalidRequest("Invalid account ID".into()))?;
         let domain_user_id = user_id.to_domain();
 
-        // Get account to verify ownership
-        let account = self
+        // Verify user is an owner of the account
+        let owner_ids = self
             .account_projection
-            .get_account(&account_id)
-            .await?
-            .ok_or_else(|| {
-                ApplicationError::AccountNotFound(format!("Account {} not found", account_id))
-            })?;
-
-        // Verify user is owner
-        crate::authorization::verify_owner(&account, &domain_user_id)?;
+            .list_account_owner_ids(&account_id)
+            .await?;
+        crate::authorization::verify_owner(&account_id, &owner_ids, &domain_user_id)?;
 
         // Get transactions
         let result = self

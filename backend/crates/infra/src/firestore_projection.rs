@@ -51,6 +51,11 @@ impl FirestoreProjection {
         Self { firestore }
     }
 
+    /// Get the path to an account document: `accounts/{accountId}`
+    fn account_document_path(account_id: &AccountId) -> String {
+        format!("accounts/{}", account_id)
+    }
+
     /// Get the path to the events collection: `accounts/{accountId}/events`
     fn events_collection_path(account_id: &AccountId) -> String {
         format!("accounts/{}/events", account_id)
@@ -262,6 +267,33 @@ impl AccountProjection for FirestoreProjection {
             &account,
             &events,
         ))
+    }
+
+    async fn list_account_owner_ids(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<Vec<String>, ApplicationError> {
+        let document_ref = self
+            .firestore
+            .doc(Self::account_document_path(account_id))
+            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+        let snapshots = self
+            .firestore
+            .get_all([document_ref])
+            .await
+            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+
+        let account_doc = snapshots
+            .into_iter()
+            .next()
+            .and_then(|s| s.data::<crate::schema::QueryAccountDocumentData>())
+            .transpose()
+            .map_err(|e| ApplicationError::Repository(e.to_string()))?
+            .ok_or_else(|| {
+                ApplicationError::AccountNotFound(format!("Account {} not found", account_id))
+            })?;
+
+        Ok(account_doc.owners)
     }
 
     async fn list_accounts(&self, owner_id: &UserId) -> Result<Vec<AccountView>, ApplicationError> {

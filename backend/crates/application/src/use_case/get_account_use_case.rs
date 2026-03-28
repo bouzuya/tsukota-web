@@ -3,7 +3,7 @@ use std::sync::Arc;
 use domain::AccountId;
 
 use crate::UserId;
-use crate::authorization::verify_owner;
+use crate::authorization;
 use crate::error::ApplicationError;
 use crate::projection::AccountProjection;
 use crate::request::GetAccountRequest;
@@ -42,7 +42,7 @@ impl GetAccountUseCase {
             })?;
 
         // Verify user is owner
-        verify_owner(&account, &domain_user_id)?;
+        authorization::verify_owner(&account_id, &account.owner_ids, &domain_user_id)?;
 
         Ok(GetAccountResponse(account))
     }

@@ -18,6 +18,17 @@ pub trait AccountProjection: Send + Sync {
         account_id: &AccountId,
     ) -> Result<Option<AccountView>, ApplicationError>;
 
+    /// List account owner ids
+    async fn list_account_owner_ids(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<Vec<String>, ApplicationError> {
+        let account = self.get_account(account_id).await?.ok_or_else(|| {
+            ApplicationError::AccountNotFound(format!("Account {} not found", account_id))
+        })?;
+        Ok(account.owner_ids)
+    }
+
     /// List all accounts owned by a user
     async fn list_accounts(&self, owner_id: &UserId) -> Result<Vec<AccountView>, ApplicationError>;
 }
