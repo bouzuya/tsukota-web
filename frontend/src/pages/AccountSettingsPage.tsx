@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { addOwner } from "../api/addOwner";
 import { deleteAccount } from "../api/deleteAccount";
 import { getAccount } from "../api/getAccount";
+import { removeOwner } from "../api/removeOwner";
 import type { Account } from "../api/types";
 import { updateAccount } from "../api/updateAccount";
 import { currentUserAtom } from "../atoms/auth";
@@ -29,6 +30,9 @@ export function AccountSettingsPage() {
 	const [newOwnerUserId, setNewOwnerUserId] = useState("");
 	const [addingOwner, setAddingOwner] = useState(false);
 	const [addOwnerError, setAddOwnerError] = useState<string | null>(null);
+	const [ownerToRemove, setOwnerToRemove] = useState<string | null>(null);
+	const [removingOwnerId, setRemovingOwnerId] = useState<string | null>(null);
+	const [removeOwnerError, setRemoveOwnerError] = useState<string | null>(null);
 
 	useEffect(() => {
 		async function fetchData() {
@@ -74,6 +78,22 @@ export function AccountSettingsPage() {
 			);
 		} finally {
 			setAddingOwner(false);
+		}
+	};
+
+	const handleRemoveOwner = async () => {
+		if (!id || !ownerToRemove) return;
+
+		setRemovingOwnerId(ownerToRemove);
+		setRemoveOwnerError(null);
+		try {
+			await removeOwner({ accountId: id, userId: ownerToRemove });
+			setOwnerIds(ownerIds.filter((oid) => oid !== ownerToRemove));
+		} catch {
+			setRemoveOwnerError("オーナーの削除に失敗しました。");
+		} finally {
+			setRemovingOwnerId(null);
+			setOwnerToRemove(null);
 		}
 	};
 
@@ -149,17 +169,27 @@ export function AccountSettingsPage() {
 								className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded"
 							>
 								<div>
-									<p className="font-medium text-gray-900">
-										{ownerId}
-									</p>
+									<p className="font-medium text-gray-900">{ownerId}</p>
 								</div>
-								{ownerId === currentUser?.id && (
-									<span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-										あなた
-									</span>
-								)}
+								<div className="flex items-center gap-2">
+									{ownerId === currentUser?.id && (
+										<span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+											あなた
+										</span>
+									)}
+									<Button
+										variant="danger"
+										onClick={() => setOwnerToRemove(ownerId)}
+										disabled={ownerIds.length <= 1 || removingOwnerId !== null}
+									>
+										{removingOwnerId === ownerId ? "削除中..." : "削除"}
+									</Button>
+								</div>
 							</div>
 						))}
+						{removeOwnerError && (
+							<p className="mt-1 text-sm text-red-600">{removeOwnerError}</p>
+						)}
 					</div>
 					<div className="mt-4">
 						<h3 className="text-sm font-medium text-gray-700 mb-2">
@@ -201,6 +231,16 @@ export function AccountSettingsPage() {
 					</Button>
 				</div>
 			</div>
+
+			<ConfirmModal
+				isOpen={ownerToRemove !== null}
+				onClose={() => setOwnerToRemove(null)}
+				onConfirm={handleRemoveOwner}
+				title="オーナーを削除"
+				message={`オーナー「${ownerToRemove}」を削除しますか？`}
+				confirmText="削除する"
+				variant="danger"
+			/>
 
 			<ConfirmModal
 				isOpen={showDeleteModal}
