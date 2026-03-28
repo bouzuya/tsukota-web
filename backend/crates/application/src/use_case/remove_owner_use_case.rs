@@ -21,6 +21,7 @@ impl RemoveOwnerUseCase {
         Self { repository }
     }
 
+    #[tracing::instrument(name = "remove_owner", skip(self))]
     pub async fn execute(
         &self,
         _user_id: &UserId,

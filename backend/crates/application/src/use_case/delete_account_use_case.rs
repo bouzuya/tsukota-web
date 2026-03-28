@@ -21,6 +21,7 @@ impl DeleteAccountUseCase {
         Self { repository }
     }
 
+    #[tracing::instrument(name = "delete_account", skip(self))]
     pub async fn execute(
         &self,
         _user_id: &UserId,

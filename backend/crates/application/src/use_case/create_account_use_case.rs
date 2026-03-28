@@ -21,6 +21,7 @@ impl CreateAccountUseCase {
         Self { repository }
     }
 
+    #[tracing::instrument(name = "create_account", skip(self))]
     pub async fn execute(
         &self,
         user_id: &UserId,

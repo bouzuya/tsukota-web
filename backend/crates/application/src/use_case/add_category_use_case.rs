@@ -22,6 +22,7 @@ impl AddCategoryUseCase {
         Self { repository }
     }
 
+    #[tracing::instrument(name = "add_category", skip(self))]
     pub async fn execute(
         &self,
         _user_id: &UserId,

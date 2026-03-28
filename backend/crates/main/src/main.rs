@@ -23,12 +23,21 @@ use infra::IamSessionTokenVerifier;
 use infra::PemSessionTokenCreator;
 use infra::PemSessionTokenVerifier;
 use infra::ServiceAccountCredentials;
+use tracing::info;
 
 #[tokio::main]
 async fn main() {
+    // tracing の初期化
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
     let env = Env::from_env().expect("Failed to load environment variables");
 
-    println!("{:?}", env);
+    tracing::info!(?env, "環境変数を読み込みました");
 
     // Firestore uses FIRESTORE_EMULATOR_HOST if set
     let firestore = Firestore::new(FirestoreOptions {
@@ -63,13 +72,15 @@ async fn main() {
                         (Arc::new(creator), Arc::new(verifier))
                     }
                     Err(e) => {
-                        eprintln!("ERROR: Failed to load credentials: {}", e);
+                        tracing::error!("認証情報の読み込みに失敗しました: {}", e);
                         std::process::exit(1);
                     }
                 }
             }
             None => {
-                println!("GOOGLE_APPLICATION_CREDENTIALS not set, using IamSessionTokenCreator");
+                tracing::info!(
+                    "GOOGLE_APPLICATION_CREDENTIALS が未設定のため IamSessionTokenCreator を使用します"
+                );
                 let creator = IamSessionTokenCreator::new(env.service_account_email.clone());
                 let verifier = IamSessionTokenVerifier::new(env.service_account_email.clone());
                 (Arc::new(creator), Arc::new(verifier))
@@ -87,6 +98,8 @@ async fn main() {
         verifier,
         user_repository,
     );
+
+    tracing::info!("アプリケーションの初期化が完了しました");
 
     // Run the server
     api::run(state, env.port, env.public_dir.as_deref(), &env.base_path).await;

@@ -28,6 +28,7 @@ impl ListCategoriesUseCase {
         }
     }
 
+    #[tracing::instrument(name = "list_categories", skip(self))]
     pub async fn execute(
         &self,
         user_id: &UserId,

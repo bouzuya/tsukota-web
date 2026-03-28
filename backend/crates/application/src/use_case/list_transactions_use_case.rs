@@ -27,6 +27,7 @@ impl ListTransactionsUseCase {
         }
     }
 
+    #[tracing::instrument(name = "list_transactions", skip(self))]
     pub async fn execute(
         &self,
         user_id: &UserId,

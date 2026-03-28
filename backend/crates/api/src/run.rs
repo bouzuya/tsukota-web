@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use tracing::info;
+
 use crate::router;
 use crate::state::AppState;
 
@@ -15,7 +17,7 @@ pub async fn run(state: AppState, port: u16, public_dir: Option<&Path>, base_pat
     let app = router::create_router(state, public_dir, base_path);
 
     let addr = format!("0.0.0.0:{}", port);
-    println!("Starting server on {}", addr);
+    tracing::info!(%addr, "サーバーを起動します");
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

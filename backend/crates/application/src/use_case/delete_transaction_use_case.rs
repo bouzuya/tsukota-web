@@ -22,6 +22,7 @@ impl DeleteTransactionUseCase {
         Self { repository }
     }
 
+    #[tracing::instrument(name = "delete_transaction", skip(self))]
     pub async fn execute(
         &self,
         _user_id: &UserId,

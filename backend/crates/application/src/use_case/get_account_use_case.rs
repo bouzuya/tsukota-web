@@ -20,6 +20,7 @@ impl GetAccountUseCase {
         Self { projection }
     }
 
+    #[tracing::instrument(name = "get_account", skip(self))]
     pub async fn execute(
         &self,
         user_id: &UserId,

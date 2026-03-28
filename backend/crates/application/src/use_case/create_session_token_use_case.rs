@@ -44,6 +44,7 @@ impl CreateSessionTokenUseCase {
     /// 5. デバイスドキュメントを保存
     /// 6. ユーザードキュメントを作成（存在しなければ）
     /// 7. セッショントークンを返す
+    #[tracing::instrument(name = "create_session_token", skip(self, device_secret))]
     pub async fn execute(
         &self,
         CreateSessionTokenRequest {

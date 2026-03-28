@@ -18,6 +18,7 @@ impl ListAccountsUseCase {
         Self { projection }
     }
 
+    #[tracing::instrument(name = "list_accounts", skip(self, _request))]
     pub async fn execute(
         &self,
         user_id: &UserId,

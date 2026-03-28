@@ -28,6 +28,7 @@ impl ExportTransactionsUseCase {
         }
     }
 
+    #[tracing::instrument(name = "export_transactions", skip(self))]
     pub async fn execute(
         &self,
         user_id: &UserId,

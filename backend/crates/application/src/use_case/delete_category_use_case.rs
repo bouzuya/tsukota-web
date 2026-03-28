@@ -22,6 +22,7 @@ impl DeleteCategoryUseCase {
         Self { repository }
     }
 
+    #[tracing::instrument(name = "delete_category", skip(self))]
     pub async fn execute(
         &self,
         _user_id: &UserId,

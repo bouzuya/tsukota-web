@@ -23,6 +23,7 @@ impl UpdateTransactionUseCase {
         Self { repository }
     }
 
+    #[tracing::instrument(name = "update_transaction", skip(self))]
     pub async fn execute(
         &self,
         _user_id: &UserId,

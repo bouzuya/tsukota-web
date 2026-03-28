@@ -25,6 +25,7 @@ impl VerifySessionTokenUseCase {
     ///
     /// 1. トークンを検証
     /// 2. ユーザー ID を取得
+    #[tracing::instrument(name = "verify_session_token", skip_all)]
     pub async fn execute(
         &self,
         VerifySessionTokenRequest { session_token }: VerifySessionTokenRequest,

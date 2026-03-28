@@ -5,6 +5,7 @@ use axum::routing::get;
 use axum::routing::post;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
+use tower_http::trace::TraceLayer;
 
 use crate::handler;
 use crate::state::AppState;
@@ -54,6 +55,7 @@ pub fn create_router(state: AppState, public_dir: Option<&Path>, base_path: &str
             post(handler::update_transaction),
         )
         .route("/me", get(handler::get_me))
+        .layer(TraceLayer::new_for_http())
         .with_state(state);
 
     match public_dir {
