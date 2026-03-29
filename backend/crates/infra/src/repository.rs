@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::Precondition;
+use bouzuya_firestore_client::Transaction as FirestoreTransaction;
 use bouzuya_firestore_client::TransactionOptions;
 
 /// リポジトリ操作の共通エラー型
@@ -97,10 +98,15 @@ pub(crate) trait Repository {
     ) -> Self::EventStream;
 
     /// イベントをイベントストリームに保存する
-    async fn store_events(
+    async fn save_events(
         &self,
         event_stream_id: Self::EventStreamId,
         events: Vec<Self::Event>,
+        callback: Box<
+            dyn FnOnce(&mut FirestoreTransaction) -> Result<(), bouzuya_firestore_client::Error>
+                + Send
+                + Sync,
+        >,
     ) -> Result<(), RepositoryError> {
         if events.is_empty() {
             return Ok(());
@@ -147,6 +153,9 @@ pub(crate) trait Repository {
                             let document_ref = firestore.doc(document_path)?;
                             transaction.create(&document_ref, event)?;
                         }
+
+                        // コールバックによる追加の更新
+                        callback(transaction)?;
 
                         Ok(())
                     })
@@ -270,7 +279,7 @@ mod tests {
         let stream_id = TestEventStreamId::generate();
         let event = test_event("evt-001", "2024-01-01T00:00:00Z", "テストデータ");
 
-        repo.store_events(stream_id.clone(), vec![event.clone()])
+        repo.save_events(stream_id.clone(), vec![event.clone()], Box::new(|_| Ok(())))
             .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
@@ -285,10 +294,18 @@ mod tests {
         let event1 = test_event("evt-001", "2024-01-01T00:00:00Z", "最初のイベント");
         let event2 = test_event("evt-002", "2024-01-02T00:00:00Z", "二番目のイベント");
 
-        repo.store_events(stream_id.clone(), vec![event1.clone()])
-            .await?;
-        repo.store_events(stream_id.clone(), vec![event2.clone()])
-            .await?;
+        repo.save_events(
+            stream_id.clone(),
+            vec![event1.clone()],
+            Box::new(|_| Ok(())),
+        )
+        .await?;
+        repo.save_events(
+            stream_id.clone(),
+            vec![event2.clone()],
+            Box::new(|_| Ok(())),
+        )
+        .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
         assert_eq!(loaded.len(), 2);
@@ -305,8 +322,12 @@ mod tests {
         let event1 = test_event("evt-001", "2024-01-02T00:00:00Z", "後のイベント");
         let event2 = test_event("evt-002", "2024-01-01T00:00:00Z", "前のイベント");
 
-        repo.store_events(stream_id.clone(), vec![event1.clone(), event2.clone()])
-            .await?;
+        repo.save_events(
+            stream_id.clone(),
+            vec![event1.clone(), event2.clone()],
+            Box::new(|_| Ok(())),
+        )
+        .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
         assert_eq!(loaded.len(), 2);
@@ -322,7 +343,8 @@ mod tests {
         let stream_id = TestEventStreamId::generate();
 
         // 空のイベントリストを保存しても何も起きない
-        repo.store_events(stream_id.clone(), vec![]).await?;
+        repo.save_events(stream_id.clone(), vec![], Box::new(|_| Ok(())))
+            .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
         assert_eq!(loaded, vec![]);
