@@ -1262,6 +1262,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "urlencoding",
+ "uuid",
 ]
 
 [[package]]

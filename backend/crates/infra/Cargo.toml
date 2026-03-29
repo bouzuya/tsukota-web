@@ -25,3 +25,4 @@ urlencoding = "2"
 
 [dev-dependencies]
 anyhow.workspace = true
+uuid.workspace = true

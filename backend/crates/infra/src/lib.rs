@@ -6,6 +6,7 @@ mod iam_session_token;
 mod in_memory_event_store;
 mod in_memory_projection;
 mod pem_session_token;
+mod repository;
 pub mod schema;
 mod service_account_credentials;
 
