@@ -4,6 +4,8 @@ use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::Precondition;
 use bouzuya_firestore_client::Transaction as FirestoreTransaction;
 use bouzuya_firestore_client::TransactionOptions;
+use std::future::Future;
+use std::pin::Pin;
 
 /// リポジトリ操作の共通エラー型
 #[derive(Debug, thiserror::Error)]
@@ -103,7 +105,10 @@ pub(crate) trait Repository {
         event_stream_id: Self::EventStreamId,
         events: Vec<Self::Event>,
         callback: Box<
-            dyn FnOnce(&mut FirestoreTransaction) -> Result<(), bouzuya_firestore_client::Error>
+            dyn for<'a> FnOnce(
+                    &'a mut FirestoreTransaction,
+                )
+                    -> Pin<Box<dyn Future<Output = Result<(), bouzuya_firestore_client::Error>> + Send + 'a>>
                 + Send
                 + Sync,
         >,
@@ -155,7 +160,7 @@ pub(crate) trait Repository {
                         }
 
                         // コールバックによる追加の更新
-                        callback(transaction)?;
+                        callback(transaction).await?;
 
                         Ok(())
                     })
@@ -279,7 +284,7 @@ mod tests {
         let stream_id = TestEventStreamId::generate();
         let event = test_event("evt-001", "2024-01-01T00:00:00Z", "テストデータ");
 
-        repo.save_events(stream_id.clone(), vec![event.clone()], Box::new(|_| Ok(())))
+        repo.save_events(stream_id.clone(), vec![event.clone()], Box::new(|_| Box::pin(async { Ok(()) })))
             .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
@@ -297,13 +302,13 @@ mod tests {
         repo.save_events(
             stream_id.clone(),
             vec![event1.clone()],
-            Box::new(|_| Ok(())),
+            Box::new(|_| Box::pin(async { Ok(()) })),
         )
         .await?;
         repo.save_events(
             stream_id.clone(),
             vec![event2.clone()],
-            Box::new(|_| Ok(())),
+            Box::new(|_| Box::pin(async { Ok(()) })),
         )
         .await?;
         let loaded = repo.load_events(&stream_id).await?;
@@ -325,7 +330,7 @@ mod tests {
         repo.save_events(
             stream_id.clone(),
             vec![event1.clone(), event2.clone()],
-            Box::new(|_| Ok(())),
+            Box::new(|_| Box::pin(async { Ok(()) })),
         )
         .await?;
         let loaded = repo.load_events(&stream_id).await?;
@@ -343,7 +348,7 @@ mod tests {
         let stream_id = TestEventStreamId::generate();
 
         // 空のイベントリストを保存しても何も起きない
-        repo.save_events(stream_id.clone(), vec![], Box::new(|_| Ok(())))
+        repo.save_events(stream_id.clone(), vec![], Box::new(|_| Box::pin(async { Ok(()) })))
             .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
