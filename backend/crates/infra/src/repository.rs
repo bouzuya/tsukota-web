@@ -107,9 +107,13 @@ pub(crate) trait Repository {
         callback: Box<
             dyn for<'a> FnOnce(
                     &'a mut FirestoreTransaction,
-                )
-                    -> Pin<Box<dyn Future<Output = Result<(), bouzuya_firestore_client::Error>> + Send + 'a>>
-                + Send
+                ) -> Pin<
+                    Box<
+                        dyn Future<Output = Result<(), bouzuya_firestore_client::Error>>
+                            + Send
+                            + 'a,
+                    >,
+                > + Send
                 + Sync,
         >,
     ) -> Result<(), RepositoryError> {
@@ -284,8 +288,12 @@ mod tests {
         let stream_id = TestEventStreamId::generate();
         let event = test_event("evt-001", "2024-01-01T00:00:00Z", "テストデータ");
 
-        repo.save_events(stream_id.clone(), vec![event.clone()], Box::new(|_| Box::pin(async { Ok(()) })))
-            .await?;
+        repo.save_events(
+            stream_id.clone(),
+            vec![event.clone()],
+            Box::new(|_| Box::pin(async { Ok(()) })),
+        )
+        .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
         assert_eq!(loaded, vec![event]);
@@ -348,8 +356,12 @@ mod tests {
         let stream_id = TestEventStreamId::generate();
 
         // 空のイベントリストを保存しても何も起きない
-        repo.save_events(stream_id.clone(), vec![], Box::new(|_| Box::pin(async { Ok(()) })))
-            .await?;
+        repo.save_events(
+            stream_id.clone(),
+            vec![],
+            Box::new(|_| Box::pin(async { Ok(()) })),
+        )
+        .await?;
         let loaded = repo.load_events(&stream_id).await?;
 
         assert_eq!(loaded, vec![]);
