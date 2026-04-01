@@ -93,10 +93,14 @@ pub(crate) trait Repository {
         Ok(events)
     }
 
-    /// 新しいイベントストリームドキュメントを生成する
+    /// イベントストリームドキュメントを生成する
+    ///
+    /// `stored_event_stream` が `Some` の場合は既存のイベントストリームの更新、
+    /// `None` の場合は新規作成として扱う。
     fn new_event_stream(
         event_stream_id: &Self::EventStreamId,
         events: &[Self::Event],
+        stored_event_stream: Option<Self::EventStream>,
     ) -> Self::EventStream;
 
     /// イベントをイベントストリームに保存する
@@ -133,24 +137,26 @@ pub(crate) trait Repository {
                             let document_snapshot = transaction.get(&document_ref).await?;
 
                             // イベントストリームドキュメントの書き込み
-                            let event_stream = Self::new_event_stream(&event_stream_id, &events);
                             let stored_event_stream =
                                 document_snapshot.data::<Self::EventStream>().transpose()?;
-                            match stored_event_stream {
-                                None => {
-                                    transaction.create(&document_ref, &event_stream)?;
-                                }
-                                Some(_stored_event_stream) => {
-                                    // TODO: 排他制御
-                                    transaction.update(
-                                        &document_ref,
-                                        &event_stream,
-                                        Precondition {
-                                            exists: Some(true),
-                                            last_update_time: None,
-                                        },
-                                    )?;
-                                }
+                            let is_update = stored_event_stream.is_some();
+                            let event_stream = Self::new_event_stream(
+                                &event_stream_id,
+                                &events,
+                                stored_event_stream,
+                            );
+                            if is_update {
+                                // TODO: 排他制御
+                                transaction.update(
+                                    &document_ref,
+                                    &event_stream,
+                                    Precondition {
+                                        exists: Some(true),
+                                        last_update_time: None,
+                                    },
+                                )?;
+                            } else {
+                                transaction.create(&document_ref, &event_stream)?;
                             }
                         }
 
@@ -247,6 +253,7 @@ mod tests {
         fn new_event_stream(
             event_stream_id: &Self::EventStreamId,
             events: &[Self::Event],
+            _stored_event_stream: Option<Self::EventStream>,
         ) -> Self::EventStream {
             let last_event = events.last().expect("events is non-empty");
             TestEventStream {

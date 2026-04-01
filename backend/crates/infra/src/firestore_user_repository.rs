@@ -61,6 +61,7 @@ impl Repository for FirestoreUserRepository {
     fn new_event_stream(
         event_stream_id: &Self::EventStreamId,
         events: &[Self::Event],
+        _stored_event_stream: Option<Self::EventStream>,
     ) -> Self::EventStream {
         let last_event = events.last().expect("events is non-empty");
         let last_event_at = Self::get_event_at(last_event);

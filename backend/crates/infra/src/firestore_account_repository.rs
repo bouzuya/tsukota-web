@@ -1,4 +1,5 @@
 use crate::FirestoreUserRepository;
+use crate::repository::Repository;
 use crate::schema::AccountEventStreamDocumentData;
 use crate::schema::QueryAccountDocumentData;
 use application::error::ApplicationError;
@@ -6,40 +7,12 @@ use application::repository::AccountRepository;
 use application::repository::UserRepository;
 use async_trait::async_trait;
 use bouzuya_firestore_client::Firestore;
-use bouzuya_firestore_client::TransactionOptions;
+use bouzuya_firestore_client::Precondition;
 use domain::AccountEvent;
 use domain::AccountId;
 use domain::User;
 use domain::UserCommand;
 use domain::UserId;
-
-/// Internal error type for FirestoreAccountRepository operations
-#[derive(Debug, thiserror::Error)]
-enum E {
-    #[error("event deserialize for account {0}")]
-    EventDeserialize(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("event not found for account {0}")]
-    EventNotFound(AccountId),
-
-    #[error("get all event documents for account {0}")]
-    GetAllEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("list event documents for account {0}")]
-    ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("transaction: {0}")]
-    Transaction(#[source] bouzuya_firestore_client::Error),
-
-    #[error("user: {0}")]
-    User(String),
-}
-
-impl From<E> for ApplicationError {
-    fn from(e: E) -> Self {
-        ApplicationError::Repository(e.to_string())
-    }
-}
 
 /// Firestore-based event store implementation
 #[derive(Clone)]
@@ -58,24 +31,6 @@ impl FirestoreAccountRepository {
         }
     }
 
-    /// Get the path to an event stream document: `aggregates/account/event_streams/{account_id}`
-    fn event_stream_document_path(account_id: &AccountId) -> String {
-        format!("aggregates/account/event_streams/{}", account_id)
-    }
-
-    /// Get the path to the events collection: `aggregates/account/event_streams/{account_id}/events`
-    fn event_collection_path(account_id: &AccountId) -> String {
-        format!("aggregates/account/event_streams/{}/events", account_id)
-    }
-
-    /// Get the path to an event document: `aggregates/account/event_streams/{account_id}/events/{eventId}`
-    fn event_document_path(account_id: &AccountId, event_id: &str) -> String {
-        format!(
-            "aggregates/account/event_streams/{}/events/{}",
-            account_id, event_id
-        )
-    }
-
     /// Get the path to a query account document: `accounts/{account_id}`
     fn query_account_document_path(account_id: &AccountId) -> String {
         format!("accounts/{}", account_id)
@@ -85,9 +40,24 @@ impl FirestoreAccountRepository {
     fn query_event_document_path(account_id: &AccountId, event_id: &str) -> String {
         format!("accounts/{}/events/{}", account_id, event_id)
     }
+}
 
-    /// Extract event ID from an AccountEvent
-    fn get_event_id(event: &AccountEvent) -> &str {
+impl Repository for FirestoreAccountRepository {
+    type Event = AccountEvent;
+    type EventAt = String;
+    type EventId = String;
+    type EventStream = AccountEventStreamDocumentData;
+    type EventStreamId = AccountId;
+
+    fn event_stream_collection_path() -> String {
+        "aggregates/account/event_streams".to_string()
+    }
+
+    fn firestore(&self) -> &Firestore {
+        &self.firestore
+    }
+
+    fn get_event_at(event: &Self::Event) -> Self::EventAt {
         match event {
             AccountEvent::AccountCreated { common, .. }
             | AccountEvent::AccountDeleted { common, .. }
@@ -99,12 +69,11 @@ impl FirestoreAccountRepository {
             | AccountEvent::OwnerRemoved { common, .. }
             | AccountEvent::TransactionAdded { common, .. }
             | AccountEvent::TransactionDeleted { common, .. }
-            | AccountEvent::TransactionUpdated { common, .. } => &common.id,
+            | AccountEvent::TransactionUpdated { common, .. } => common.at.clone(),
         }
     }
 
-    /// Extract the `at` timestamp from an AccountEvent
-    fn get_event_at(event: &AccountEvent) -> &str {
+    fn get_event_id(event: &Self::Event) -> Self::EventId {
         match event {
             AccountEvent::AccountCreated { common, .. }
             | AccountEvent::AccountDeleted { common, .. }
@@ -116,7 +85,62 @@ impl FirestoreAccountRepository {
             | AccountEvent::OwnerRemoved { common, .. }
             | AccountEvent::TransactionAdded { common, .. }
             | AccountEvent::TransactionDeleted { common, .. }
-            | AccountEvent::TransactionUpdated { common, .. } => &common.at,
+            | AccountEvent::TransactionUpdated { common, .. } => common.id.clone(),
+        }
+    }
+
+    fn new_event_stream(
+        event_stream_id: &Self::EventStreamId,
+        events: &[Self::Event],
+        stored_event_stream: Option<Self::EventStream>,
+    ) -> Self::EventStream {
+        let mut owners = match &stored_event_stream {
+            Some(stored) => stored.owners.clone(),
+            None => match &events[0] {
+                AccountEvent::AccountCreated { owners, .. } => owners.clone(),
+                AccountEvent::AccountDeleted { .. }
+                | AccountEvent::AccountUpdated { .. }
+                | AccountEvent::CategoryAdded { .. }
+                | AccountEvent::CategoryDeleted { .. }
+                | AccountEvent::CategoryUpdated { .. }
+                | AccountEvent::OwnerAdded { .. }
+                | AccountEvent::OwnerRemoved { .. }
+                | AccountEvent::TransactionAdded { .. }
+                | AccountEvent::TransactionDeleted { .. }
+                | AccountEvent::TransactionUpdated { .. } => vec![],
+            },
+        };
+
+        // イベントからオーナー変更を適用
+        for event in events {
+            match event {
+                AccountEvent::OwnerAdded { owner, .. } => {
+                    if !owners.contains(owner) {
+                        owners.push(owner.clone());
+                    }
+                }
+                AccountEvent::OwnerRemoved { owner, .. } => {
+                    owners.retain(|o| o != owner);
+                }
+                AccountEvent::AccountCreated { .. }
+                | AccountEvent::AccountDeleted { .. }
+                | AccountEvent::AccountUpdated { .. }
+                | AccountEvent::CategoryAdded { .. }
+                | AccountEvent::CategoryDeleted { .. }
+                | AccountEvent::CategoryUpdated { .. }
+                | AccountEvent::TransactionAdded { .. }
+                | AccountEvent::TransactionDeleted { .. }
+                | AccountEvent::TransactionUpdated { .. } => {}
+            }
+        }
+
+        let last_event = events.last().expect("events is non-empty");
+        AccountEventStreamDocumentData {
+            id: event_stream_id.to_string(),
+            last_event_id: Self::get_event_id(last_event),
+            owners,
+            protocol_version: domain::Account::PROTOCOL_VERSION,
+            updated_at: Self::get_event_at(last_event),
         }
     }
 }
@@ -127,7 +151,9 @@ impl AccountRepository for FirestoreAccountRepository {
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<AccountEvent>, ApplicationError> {
-        self.load_events_impl(account_id).await.map_err(Into::into)
+        Repository::load_events(self, account_id)
+            .await
+            .map_err(|e| ApplicationError::Repository(e.to_string()))
     }
 
     async fn save_events(
@@ -135,104 +161,45 @@ impl AccountRepository for FirestoreAccountRepository {
         account_id: &AccountId,
         events: Vec<AccountEvent>,
     ) -> Result<(), ApplicationError> {
-        self.save_events_impl(account_id, events)
+        // オーナー変更を収集 (User 集約の更新に使用)
+        let user_updates = Self::collect_user_updates(&events);
+
+        let account_id_owned = *account_id;
+        let events_clone = events.clone();
+        let firestore = self.firestore.clone();
+        Repository::save_events(
+            self,
+            *account_id,
+            events,
+            Box::new(move |transaction| {
+                Box::pin(async move {
+                    // accounts/* (クエリ用コレクション) への書き込み
+                    Self::build_query_account_writes_in_tx(
+                        &firestore,
+                        &account_id_owned,
+                        &events_clone,
+                        transaction,
+                    )
+                    .await?;
+                    Ok(())
+                })
+            }),
+        )
+        .await
+        .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+
+        // User 集約の更新 (別トランザクション)
+        self.update_user_aggregates(account_id, user_updates)
             .await
-            .map_err(Into::into)
+            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+
+        Ok(())
     }
 }
 
 impl FirestoreAccountRepository {
-    async fn load_events_impl(&self, account_id: &AccountId) -> Result<Vec<AccountEvent>, E> {
-        let collection_path = Self::event_collection_path(account_id);
-        let collection_ref = self
-            .firestore
-            .collection(collection_path)
-            .expect("invalid collection path");
-        let document_refs = collection_ref
-            .list_documents()
-            .await
-            .map_err(|e| E::ListEventDocuments(account_id.clone(), e))?;
-
-        let snapshots = self
-            .firestore
-            .get_all(document_refs)
-            .await
-            .map_err(|e| E::GetAllEventDocuments(account_id.clone(), e))?;
-
-        let mut all_events = Vec::new();
-        for snapshot in snapshots {
-            let event = snapshot
-                .data::<AccountEvent>()
-                .ok_or_else(|| E::EventNotFound(account_id.clone()))?
-                .map_err(|e| E::EventDeserialize(account_id.clone(), e))?;
-            all_events.push(event);
-        }
-
-        // Sort events by their `at` timestamp to ensure correct ordering
-        all_events.sort_by(|a, b| Self::get_event_at(a).cmp(Self::get_event_at(b)));
-
-        Ok(all_events)
-    }
-
-    async fn save_events_impl(
-        &self,
-        account_id: &AccountId,
-        events: Vec<AccountEvent>,
-    ) -> Result<(), E> {
-        if events.is_empty() {
-            return Ok(());
-        }
-
-        // オーナー変更を収集 (User 集約の更新に使用)
-        let user_updates = self.collect_user_updates(&events);
-
-        let firestore = self.firestore.clone();
-        let account_id_owned = account_id.clone();
-        self.firestore
-            .run_transaction(
-                |transaction| {
-                    Box::pin(async move {
-                        // ========================================
-                        // aggregates/account/* (イベントストア)
-                        // ========================================
-                        Self::build_aggregate_writes_in_tx(
-                            &firestore,
-                            &account_id_owned,
-                            &events,
-                            transaction,
-                        )
-                        .await?;
-
-                        // ========================================
-                        // accounts/* (クエリ用コレクション)
-                        // ========================================
-                        Self::build_query_account_writes_in_tx(
-                            &firestore,
-                            &account_id_owned,
-                            &events,
-                            transaction,
-                        )
-                        .await?;
-
-                        Ok(())
-                    })
-                },
-                TransactionOptions::default(),
-            )
-            .await
-            .map_err(E::Transaction)?;
-
-        // ========================================
-        // User 集約の更新 (別トランザクション)
-        // ========================================
-        self.update_user_aggregates(account_id, user_updates)
-            .await?;
-
-        Ok(())
-    }
-
     /// AccountEvent からオーナー変更を収集する
-    fn collect_user_updates(&self, events: &[AccountEvent]) -> Vec<(UserId, UserUpdateAction)> {
+    fn collect_user_updates(events: &[AccountEvent]) -> Vec<(UserId, UserUpdateAction)> {
         let mut updates = Vec::new();
 
         for event in events {
@@ -273,14 +240,10 @@ impl FirestoreAccountRepository {
         &self,
         account_id: &AccountId,
         user_updates: Vec<(UserId, UserUpdateAction)>,
-    ) -> Result<(), E> {
+    ) -> Result<(), ApplicationError> {
         for (user_id, action) in user_updates {
             // User 集約を読み込み
-            let user_events = self
-                .user_repository
-                .load_events(&user_id)
-                .await
-                .map_err(|e| E::User(e.to_string()))?;
+            let user_events = UserRepository::load_events(&self.user_repository, &user_id).await?;
             let user = User::from_events(user_events);
 
             // コマンドを実行
@@ -306,101 +269,13 @@ impl FirestoreAccountRepository {
                     continue;
                 }
                 Err(e) => {
-                    return Err(E::User(e.to_string()));
+                    return Err(ApplicationError::Repository(e.to_string()));
                 }
             };
 
             // 新しいイベントを保存
             if !new_events.is_empty() {
-                self.user_repository
-                    .save_events(&user_id, new_events)
-                    .await
-                    .map_err(|e| E::User(e.to_string()))?;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// `aggregates/account/*` への書き込みをトランザクション内で実行する
-    async fn build_aggregate_writes_in_tx(
-        firestore: &Firestore,
-        account_id: &AccountId,
-        events: &[AccountEvent],
-        transaction: &mut bouzuya_firestore_client::Transaction,
-    ) -> Result<(), bouzuya_firestore_client::Error> {
-        // イベントドキュメントの書き込み
-        for event in events {
-            let event_id = Self::get_event_id(event);
-            let document_path = Self::event_document_path(account_id, event_id);
-            let document_ref = firestore.doc(document_path)?;
-            transaction.create(&document_ref, event)?;
-        }
-
-        // イベントストリームドキュメントの更新 (排他制御のために get を使用)
-        let document_path = Self::event_stream_document_path(account_id);
-        let document_ref = firestore.doc(document_path)?;
-        let document_snapshot = transaction.get(&document_ref).await?;
-
-        let last_event = events.last().expect("events is non-empty");
-        let last_event_id = Self::get_event_id(last_event);
-        let last_event_at = Self::get_event_at(last_event);
-
-        match document_snapshot.data::<AccountEventStreamDocumentData>() {
-            None => {
-                let owners = match &events[0] {
-                    AccountEvent::AccountCreated { owners, .. } => owners.clone(),
-                    AccountEvent::AccountDeleted { .. }
-                    | AccountEvent::AccountUpdated { .. }
-                    | AccountEvent::CategoryAdded { .. }
-                    | AccountEvent::CategoryDeleted { .. }
-                    | AccountEvent::CategoryUpdated { .. }
-                    | AccountEvent::OwnerAdded { .. }
-                    | AccountEvent::OwnerRemoved { .. }
-                    | AccountEvent::TransactionAdded { .. }
-                    | AccountEvent::TransactionDeleted { .. }
-                    | AccountEvent::TransactionUpdated { .. } => vec![],
-                };
-
-                let document_data = AccountEventStreamDocumentData {
-                    id: account_id.to_string(),
-                    last_event_id: last_event_id.to_string(),
-                    owners,
-                    protocol_version: domain::Account::PROTOCOL_VERSION,
-                    updated_at: last_event_at.to_string(),
-                };
-
-                transaction.create(&document_ref, &document_data)?;
-            }
-            Some(result) => {
-                let mut document_data: AccountEventStreamDocumentData = result?;
-
-                for event in events {
-                    match event {
-                        AccountEvent::OwnerAdded { owner, .. } => {
-                            if !document_data.owners.contains(owner) {
-                                document_data.owners.push(owner.clone());
-                            }
-                        }
-                        AccountEvent::OwnerRemoved { owner, .. } => {
-                            document_data.owners.retain(|o| o != owner);
-                        }
-                        AccountEvent::AccountCreated { .. }
-                        | AccountEvent::AccountDeleted { .. }
-                        | AccountEvent::AccountUpdated { .. }
-                        | AccountEvent::CategoryAdded { .. }
-                        | AccountEvent::CategoryDeleted { .. }
-                        | AccountEvent::CategoryUpdated { .. }
-                        | AccountEvent::TransactionAdded { .. }
-                        | AccountEvent::TransactionDeleted { .. }
-                        | AccountEvent::TransactionUpdated { .. } => {}
-                    }
-                }
-
-                document_data.last_event_id = last_event_id.to_string();
-                document_data.updated_at = last_event_at.to_string();
-
-                transaction.set(&document_ref, &document_data)?;
+                UserRepository::save_events(&self.user_repository, &user_id, new_events).await?;
             }
         }
 
@@ -417,7 +292,7 @@ impl FirestoreAccountRepository {
         // accounts/{account_id}/events/{event_id} へのイベント書き込み
         for event in events {
             let event_id = Self::get_event_id(event);
-            let document_path = Self::query_event_document_path(account_id, event_id);
+            let document_path = Self::query_event_document_path(account_id, &event_id);
             let document_ref = firestore.doc(document_path)?;
             transaction.create(&document_ref, event)?;
         }
@@ -469,7 +344,14 @@ impl FirestoreAccountRepository {
                     }
                 }
 
-                transaction.set(&document_ref, &document_data)?;
+                transaction.update(
+                    &document_ref,
+                    &document_data,
+                    Precondition {
+                        exists: Some(true),
+                        last_update_time: None,
+                    },
+                )?;
             }
         }
 
@@ -519,7 +401,7 @@ mod tests {
         let repo = setup_repository().await?;
         let account_id = AccountId::generate();
 
-        let events = repo.load_events(&account_id).await?;
+        let events = AccountRepository::load_events(&repo, &account_id).await?;
 
         assert_eq!(events, vec![]);
         Ok(())
@@ -531,8 +413,8 @@ mod tests {
         let account_id = AccountId::generate();
         let event = account_created_event(&account_id, "evt-001", "2024-01-01T00:00:00Z");
 
-        repo.save_events(&account_id, vec![event.clone()]).await?;
-        let loaded = repo.load_events(&account_id).await?;
+        AccountRepository::save_events(&repo, &account_id, vec![event.clone()]).await?;
+        let loaded = AccountRepository::load_events(&repo, &account_id).await?;
 
         assert_eq!(loaded, vec![event]);
         Ok(())
@@ -553,10 +435,10 @@ mod tests {
             name: "更新後アカウント".to_string(),
         };
 
-        repo.save_events(&account_id, vec![event1.clone()]).await?;
-        repo.save_events(&account_id, vec![event2.clone()]).await?;
+        AccountRepository::save_events(&repo, &account_id, vec![event1.clone()]).await?;
+        AccountRepository::save_events(&repo, &account_id, vec![event2.clone()]).await?;
 
-        let loaded = repo.load_events(&account_id).await?;
+        let loaded = AccountRepository::load_events(&repo, &account_id).await?;
 
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded[0], event1);
