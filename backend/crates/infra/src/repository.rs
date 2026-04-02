@@ -49,8 +49,13 @@ pub(crate) trait Repository {
         )
     }
 
+    /// 集約名を返す
+    fn aggregate_name() -> String;
+
     /// イベントストリームコレクションのパスを返す: `aggregates/{aggregate}/event_streams`
-    fn event_stream_collection_path() -> String;
+    fn event_stream_collection_path() -> String {
+        format!("aggregates/{}/event_streams", Self::aggregate_name())
+    }
 
     /// イベントストリームドキュメントのパスを返す: `aggregates/{aggregate}/event_streams/{id}`
     fn event_stream_document_path(event_stream_id: &Self::EventStreamId) -> String {
@@ -232,8 +237,8 @@ mod tests {
         type EventStream = TestEventStream;
         type EventStreamId = TestEventStreamId;
 
-        fn event_stream_collection_path() -> String {
-            "aggregates/test/event_streams".to_string()
+        fn aggregate_name() -> String {
+            "test".to_string()
         }
 
         fn firestore(&self) -> &Firestore {

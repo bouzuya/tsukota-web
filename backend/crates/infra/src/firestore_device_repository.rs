@@ -33,8 +33,8 @@ impl Repository for FirestoreDeviceRepository {
     type EventStream = DeviceEventStreamDocumentData;
     type EventStreamId = DeviceId;
 
-    fn event_stream_collection_path() -> String {
-        "aggregates/device/event_streams".to_string()
+    fn aggregate_name() -> String {
+        "device".to_string()
     }
 
     fn firestore(&self) -> &Firestore {

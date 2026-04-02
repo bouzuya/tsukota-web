@@ -34,8 +34,8 @@ impl Repository for FirestoreUserRepository {
     type EventStream = UserEventStreamDocumentData;
     type EventStreamId = UserId;
 
-    fn event_stream_collection_path() -> String {
-        "aggregates/user/event_streams".to_string()
+    fn aggregate_name() -> String {
+        "user".to_string()
     }
 
     fn firestore(&self) -> &Firestore {
