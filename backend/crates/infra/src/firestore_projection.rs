@@ -114,20 +114,20 @@ impl FirestoreProjection {
         let document_refs = collection_ref
             .list_documents()
             .await
-            .map_err(|e| E::ListEventDocuments(account_id.clone(), e))?;
+            .map_err(|e| E::ListEventDocuments(*account_id, e))?;
 
         let snapshots = self
             .firestore
             .get_all(document_refs)
             .await
-            .map_err(|e| E::GetAllEventDocuments(account_id.clone(), e))?;
+            .map_err(|e| E::GetAllEventDocuments(*account_id, e))?;
 
         let mut all_events = Vec::new();
         for snapshot in snapshots {
             let event = snapshot
                 .data::<AccountEvent>()
-                .ok_or_else(|| E::EventNotFound(account_id.clone()))?
-                .map_err(|e| E::DeserializeEvent(account_id.clone(), e))?;
+                .ok_or_else(|| E::EventNotFound(*account_id))?
+                .map_err(|e| E::DeserializeEvent(*account_id, e))?;
             all_events.push(event);
         }
 

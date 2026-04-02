@@ -7,6 +7,15 @@ use bouzuya_firestore_client::TransactionOptions;
 use std::future::Future;
 use std::pin::Pin;
 
+type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+type SaveEventsCallback = Box<
+    dyn for<'a> FnOnce(
+            &'a mut FirestoreTransaction,
+        ) -> BoxFuture<'a, Result<(), bouzuya_firestore_client::Error>>
+        + Send
+        + Sync,
+>;
+
 /// リポジトリ操作の共通エラー型
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
@@ -18,7 +27,7 @@ pub(crate) trait Repository {
     type EventAt: Ord;
     type EventId: Display;
     type EventStream: serde::de::DeserializeOwned + serde::Serialize + Send + Sync + 'static;
-    type EventStreamId: Clone + Display + Send + Sync + 'static; //: Clone + Send + Sync + 'static;
+    type EventStreamId: Clone + Display + Send + Sync + 'static;
 
     /// イベントコレクションのパスを返す: `aggregates/{aggregate}/event_streams/{id}/events`
     fn event_collection_path(event_stream_id: &Self::EventStreamId) -> String {
@@ -108,18 +117,7 @@ pub(crate) trait Repository {
         &self,
         event_stream_id: Self::EventStreamId,
         events: Vec<Self::Event>,
-        callback: Box<
-            dyn for<'a> FnOnce(
-                    &'a mut FirestoreTransaction,
-                ) -> Pin<
-                    Box<
-                        dyn Future<Output = Result<(), bouzuya_firestore_client::Error>>
-                            + Send
-                            + 'a,
-                    >,
-                > + Send
-                + Sync,
-        >,
+        callback: SaveEventsCallback,
     ) -> Result<(), RepositoryError> {
         if events.is_empty() {
             return Ok(());

@@ -23,7 +23,6 @@ use infra::IamSessionTokenVerifier;
 use infra::PemSessionTokenCreator;
 use infra::PemSessionTokenVerifier;
 use infra::ServiceAccountCredentials;
-use tracing::info;
 
 #[tokio::main]
 async fn main() {
@@ -40,6 +39,17 @@ async fn main() {
     tracing::info!(?env, "環境変数を読み込みました");
 
     // Firestore uses FIRESTORE_EMULATOR_HOST if set
+    match env.firestore_emulator_host {
+        None => {
+            // do nothing
+        }
+        Some(firestore_emulator_host) => {
+            tracing::info!(
+                "FIRESTORE_EMULATOR_HOST is set to {}, using Firestore emulator",
+                firestore_emulator_host
+            );
+        }
+    }
     let firestore = Firestore::new(FirestoreOptions {
         project_id: Some(env.project_id.clone()),
     })

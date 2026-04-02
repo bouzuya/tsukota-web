@@ -1,7 +1,5 @@
 use std::path::Path;
 
-use tracing::info;
-
 use crate::router;
 use crate::state::AppState;
 
