@@ -42,7 +42,9 @@ impl CreateAccountUseCase {
         let events = aggregate.handle_command(command)?;
 
         // Save events
-        self.repository.save_events(&account_id, events).await?;
+        self.repository
+            .save_events(&account_id, events, &aggregate)
+            .await?;
 
         Ok(CreateAccountResponse {
             account_id: account_id.to_string(),

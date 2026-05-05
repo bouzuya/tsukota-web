@@ -30,6 +30,10 @@ pub fn create_router(state: AppState, public_dir: Option<&Path>, base_path: &str
             get(handler::export_transactions),
         )
         .route(
+            "/accounts/{account_id}/stats/monthly",
+            get(handler::get_monthly_summary),
+        )
+        .route(
             "/accounts/{account_id}/transactions",
             get(handler::list_transactions),
         )

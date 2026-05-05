@@ -54,7 +54,9 @@ impl RemoveOwnerUseCase {
         let new_events = aggregate.handle_command(command)?;
 
         // Save events
-        self.repository.save_events(&account_id, new_events).await?;
+        self.repository
+            .save_events(&account_id, new_events, &aggregate)
+            .await?;
 
         Ok(RemoveOwnerResponse {})
     }

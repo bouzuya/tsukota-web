@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use domain::Account;
 use domain::AccountEvent;
 use domain::AccountId;
 use domain::DeviceEvent;
@@ -22,6 +23,7 @@ pub trait AccountRepository: Send + Sync {
         &self,
         account_id: &AccountId,
         events: Vec<AccountEvent>,
+        aggregate: &Account,
     ) -> Result<(), ApplicationError>;
 }
 

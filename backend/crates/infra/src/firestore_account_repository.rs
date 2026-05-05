@@ -1,15 +1,20 @@
+use std::collections::BTreeMap;
+
 use crate::FirestoreUserRepository;
 use crate::repository::Repository;
 use crate::schema::AccountEventStreamDocumentData;
 use crate::schema::QueryAccountDocumentData;
+use crate::schema::QueryAccountMonthlySummaryDocumentData;
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
 use application::repository::UserRepository;
 use async_trait::async_trait;
 use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::Precondition;
+use domain::Account;
 use domain::AccountEvent;
 use domain::AccountId;
+use domain::TransactionId;
 use domain::User;
 use domain::UserCommand;
 use domain::UserId;
@@ -160,6 +165,7 @@ impl AccountRepository for FirestoreAccountRepository {
         &self,
         account_id: &AccountId,
         events: Vec<AccountEvent>,
+        aggregate: &Account,
     ) -> Result<(), ApplicationError> {
         // オーナー変更を収集 (User 集約の更新に使用)
         let user_updates = Self::collect_user_updates(&events);
@@ -167,6 +173,7 @@ impl AccountRepository for FirestoreAccountRepository {
         let account_id_owned = *account_id;
         let events_clone = events.clone();
         let firestore = self.firestore.clone();
+        let aggregate_clone = aggregate.clone();
         Repository::save_events(
             self,
             *account_id,
@@ -178,6 +185,7 @@ impl AccountRepository for FirestoreAccountRepository {
                         &firestore,
                         &account_id_owned,
                         &events_clone,
+                        &aggregate_clone,
                         transaction,
                     )
                     .await?;
@@ -282,11 +290,28 @@ impl FirestoreAccountRepository {
         Ok(())
     }
 
+    /// 月別サマリードキュメントのパス: `accounts/{account_id}/stats/monthly`
+    fn monthly_summary_document_path(account_id: &AccountId) -> String {
+        format!("accounts/{}/stats/monthly", account_id)
+    }
+
+    /// 日付文字列 ("YYYY-MM-DD") から月キー ("YYYY-MM") を取得する
+    fn month_key_from_date(date: &str) -> String {
+        // date は "YYYY-MM-DD" 形式
+        date[..7].to_string()
+    }
+
+    /// 金額文字列を i64 にパースする
+    fn parse_amount(amount: &str) -> i64 {
+        amount.parse::<i64>().unwrap_or(0)
+    }
+
     /// `accounts/*` への書き込みをトランザクション内で実行する
     async fn build_query_account_writes_in_tx(
         firestore: &Firestore,
         account_id: &AccountId,
         events: &[AccountEvent],
+        aggregate: &Account,
         transaction: &mut bouzuya_firestore_client::Transaction,
     ) -> Result<(), bouzuya_firestore_client::Error> {
         // accounts/{account_id}/events/{event_id} へのイベント書き込み
@@ -355,6 +380,151 @@ impl FirestoreAccountRepository {
             }
         }
 
+        // 月別サマリーの更新
+        Self::update_monthly_summary_in_tx(firestore, account_id, events, aggregate, transaction)
+            .await?;
+
+        Ok(())
+    }
+
+    /// 月別サマリードキュメントをトランザクション内で更新する
+    async fn update_monthly_summary_in_tx(
+        firestore: &Firestore,
+        account_id: &AccountId,
+        events: &[AccountEvent],
+        aggregate: &Account,
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
+        // トランザクション関連のイベントがあるか確認
+        let has_transaction_events = events.iter().any(|e| {
+            matches!(
+                e,
+                AccountEvent::TransactionAdded { .. }
+                    | AccountEvent::TransactionUpdated { .. }
+                    | AccountEvent::TransactionDeleted { .. }
+            )
+        });
+        if !has_transaction_events {
+            return Ok(());
+        }
+
+        // 既存のサマリードキュメントを読み込む
+        let document_path = Self::monthly_summary_document_path(account_id);
+        let document_ref = firestore.doc(document_path)?;
+        let document_snapshot = transaction.get(&document_ref).await?;
+
+        let mut summary = match document_snapshot.data::<QueryAccountMonthlySummaryDocumentData>() {
+            Some(result) => result?,
+            None => QueryAccountMonthlySummaryDocumentData {
+                id: account_id.to_string(),
+                totals: BTreeMap::new(),
+            },
+        };
+        let is_update = document_snapshot
+            .data::<QueryAccountMonthlySummaryDocumentData>()
+            .is_some();
+
+        // 集約からトランザクションマップを取得
+        let transactions = match aggregate {
+            Account::Active { transactions, .. } => transactions,
+            Account::Empty => {
+                // Empty の場合はトランザクションイベントは発生しないはず
+                return Ok(());
+            }
+        };
+
+        // イベントに基づいてサマリーを更新
+        for event in events {
+            match event {
+                AccountEvent::TransactionAdded { props, .. } => {
+                    let month_key = Self::month_key_from_date(&props.date);
+                    let amount = Self::parse_amount(&props.amount);
+                    let current = summary
+                        .totals
+                        .get(&month_key)
+                        .map(|s| Self::parse_amount(s))
+                        .unwrap_or(0);
+                    summary
+                        .totals
+                        .insert(month_key, (current + amount).to_string());
+                }
+                AccountEvent::TransactionUpdated {
+                    transaction_id,
+                    props,
+                    ..
+                } => {
+                    // 旧トランザクションの金額・日付を集約から取得
+                    let tid: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id");
+                    if let Some(old_tx) = transactions.get(&tid) {
+                        // 旧月から減算
+                        let old_month_key = Self::month_key_from_date(&old_tx.date);
+                        let old_current = summary
+                            .totals
+                            .get(&old_month_key)
+                            .map(|s| Self::parse_amount(s))
+                            .unwrap_or(0);
+                        let old_amount = Self::parse_amount(&old_tx.amount);
+                        summary
+                            .totals
+                            .insert(old_month_key, (old_current - old_amount).to_string());
+                    }
+                    // 新月に加算
+                    let new_month_key = Self::month_key_from_date(&props.date);
+                    let new_current = summary
+                        .totals
+                        .get(&new_month_key)
+                        .map(|s| Self::parse_amount(s))
+                        .unwrap_or(0);
+                    let new_amount = Self::parse_amount(&props.amount);
+                    summary
+                        .totals
+                        .insert(new_month_key, (new_current + new_amount).to_string());
+                }
+                AccountEvent::TransactionDeleted { transaction_id, .. } => {
+                    // 旧トランザクションの金額・日付を集約から取得
+                    let tid: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id");
+                    if let Some(old_tx) = transactions.get(&tid) {
+                        let month_key = Self::month_key_from_date(&old_tx.date);
+                        let current = summary
+                            .totals
+                            .get(&month_key)
+                            .map(|s| Self::parse_amount(s))
+                            .unwrap_or(0);
+                        let amount = Self::parse_amount(&old_tx.amount);
+                        summary
+                            .totals
+                            .insert(month_key, (current - amount).to_string());
+                    }
+                }
+                AccountEvent::AccountCreated { .. }
+                | AccountEvent::AccountDeleted { .. }
+                | AccountEvent::AccountUpdated { .. }
+                | AccountEvent::CategoryAdded { .. }
+                | AccountEvent::CategoryDeleted { .. }
+                | AccountEvent::CategoryUpdated { .. }
+                | AccountEvent::OwnerAdded { .. }
+                | AccountEvent::OwnerRemoved { .. } => {}
+            }
+        }
+
+        // サマリードキュメントを書き込む
+        if is_update {
+            transaction.update(
+                &document_ref,
+                &summary,
+                Precondition {
+                    exists: Some(true),
+                    last_update_time: None,
+                },
+            )?;
+        } else {
+            transaction.create(&document_ref, &summary)?;
+        }
+
         Ok(())
     }
 }
@@ -413,7 +583,8 @@ mod tests {
         let account_id = AccountId::generate();
         let event = account_created_event(&account_id, "evt-001", "2024-01-01T00:00:00Z");
 
-        AccountRepository::save_events(&repo, &account_id, vec![event.clone()]).await?;
+        let aggregate = Account::Empty;
+        AccountRepository::save_events(&repo, &account_id, vec![event.clone()], &aggregate).await?;
         let loaded = AccountRepository::load_events(&repo, &account_id).await?;
 
         assert_eq!(loaded, vec![event]);
@@ -435,8 +606,12 @@ mod tests {
             name: "更新後アカウント".to_string(),
         };
 
-        AccountRepository::save_events(&repo, &account_id, vec![event1.clone()]).await?;
-        AccountRepository::save_events(&repo, &account_id, vec![event2.clone()]).await?;
+        let aggregate = Account::Empty;
+        AccountRepository::save_events(&repo, &account_id, vec![event1.clone()], &aggregate)
+            .await?;
+        let aggregate = Account::from_events(vec![event1.clone()]);
+        AccountRepository::save_events(&repo, &account_id, vec![event2.clone()], &aggregate)
+            .await?;
 
         let loaded = AccountRepository::load_events(&repo, &account_id).await?;
 

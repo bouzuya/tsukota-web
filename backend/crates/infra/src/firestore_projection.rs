@@ -1,10 +1,13 @@
+use crate::schema::QueryAccountMonthlySummaryDocumentData;
 use crate::schema::QueryUserDocumentData;
 use application::error::ApplicationError;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
+use application::projection::MonthlySummaryProjection;
 use application::projection::TransactionProjection;
 use application::view::AccountView;
 use application::view::CategoryView;
+use application::view::MonthlySummaryView;
 use application::view::PaginatedList;
 use application::view::TransactionView;
 use async_trait::async_trait;
@@ -50,6 +53,15 @@ enum E {
 
     #[error("list event documents for account {0}")]
     ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("get monthly summary for account {0}")]
+    GetMonthlySummary(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("deserialize monthly summary for account {0}")]
+    DeserializeMonthlySummary(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid monthly summary document path for account {0}")]
+    InvalidMonthlySummaryDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
 }
 
 impl From<E> for ApplicationError {
@@ -75,6 +87,11 @@ impl FirestoreProjection {
     /// Get the path to an account document: `accounts/{accountId}`
     fn account_document_path(account_id: &AccountId) -> String {
         format!("accounts/{}", account_id)
+    }
+
+    /// 月別サマリードキュメントのパス: `accounts/{account_id}/stats/monthly`
+    fn monthly_summary_document_path(account_id: &AccountId) -> String {
+        format!("accounts/{}/stats/monthly", account_id)
     }
 
     /// Get the path to the events collection: `accounts/{accountId}/events`
@@ -463,5 +480,34 @@ impl TransactionProjection for FirestoreProjection {
         transactions.sort_by(|a, b| a.date.cmp(&b.date));
 
         Ok(transactions)
+    }
+}
+
+#[async_trait]
+impl MonthlySummaryProjection for FirestoreProjection {
+    async fn get_monthly_summary(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<MonthlySummaryView, ApplicationError> {
+        let document_reference = self
+            .firestore
+            .doc(Self::monthly_summary_document_path(account_id))
+            .map_err(|e| E::InvalidMonthlySummaryDocumentPath(*account_id, e))?;
+        let document_snapshot = document_reference
+            .get()
+            .await
+            .map_err(|e| E::GetMonthlySummary(*account_id, e))?;
+
+        let totals = document_snapshot
+            .data::<QueryAccountMonthlySummaryDocumentData>()
+            .transpose()
+            .map_err(|e| E::DeserializeMonthlySummary(*account_id, e))?
+            .map(|data| data.totals)
+            .unwrap_or_default();
+
+        Ok(MonthlySummaryView {
+            account_id: account_id.to_string(),
+            totals,
+        })
     }
 }

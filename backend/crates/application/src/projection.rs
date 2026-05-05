@@ -6,6 +6,7 @@ use domain::UserId;
 use crate::error::ApplicationError;
 use crate::view::AccountView;
 use crate::view::CategoryView;
+use crate::view::MonthlySummaryView;
 use crate::view::PaginatedList;
 use crate::view::TransactionView;
 
@@ -41,6 +42,16 @@ pub trait CategoryProjection: Send + Sync {
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<CategoryView>, ApplicationError>;
+}
+
+/// Projection trait for monthly summary read models
+#[async_trait]
+pub trait MonthlySummaryProjection: Send + Sync {
+    /// Get the monthly summary for an account
+    async fn get_monthly_summary(
+        &self,
+        account_id: &AccountId,
+    ) -> Result<MonthlySummaryView, ApplicationError>;
 }
 
 /// Projection trait for Transaction read models

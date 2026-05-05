@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
+use application::projection::MonthlySummaryProjection;
 use application::projection::TransactionProjection;
 use application::repository::AccountRepository;
 use application::repository::DeviceRepository;
@@ -18,6 +19,7 @@ use application::use_case::DeleteCategoryUseCase;
 use application::use_case::DeleteTransactionUseCase;
 use application::use_case::ExportTransactionsUseCase;
 use application::use_case::GetAccountUseCase;
+use application::use_case::GetMonthlySummaryUseCase;
 use application::use_case::ListAccountsUseCase;
 use application::use_case::ListCategoriesUseCase;
 use application::use_case::ListTransactionsUseCase;
@@ -51,6 +53,7 @@ pub struct AppState {
     // Query use cases
     pub list_accounts: ListAccountsUseCase,
     pub get_account: GetAccountUseCase,
+    pub get_monthly_summary: GetMonthlySummaryUseCase,
     pub list_categories: ListCategoriesUseCase,
     pub list_transactions: ListTransactionsUseCase,
     pub export_transactions: ExportTransactionsUseCase,
@@ -62,6 +65,7 @@ impl AppState {
         account_repository: Arc<dyn AccountRepository>,
         account_projection: Arc<dyn AccountProjection>,
         category_projection: Arc<dyn CategoryProjection>,
+        monthly_summary_projection: Arc<dyn MonthlySummaryProjection>,
         transaction_projection: Arc<dyn TransactionProjection>,
         device_repository: Arc<dyn DeviceRepository>,
         creator: Arc<dyn SessionTokenCreator>,
@@ -93,6 +97,10 @@ impl AppState {
             // Query use cases
             list_accounts: ListAccountsUseCase::new(account_projection.clone()),
             get_account: GetAccountUseCase::new(account_projection.clone()),
+            get_monthly_summary: GetMonthlySummaryUseCase::new(
+                account_projection.clone(),
+                monthly_summary_projection,
+            ),
             list_categories: ListCategoriesUseCase::new(
                 account_projection.clone(),
                 category_projection,
@@ -192,6 +200,12 @@ impl FromRef<AppState> for ListAccountsUseCase {
 impl FromRef<AppState> for GetAccountUseCase {
     fn from_ref(state: &AppState) -> Self {
         state.get_account.clone()
+    }
+}
+
+impl FromRef<AppState> for GetMonthlySummaryUseCase {
+    fn from_ref(state: &AppState) -> Self {
+        state.get_monthly_summary.clone()
     }
 }
 

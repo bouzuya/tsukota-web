@@ -7,6 +7,7 @@ use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
+use application::projection::MonthlySummaryProjection;
 use application::projection::TransactionProjection;
 use application::repository::AccountRepository;
 use application::repository::DeviceRepository;
@@ -67,6 +68,8 @@ async fn main() {
     let projection = FirestoreProjection::new(firestore.clone());
     let account_projection: Arc<dyn AccountProjection> = Arc::new(projection.clone());
     let category_projection: Arc<dyn CategoryProjection> = Arc::new(projection.clone());
+    let monthly_summary_projection: Arc<dyn MonthlySummaryProjection> =
+        Arc::new(projection.clone());
     let transaction_projection: Arc<dyn TransactionProjection> = Arc::new(projection);
 
     // Create session token creator and verifier
@@ -102,6 +105,7 @@ async fn main() {
         account_repository,
         account_projection,
         category_projection,
+        monthly_summary_projection,
         transaction_projection,
         device_repository,
         creator,

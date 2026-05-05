@@ -1,5 +1,7 @@
 //! Firestore ドキュメントのスキーマ定義
 
+use std::collections::BTreeMap;
+
 /// Account 集約のイベントストリームドキュメント (`aggregates/account/event_streams/{account_id}`)
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,4 +54,13 @@ pub struct QueryDeviceDocumentData {
 pub struct QueryUserDocumentData {
     pub account_ids: Vec<String>,
     pub id: String,
+}
+
+/// 月別サマリードキュメント (`accounts/{account_id}/stats/monthly`)
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryAccountMonthlySummaryDocumentData {
+    pub id: String,
+    /// 月別合計金額 ("YYYY-MM" -> 合計金額)
+    pub totals: BTreeMap<String, String>,
 }
