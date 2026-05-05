@@ -121,4 +121,3 @@ api → application → domain
 
 - 日本語でコメント・ドキュメントを書く、ただしコミットログは英語で書く
 - **テスト**: `anyhow::Result<()>` を返す、`unwrap()` を避ける
-- `@prompts/{N}.md` の形で指示されたときは、その変更のコミットログの案を `@prompts/{N}-commit.md` に作成する

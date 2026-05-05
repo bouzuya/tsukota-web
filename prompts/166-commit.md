@@ -1,1 +1,0 @@
-Apply Repository trait to FirestoreUserRepository
