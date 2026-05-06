@@ -12,6 +12,7 @@ bouzuya-firestore-client.workspace = true
 domain.workspace = true
 google-cloud-iam-credentials-v1 = "1"
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+openidconnect = "4"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
     "json",

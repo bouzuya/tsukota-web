@@ -56,6 +56,14 @@ pub struct QueryUserDocumentData {
     pub id: String,
 }
 
+/// Google sub と内部 UserId の対応ドキュメント (`google_user_map/{sub}`)
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryGoogleUserMapDocumentData {
+    pub google_user_id: String,
+    pub user_id: String,
+}
+
 /// 月別サマリードキュメント (`accounts/{account_id}/stats/monthly`)
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
