@@ -27,6 +27,8 @@ pub use self::value_objects::DeviceId;
 pub use self::value_objects::DeviceIdError;
 pub use self::value_objects::DeviceSecret;
 pub use self::value_objects::DeviceSecretError;
+pub use self::value_objects::GoogleUserId;
+pub use self::value_objects::GoogleUserIdError;
 pub use self::value_objects::TransactionId;
 pub use self::value_objects::TransactionIdError;
 pub use self::value_objects::UserId;
