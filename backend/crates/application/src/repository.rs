@@ -4,6 +4,7 @@ use domain::AccountEvent;
 use domain::AccountId;
 use domain::DeviceEvent;
 use domain::DeviceId;
+use domain::GoogleUserId;
 use domain::UserEvent;
 use domain::UserId;
 
@@ -39,6 +40,24 @@ pub trait DeviceRepository: Send + Sync {
         &self,
         device_id: &DeviceId,
         events: Vec<DeviceEvent>,
+    ) -> Result<(), ApplicationError>;
+}
+
+/// Google sub と内部 UserId の対応を管理するサイドインデックス
+#[async_trait]
+pub trait GoogleUserMapRepository: Send + Sync {
+    /// Google の sub から内部 UserId を引く。未登録は Ok(None)
+    async fn find_user_id_by_google_user_id(
+        &self,
+        google_user_id: &GoogleUserId,
+    ) -> Result<Option<UserId>, ApplicationError>;
+
+    /// Google の sub と内部 UserId の対応を新規登録する。
+    /// 既存の場合は ApplicationError::GoogleUser(GoogleUserError::AlreadyRegistered) を返す
+    async fn save(
+        &self,
+        google_user_id: &GoogleUserId,
+        user_id: &UserId,
     ) -> Result<(), ApplicationError>;
 }
 

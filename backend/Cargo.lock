@@ -48,6 +48,7 @@ dependencies = [
  "domain",
  "serde",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 

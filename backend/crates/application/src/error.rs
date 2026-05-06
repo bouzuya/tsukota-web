@@ -1,5 +1,16 @@
 use domain::AccountError;
 
+/// Google アカウント関連のエラー
+#[derive(Debug, thiserror::Error)]
+pub enum GoogleUserError {
+    /// signin に対応する Google アカウントが未登録
+    #[error("Google user not registered")]
+    NotRegistered,
+    /// signup で既に登録済みの Google アカウント
+    #[error("Google user already registered")]
+    AlreadyRegistered,
+}
+
 /// Application layer errors
 #[derive(Debug, thiserror::Error)]
 pub enum ApplicationError {
@@ -26,6 +37,9 @@ pub enum ApplicationError {
 
     #[error("User error: {0}")]
     User(#[source] domain::UserError),
+
+    #[error("Google user error: {0}")]
+    GoogleUser(#[source] GoogleUserError),
 
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
