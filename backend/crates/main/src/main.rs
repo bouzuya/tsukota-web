@@ -3,6 +3,9 @@ use std::sync::Arc;
 mod env;
 
 use api::AppState;
+use api::BasePath;
+use api::CookieKey;
+use api::IsProd;
 use application::SessionTokenCreator;
 use application::SessionTokenVerifier;
 use application::projection::AccountProjection;
@@ -100,6 +103,13 @@ async fn main() {
             }
         };
 
+    // Cookie 署名鍵を hex 文字列から復元
+    let cookie_key_bytes =
+        hex::decode(&env.cookie_signing_secret).expect("COOKIE_SIGNING_SECRET must be valid hex");
+    let cookie_key = CookieKey::from_bytes(&cookie_key_bytes);
+    let base_path = BasePath(env.base_path.clone());
+    let is_prod = IsProd(env.is_prod);
+
     // Create application state
     let state = AppState::new(
         account_repository,
@@ -111,6 +121,9 @@ async fn main() {
         creator,
         verifier,
         user_repository,
+        base_path,
+        cookie_key,
+        is_prod,
     );
 
     tracing::info!("アプリケーションの初期化が完了しました");

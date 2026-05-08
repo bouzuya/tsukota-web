@@ -65,11 +65,9 @@ impl IntoResponse for ApiError {
                 "user_error",
                 "An internal user error occurred".to_owned(),
             ),
-            ApplicationError::GoogleUser(err) => (
-                StatusCode::FORBIDDEN,
-                "google_user_error",
-                err.to_string(),
-            ),
+            ApplicationError::GoogleUser(err) => {
+                (StatusCode::FORBIDDEN, "google_user_error", err.to_string())
+            }
         };
 
         let body = json!({

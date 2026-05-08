@@ -133,10 +133,7 @@ mod tests {
 
     #[async_trait]
     impl UserRepository for InMemoryUserRepo {
-        async fn load_events(
-            &self,
-            user_id: &UserId,
-        ) -> Result<Vec<UserEvent>, ApplicationError> {
+        async fn load_events(&self, user_id: &UserId) -> Result<Vec<UserEvent>, ApplicationError> {
             let events = self.events.lock().expect("poisoned");
             Ok(events
                 .iter()

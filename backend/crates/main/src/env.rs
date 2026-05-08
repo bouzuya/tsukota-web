@@ -4,10 +4,14 @@ use std::path::PathBuf;
 pub(crate) struct Env {
     /// ベースパス (デフォルト: "/lab/tsukota")
     pub(crate) base_path: String,
+    /// 署名 Cookie の HMAC 鍵 (hex 文字列、≥64 byte 推奨)
+    pub(crate) cookie_signing_secret: String,
     /// Firestore エミュレーターのホスト (例: "localhost:8080")
     pub(crate) firestore_emulator_host: Option<String>,
     /// Cloud Run では metadata server から取得するので None
     pub(crate) google_application_credentials: Option<String>,
+    /// 本番環境かどうか (Cookie の Secure フラグ切替)
+    pub(crate) is_prod: bool,
     /// ポート番号 (デフォルト: 3000)
     pub(crate) port: u16,
     /// Firestore の接続先 プロジェクト ID
@@ -21,8 +25,15 @@ pub(crate) struct Env {
 impl Env {
     pub(crate) fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
         let base_path = std::env::var("BASE_PATH").unwrap_or_else(|_| "/lab/tsukota".to_owned());
+        let cookie_signing_secret = std::env::var("COOKIE_SIGNING_SECRET")
+            .ok()
+            .ok_or("COOKIE_SIGNING_SECRET not set")?;
         let firestore_emulator_host = std::env::var("FIRESTORE_EMULATOR_HOST").ok();
         let google_application_credentials = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
+        let is_prod = std::env::var("IS_PROD")
+            .ok()
+            .map(|s| s == "true" || s == "1")
+            .unwrap_or(false);
         let port = std::env::var("PORT")
             .ok()
             .and_then(|s| s.parse::<u16>().ok())
@@ -37,8 +48,10 @@ impl Env {
             .ok_or("SERVICE_ACCOUNT_EMAIL not set")?;
         Ok(Self {
             base_path,
+            cookie_signing_secret,
             firestore_emulator_host,
             google_application_credentials,
+            is_prod,
             port,
             project_id,
             public_dir,
@@ -53,15 +66,20 @@ mod tests {
 
     use super::Env;
 
+    /// テスト用の COOKIE_SIGNING_SECRET (ダミーの hex 文字列)
+    const TEST_COOKIE_SECRET: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+
     /// 必須フィールドのみ設定したとき、省略可能フィールドはデフォルト値になる
     #[test]
     fn test_from_env_デフォルト値() -> anyhow::Result<()> {
         temp_env::with_vars(
             [
                 ("BASE_PATH", None),
+                ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
                 ("FIRESTORE_EMULATOR_HOST", None),
                 ("GOOGLE_APPLICATION_CREDENTIALS", None),
                 ("GOOGLE_CLOUD_PROJECT", None),
+                ("IS_PROD", None),
                 ("PORT", None),
                 ("PROJECT_ID", Some("test-project")),
                 ("PUBLIC_DIR", None),
@@ -71,8 +89,10 @@ mod tests {
                 let env = Env::from_env().map_err(|e| anyhow::anyhow!("{e}"))?;
 
                 assert_eq!(env.base_path, "/lab/tsukota");
+                assert_eq!(env.cookie_signing_secret, TEST_COOKIE_SECRET);
                 assert!(env.firestore_emulator_host.is_none());
                 assert!(env.google_application_credentials.is_none());
+                assert!(!env.is_prod);
                 assert_eq!(env.port, 3000);
                 assert_eq!(env.project_id, "test-project");
                 assert!(env.public_dir.is_none());
@@ -89,12 +109,14 @@ mod tests {
         temp_env::with_vars(
             [
                 ("BASE_PATH", Some("/custom/path")),
+                ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
                 ("FIRESTORE_EMULATOR_HOST", Some("localhost:8080")),
                 (
                     "GOOGLE_APPLICATION_CREDENTIALS",
                     Some("/path/to/creds.json"),
                 ),
                 ("GOOGLE_CLOUD_PROJECT", None),
+                ("IS_PROD", Some("true")),
                 ("PORT", Some("8000")),
                 ("PROJECT_ID", Some("my-project")),
                 ("PUBLIC_DIR", Some("/var/www")),
@@ -107,6 +129,7 @@ mod tests {
                 let env = Env::from_env().map_err(|e| anyhow::anyhow!("{e}"))?;
 
                 assert_eq!(env.base_path, "/custom/path");
+                assert!(env.is_prod);
                 assert_eq!(env.port, 8000);
                 assert_eq!(
                     env.google_application_credentials,
@@ -133,6 +156,7 @@ mod tests {
     fn test_from_env_google_cloud_project優先() -> anyhow::Result<()> {
         temp_env::with_vars(
             [
+                ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
                 ("GOOGLE_CLOUD_PROJECT", Some("gcp-project")),
                 ("PROJECT_ID", Some("other-project")),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
@@ -150,6 +174,7 @@ mod tests {
     fn test_from_env_project_id未設定() -> anyhow::Result<()> {
         temp_env::with_vars(
             [
+                ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
                 ("GOOGLE_CLOUD_PROJECT", None),
                 ("PROJECT_ID", None),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
@@ -166,8 +191,25 @@ mod tests {
     fn test_from_env_service_account_email未設定() -> anyhow::Result<()> {
         temp_env::with_vars(
             [
+                ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
                 ("PROJECT_ID", Some("test-project")),
                 ("SERVICE_ACCOUNT_EMAIL", None),
+            ],
+            || {
+                assert!(Env::from_env().is_err());
+                Ok(())
+            },
+        )
+    }
+
+    /// COOKIE_SIGNING_SECRET が未設定のときエラーになる
+    #[test]
+    fn test_from_env_cookie_signing_secret未設定() -> anyhow::Result<()> {
+        temp_env::with_vars(
+            [
+                ("COOKIE_SIGNING_SECRET", None),
+                ("PROJECT_ID", Some("test-project")),
+                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
             || {
                 assert!(Env::from_env().is_err());

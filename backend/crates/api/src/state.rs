@@ -30,11 +30,26 @@ use application::use_case::UpdateTransactionUseCase;
 use application::use_case::VerifySessionTokenUseCase;
 use axum::extract::FromRef;
 
+use crate::cookie_jar::BasePath;
+use crate::cookie_jar::CookieKey;
+use crate::cookie_jar::IsProd;
+
 /// Application state holding all use cases
 #[derive(Clone)]
 pub struct AppState {
     // Auth use cases
     pub verify_session_token: VerifySessionTokenUseCase,
+
+    /// Cookie の Path 属性に使うベースパス
+    pub base_path: BasePath,
+
+    /// 署名 Cookie の HMAC 鍵
+    ///
+    /// `SignedCookieJar` 経由で OIDC 認証フローの一時 Cookie と session Cookie を扱う
+    pub cookie_key: CookieKey,
+
+    /// 本番環境かどうか (Cookie の Secure 切替に使う)
+    pub is_prod: IsProd,
 
     // Command use cases
     pub create_account: CreateAccountUseCase,
@@ -71,10 +86,18 @@ impl AppState {
         creator: Arc<dyn SessionTokenCreator>,
         verifier: Arc<dyn SessionTokenVerifier>,
         user_repository: Arc<dyn UserRepository>,
+        base_path: BasePath,
+        cookie_key: CookieKey,
+        is_prod: IsProd,
     ) -> Self {
         Self {
             // Auth use cases
             verify_session_token: VerifySessionTokenUseCase::new(verifier),
+
+            // Cookie 関連
+            base_path,
+            cookie_key,
+            is_prod,
 
             // Command use cases
             create_account: CreateAccountUseCase::new(account_repository.clone()),
@@ -230,5 +253,23 @@ impl FromRef<AppState> for ExportTransactionsUseCase {
 impl FromRef<AppState> for VerifySessionTokenUseCase {
     fn from_ref(state: &AppState) -> Self {
         state.verify_session_token.clone()
+    }
+}
+
+impl FromRef<AppState> for BasePath {
+    fn from_ref(state: &AppState) -> Self {
+        state.base_path.clone()
+    }
+}
+
+impl FromRef<AppState> for CookieKey {
+    fn from_ref(state: &AppState) -> Self {
+        state.cookie_key.clone()
+    }
+}
+
+impl FromRef<AppState> for IsProd {
+    fn from_ref(state: &AppState) -> Self {
+        state.is_prod
     }
 }
