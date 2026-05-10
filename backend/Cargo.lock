@@ -35,6 +35,7 @@ dependencies = [
  "axum",
  "axum-extra",
  "cookie",
+ "domain",
  "serde",
  "serde_json",
  "tokio",

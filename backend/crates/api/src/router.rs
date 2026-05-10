@@ -10,6 +10,8 @@ use tower_http::trace::TraceLayer;
 use crate::handler;
 use crate::state::AppState;
 
+pub(crate) mod auth;
+
 /// API ルーターを作成する
 ///
 /// # Arguments
