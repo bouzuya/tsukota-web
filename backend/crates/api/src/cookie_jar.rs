@@ -277,7 +277,7 @@ mod tests {
 
     impl FromRef<AppStateForTest> for IsProd {
         fn from_ref(state: &AppStateForTest) -> Self {
-            state.is_prod.clone()
+            state.is_prod
         }
     }
 

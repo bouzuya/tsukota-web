@@ -41,9 +41,9 @@ impl GoogleUserMapRepository for FirestoreGoogleUserMapRepository {
                     Box::pin(async move {
                         let document_ref = firestore.doc(document_path)?;
                         let snapshot = transaction.get(&document_ref).await?;
-                        Ok(snapshot
+                        snapshot
                             .data::<QueryGoogleUserMapDocumentData>()
-                            .transpose()?)
+                            .transpose()
                     })
                 },
                 TransactionOptions::default(),

@@ -12,6 +12,14 @@ pub(crate) struct Env {
     pub(crate) google_application_credentials: Option<String>,
     /// 本番環境かどうか (Cookie の Secure フラグ切替)
     pub(crate) is_prod: bool,
+    /// Google OAuth クライアント ID
+    pub(crate) oidc_client_id: String,
+    /// Google OAuth クライアントシークレット
+    pub(crate) oidc_client_secret: String,
+    /// OIDC issuer の URL (デフォルト: "https://accounts.google.com")
+    pub(crate) oidc_issuer_url: String,
+    /// callback の絶対 URL (Google Console の Authorized redirect URIs に登録した値)
+    pub(crate) oidc_redirect_uri: String,
     /// ポート番号 (デフォルト: 3000)
     pub(crate) port: u16,
     /// Firestore の接続先 プロジェクト ID
@@ -34,6 +42,17 @@ impl Env {
             .ok()
             .map(|s| s == "true" || s == "1")
             .unwrap_or(false);
+        let oidc_client_id = std::env::var("OIDC_CLIENT_ID")
+            .ok()
+            .ok_or("OIDC_CLIENT_ID not set")?;
+        let oidc_client_secret = std::env::var("OIDC_CLIENT_SECRET")
+            .ok()
+            .ok_or("OIDC_CLIENT_SECRET not set")?;
+        let oidc_issuer_url = std::env::var("OIDC_ISSUER_URL")
+            .unwrap_or_else(|_| "https://accounts.google.com".to_owned());
+        let oidc_redirect_uri = std::env::var("OIDC_REDIRECT_URI")
+            .ok()
+            .ok_or("OIDC_REDIRECT_URI not set")?;
         let port = std::env::var("PORT")
             .ok()
             .and_then(|s| s.parse::<u16>().ok())
@@ -52,6 +71,10 @@ impl Env {
             firestore_emulator_host,
             google_application_credentials,
             is_prod,
+            oidc_client_id,
+            oidc_client_secret,
+            oidc_issuer_url,
+            oidc_redirect_uri,
             port,
             project_id,
             public_dir,
@@ -68,6 +91,9 @@ mod tests {
 
     /// テスト用の COOKIE_SIGNING_SECRET (ダミーの hex 文字列)
     const TEST_COOKIE_SECRET: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+    const TEST_OIDC_CLIENT_ID: &str = "client-id.apps.googleusercontent.com";
+    const TEST_OIDC_CLIENT_SECRET: &str = "GOCSPX-test-secret";
+    const TEST_OIDC_REDIRECT_URI: &str = "http://localhost:5173/lab/tsukota/auth/callback";
 
     /// 必須フィールドのみ設定したとき、省略可能フィールドはデフォルト値になる
     #[test]
@@ -80,6 +106,10 @@ mod tests {
                 ("GOOGLE_APPLICATION_CREDENTIALS", None),
                 ("GOOGLE_CLOUD_PROJECT", None),
                 ("IS_PROD", None),
+                ("OIDC_CLIENT_ID", Some(TEST_OIDC_CLIENT_ID)),
+                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
+                ("OIDC_ISSUER_URL", None),
+                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PORT", None),
                 ("PROJECT_ID", Some("test-project")),
                 ("PUBLIC_DIR", None),
@@ -93,6 +123,10 @@ mod tests {
                 assert!(env.firestore_emulator_host.is_none());
                 assert!(env.google_application_credentials.is_none());
                 assert!(!env.is_prod);
+                assert_eq!(env.oidc_client_id, TEST_OIDC_CLIENT_ID);
+                assert_eq!(env.oidc_client_secret, TEST_OIDC_CLIENT_SECRET);
+                assert_eq!(env.oidc_issuer_url, "https://accounts.google.com");
+                assert_eq!(env.oidc_redirect_uri, TEST_OIDC_REDIRECT_URI);
                 assert_eq!(env.port, 3000);
                 assert_eq!(env.project_id, "test-project");
                 assert!(env.public_dir.is_none());
@@ -117,6 +151,10 @@ mod tests {
                 ),
                 ("GOOGLE_CLOUD_PROJECT", None),
                 ("IS_PROD", Some("true")),
+                ("OIDC_CLIENT_ID", Some(TEST_OIDC_CLIENT_ID)),
+                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
+                ("OIDC_ISSUER_URL", Some("https://example.com")),
+                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PORT", Some("8000")),
                 ("PROJECT_ID", Some("my-project")),
                 ("PUBLIC_DIR", Some("/var/www")),
@@ -130,6 +168,7 @@ mod tests {
 
                 assert_eq!(env.base_path, "/custom/path");
                 assert!(env.is_prod);
+                assert_eq!(env.oidc_issuer_url, "https://example.com");
                 assert_eq!(env.port, 8000);
                 assert_eq!(
                     env.google_application_credentials,
@@ -158,6 +197,9 @@ mod tests {
             [
                 ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
                 ("GOOGLE_CLOUD_PROJECT", Some("gcp-project")),
+                ("OIDC_CLIENT_ID", Some(TEST_OIDC_CLIENT_ID)),
+                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
+                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", Some("other-project")),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
@@ -176,6 +218,9 @@ mod tests {
             [
                 ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
                 ("GOOGLE_CLOUD_PROJECT", None),
+                ("OIDC_CLIENT_ID", Some(TEST_OIDC_CLIENT_ID)),
+                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
+                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", None),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
@@ -192,6 +237,9 @@ mod tests {
         temp_env::with_vars(
             [
                 ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
+                ("OIDC_CLIENT_ID", Some(TEST_OIDC_CLIENT_ID)),
+                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
+                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", Some("test-project")),
                 ("SERVICE_ACCOUNT_EMAIL", None),
             ],
@@ -208,6 +256,28 @@ mod tests {
         temp_env::with_vars(
             [
                 ("COOKIE_SIGNING_SECRET", None),
+                ("OIDC_CLIENT_ID", Some(TEST_OIDC_CLIENT_ID)),
+                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
+                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
+                ("PROJECT_ID", Some("test-project")),
+                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
+            ],
+            || {
+                assert!(Env::from_env().is_err());
+                Ok(())
+            },
+        )
+    }
+
+    /// OIDC_CLIENT_ID が未設定のときエラーになる
+    #[test]
+    fn test_from_env_oidc_client_id未設定() -> anyhow::Result<()> {
+        temp_env::with_vars(
+            [
+                ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
+                ("OIDC_CLIENT_ID", None),
+                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
+                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", Some("test-project")),
                 ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],

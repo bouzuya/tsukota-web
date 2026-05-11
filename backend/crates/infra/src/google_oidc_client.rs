@@ -12,10 +12,32 @@ use openidconnect::Nonce;
 use openidconnect::PkceCodeChallenge;
 use openidconnect::PkceCodeVerifier;
 use openidconnect::RedirectUrl;
-use openidconnect::Scope;
 use openidconnect::core::CoreAuthenticationFlow;
 use openidconnect::core::CoreClient;
 use openidconnect::core::CoreProviderMetadata;
+
+/// 起動時に discover した Google OIDC メタデータを持つ `openidconnect::Client` の型エイリアス
+///
+/// 型パラメータが多いため alias で隠蔽する
+type ConfiguredCoreClient = openidconnect::Client<
+    openidconnect::EmptyAdditionalClaims,
+    openidconnect::core::CoreAuthDisplay,
+    openidconnect::core::CoreGenderClaim,
+    openidconnect::core::CoreJweContentEncryptionAlgorithm,
+    openidconnect::core::CoreJsonWebKey,
+    openidconnect::core::CoreAuthPrompt,
+    openidconnect::StandardErrorResponse<openidconnect::core::CoreErrorResponseType>,
+    openidconnect::core::CoreTokenResponse,
+    openidconnect::core::CoreTokenIntrospectionResponse,
+    openidconnect::core::CoreRevocableToken,
+    openidconnect::core::CoreRevocationErrorResponse,
+    openidconnect::EndpointSet,
+    openidconnect::EndpointNotSet,
+    openidconnect::EndpointNotSet,
+    openidconnect::EndpointNotSet,
+    openidconnect::EndpointMaybeSet,
+    openidconnect::EndpointMaybeSet,
+>;
 
 /// Google を IdP とする OIDC クライアントの実装
 ///
@@ -23,25 +45,7 @@ use openidconnect::core::CoreProviderMetadata;
 /// authorization code → id_token の交換 + 検証を行う
 #[derive(Clone)]
 pub struct GoogleOidcClient {
-    client: openidconnect::Client<
-        openidconnect::EmptyAdditionalClaims,
-        openidconnect::core::CoreAuthDisplay,
-        openidconnect::core::CoreGenderClaim,
-        openidconnect::core::CoreJweContentEncryptionAlgorithm,
-        openidconnect::core::CoreJsonWebKey,
-        openidconnect::core::CoreAuthPrompt,
-        openidconnect::StandardErrorResponse<openidconnect::core::CoreErrorResponseType>,
-        openidconnect::core::CoreTokenResponse,
-        openidconnect::core::CoreTokenIntrospectionResponse,
-        openidconnect::core::CoreRevocableToken,
-        openidconnect::core::CoreRevocationErrorResponse,
-        openidconnect::EndpointSet,
-        openidconnect::EndpointNotSet,
-        openidconnect::EndpointNotSet,
-        openidconnect::EndpointNotSet,
-        openidconnect::EndpointMaybeSet,
-        openidconnect::EndpointMaybeSet,
-    >,
+    client: ConfiguredCoreClient,
     http_client: reqwest::Client,
 }
 
@@ -75,6 +79,7 @@ impl GoogleOidcClient {
 impl OidcClient for GoogleOidcClient {
     fn authorize_url(&self) -> Result<AuthorizationRequest, OidcError> {
         let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
+        // openidconnect crate が `openid` scope を自動付与するので明示追加はしない
         let (auth_url, state, nonce) = self
             .client
             .authorize_url(
@@ -82,7 +87,6 @@ impl OidcClient for GoogleOidcClient {
                 CsrfToken::new_random,
                 Nonce::new_random,
             )
-            .add_scope(Scope::new("openid".to_owned()))
             .set_pkce_challenge(challenge)
             .url();
         Ok(AuthorizationRequest {

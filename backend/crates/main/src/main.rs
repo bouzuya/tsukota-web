@@ -3,6 +3,7 @@ use std::sync::Arc;
 mod env;
 
 use api::AppState;
+use api::AuthState;
 use api::BasePath;
 use api::CookieKey;
 use api::IsProd;
@@ -14,14 +15,19 @@ use application::projection::MonthlySummaryProjection;
 use application::projection::TransactionProjection;
 use application::repository::AccountRepository;
 use application::repository::DeviceRepository;
+use application::repository::GoogleUserMapRepository;
 use application::repository::UserRepository;
+use application::use_case::SignInWithGoogleUseCase;
+use application::use_case::SignUpWithGoogleUseCase;
 use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::FirestoreOptions;
 use env::Env;
 use infra::FirestoreAccountRepository;
 use infra::FirestoreDeviceRepository;
+use infra::FirestoreGoogleUserMapRepository;
 use infra::FirestoreProjection;
 use infra::FirestoreUserRepository;
+use infra::GoogleOidcClient;
 use infra::IamSessionTokenCreator;
 use infra::IamSessionTokenVerifier;
 use infra::PemSessionTokenCreator;
@@ -66,6 +72,8 @@ async fn main() {
         Arc::new(FirestoreDeviceRepository::new(firestore.clone()));
     let user_repository: Arc<dyn UserRepository> =
         Arc::new(FirestoreUserRepository::new(firestore.clone()));
+    let google_user_map_repository: Arc<dyn GoogleUserMapRepository> =
+        Arc::new(FirestoreGoogleUserMapRepository::new(firestore.clone()));
 
     // Create projections with Arc<dyn T>
     let projection = FirestoreProjection::new(firestore.clone());
@@ -75,7 +83,7 @@ async fn main() {
         Arc::new(projection.clone());
     let transaction_projection: Arc<dyn TransactionProjection> = Arc::new(projection);
 
-    // Create session token creator and verifier
+    // Create session token creator and verifier (旧 Bearer 認証用、Step 8/9 で削除予定)
     let (creator, verifier): (Arc<dyn SessionTokenCreator>, Arc<dyn SessionTokenVerifier>) =
         match env.google_application_credentials {
             Some(google_application_credentials) => {
@@ -103,12 +111,28 @@ async fn main() {
             }
         };
 
-    // Cookie 署名鍵を hex 文字列から復元
+    // OIDC client を起動時に discover
+    let oidc_client = GoogleOidcClient::discover(
+        &env.oidc_issuer_url,
+        &env.oidc_client_id,
+        &env.oidc_client_secret,
+        &env.oidc_redirect_uri,
+    )
+    .await
+    .expect("Failed to discover OIDC provider metadata");
+    let oidc_client: Arc<dyn application::OidcClient> = Arc::new(oidc_client);
+
+    // Cookie 関連の値を構築
     let cookie_key_bytes =
         hex::decode(&env.cookie_signing_secret).expect("COOKIE_SIGNING_SECRET must be valid hex");
     let cookie_key = CookieKey::from_bytes(&cookie_key_bytes);
     let base_path = BasePath(env.base_path.clone());
     let is_prod = IsProd(env.is_prod);
+
+    // Google サインイン / サインアップ use case
+    let sign_in_with_google = SignInWithGoogleUseCase::new(google_user_map_repository.clone());
+    let sign_up_with_google =
+        SignUpWithGoogleUseCase::new(google_user_map_repository, user_repository.clone());
 
     // Create application state
     let state = AppState::new(
@@ -121,13 +145,30 @@ async fn main() {
         creator,
         verifier,
         user_repository,
-        base_path,
+        base_path.clone(),
+        cookie_key.clone(),
+        is_prod,
+    );
+
+    // Create auth state
+    let auth_state = AuthState::new(
+        oidc_client,
+        sign_in_with_google,
+        sign_up_with_google,
         cookie_key,
+        base_path,
         is_prod,
     );
 
     tracing::info!("アプリケーションの初期化が完了しました");
 
     // Run the server
-    api::run(state, env.port, env.public_dir.as_deref(), &env.base_path).await;
+    api::run(
+        state,
+        auth_state,
+        env.port,
+        env.public_dir.as_deref(),
+        &env.base_path,
+    )
+    .await;
 }
