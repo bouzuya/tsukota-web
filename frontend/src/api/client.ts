@@ -13,7 +13,7 @@ export class ApiError extends Error {
 	}
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/lab/tsukota";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "/lab/tsukota/api";
 
 function getHeaders(): Record<string, string> {
 	const headers: Record<string, string> = {

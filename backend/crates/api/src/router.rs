@@ -76,7 +76,9 @@ pub fn create_router(
 
     let auth_router = Router::new().nest("/auth", create_auth_router(auth_state));
 
-    let app = api_router
+    // API ルートは `/api` 配下に集約する。`/auth` は base_path 直下に置く
+    let app = Router::new()
+        .nest("/api", api_router)
         .merge(auth_router)
         .layer(TraceLayer::new_for_http());
 
