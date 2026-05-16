@@ -47,6 +47,14 @@ impl CookieKey {
     pub fn generate() -> Self {
         Self(Key::generate())
     }
+
+    /// マスター鍵の生バイト列を返す (64 byte)
+    ///
+    /// `Key::master` に転送する。`COOKIE_SIGNING_SECRET` 用に hex 化して
+    /// 出力する CLI サブコマンドなどで利用する。
+    pub fn master(&self) -> &[u8] {
+        self.0.master()
+    }
 }
 
 impl From<CookieKey> for Key {

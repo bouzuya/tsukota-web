@@ -27,6 +27,22 @@ use infra::GoogleOidcClient;
 
 #[tokio::main]
 async fn main() {
+    // サブコマンド解決。第 1 引数が既知のサブコマンド名なら専用処理を実行して終了する。
+    // 未指定または未知の場合は従来通りサーバーを起動する。
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
+        Some("generate-cookie-key") => {
+            // 新しい署名鍵 (64 byte) を生成し hex 化して標準出力に書き出す。
+            // 出力は `COOKIE_SIGNING_SECRET` にそのまま設定できる形式。
+            let key = CookieKey::generate();
+            println!("{}", hex::encode(key.master()));
+            return;
+        }
+        Some(_) | None => {
+            // フォールスルー: 従来通りサーバーを起動する
+        }
+    }
+
     // tracing の初期化
     tracing_subscriber::fmt()
         .with_env_filter(
