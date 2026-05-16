@@ -9,6 +9,9 @@ use crate::cookie_jar::CookieJar;
 use crate::error::AuthError;
 
 /// Authenticated user extracted from request
+///
+/// Step B で削除予定。それまでの暫定で dead_code 警告を抑制している
+#[allow(dead_code)]
 pub(crate) struct AuthUser(pub(crate) UserId);
 
 impl<S> FromRequestParts<S> for AuthUser
@@ -49,9 +52,6 @@ where
 ///
 /// OIDC callback で発行された Cookie を `CookieJar` 経由で取り出し、
 /// `UserId` にパースする。失敗時は 401 を返す。
-///
-/// Step 7 でハンドラを `AuthUser` から `CurrentUserId` に切り替える時に参照される
-#[allow(dead_code)]
 pub(crate) struct CurrentUserId(pub(crate) UserId);
 
 impl<S> FromRequestParts<S> for CurrentUserId

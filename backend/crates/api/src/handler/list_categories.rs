@@ -6,11 +6,11 @@ use axum::extract::Path;
 use axum::extract::State;
 
 use crate::error::ApiError;
-use crate::extractor::AuthUser;
+use crate::extractor::CurrentUserId;
 
 pub async fn list_categories(
     State(use_case): State<ListCategoriesUseCase>,
-    AuthUser(user_id): AuthUser,
+    CurrentUserId(user_id): CurrentUserId,
     Path(account_id): Path<String>,
 ) -> Result<Json<ListCategoriesResponse>, ApiError> {
     let request = ListCategoriesRequest { account_id };

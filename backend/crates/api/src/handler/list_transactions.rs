@@ -8,7 +8,7 @@ use axum::extract::State;
 use serde::Deserialize;
 
 use crate::error::ApiError;
-use crate::extractor::AuthUser;
+use crate::extractor::CurrentUserId;
 
 const DEFAULT_PAGE_SIZE: usize = 20;
 
@@ -19,7 +19,7 @@ pub struct ListTransactionsParams {
 
 pub async fn list_transactions(
     State(use_case): State<ListTransactionsUseCase>,
-    AuthUser(user_id): AuthUser,
+    CurrentUserId(user_id): CurrentUserId,
     Path(account_id): Path<String>,
     Query(params): Query<ListTransactionsParams>,
 ) -> Result<Json<ListTransactionsResponse>, ApiError> {
