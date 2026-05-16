@@ -39,6 +39,14 @@ impl CookieKey {
     pub fn from_bytes(bytes: &[u8]) -> Self {
         Self(Key::from(bytes))
     }
+
+    /// 暗号学的乱数から鍵を生成する
+    ///
+    /// `Key::generate` に転送する。テストや開発環境で一時的な鍵が必要な
+    /// ときに使う。
+    pub fn generate() -> Self {
+        Self(Key::generate())
+    }
 }
 
 impl From<CookieKey> for Key {
@@ -299,6 +307,15 @@ mod tests {
             nonce: "test_nonce".to_owned(),
             pkce_verifier: "test_pkce_verifier".to_owned(),
         }
+    }
+
+    #[test]
+    fn test_generate_produces_different_keys() {
+        let key1 = CookieKey::generate();
+        let key2 = CookieKey::generate();
+        // `Key` の `PartialEq` は constant-time 比較。乱数生成が動いていれば
+        // 2 回の呼び出しで同じ鍵になる確率は無視できる
+        assert_ne!(key1.0, key2.0);
     }
 
     #[tokio::test]
