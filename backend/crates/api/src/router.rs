@@ -54,10 +54,6 @@ pub fn create_router(
         .route("/commands/add_owner", post(handler::add_owner))
         .route("/commands/add_transaction", post(handler::add_transaction))
         .route("/commands/create_account", post(handler::create_account))
-        .route(
-            "/commands/create_session_token",
-            post(handler::create_session_token),
-        )
         .route("/commands/delete_account", post(handler::delete_account))
         .route("/commands/delete_category", post(handler::delete_category))
         .route(

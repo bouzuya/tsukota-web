@@ -9,6 +9,7 @@ pub(crate) struct Env {
     /// Firestore エミュレーターのホスト (例: "localhost:8080")
     pub(crate) firestore_emulator_host: Option<String>,
     /// Cloud Run では metadata server から取得するので None
+    #[allow(dead_code)]
     pub(crate) google_application_credentials: Option<String>,
     /// 本番環境かどうか (Cookie の Secure フラグ切替)
     pub(crate) is_prod: bool,
@@ -26,8 +27,6 @@ pub(crate) struct Env {
     pub(crate) project_id: String,
     /// 静的ファイルのディレクトリ
     pub(crate) public_dir: Option<PathBuf>,
-    /// 署名に使用するサービスアカウントのメールアドレス
-    pub(crate) service_account_email: String,
 }
 
 impl Env {
@@ -62,9 +61,6 @@ impl Env {
             .ok()
             .ok_or("GOOGLE_CLOUD_PROJECT nor PROJECT_ID not set")?;
         let public_dir = std::env::var("PUBLIC_DIR").ok().map(PathBuf::from);
-        let service_account_email = std::env::var("SERVICE_ACCOUNT_EMAIL")
-            .ok()
-            .ok_or("SERVICE_ACCOUNT_EMAIL not set")?;
         Ok(Self {
             base_path,
             cookie_signing_secret,
@@ -78,7 +74,6 @@ impl Env {
             port,
             project_id,
             public_dir,
-            service_account_email,
         })
     }
 }
@@ -113,7 +108,6 @@ mod tests {
                 ("PORT", None),
                 ("PROJECT_ID", Some("test-project")),
                 ("PUBLIC_DIR", None),
-                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
             || {
                 let env = Env::from_env().map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -130,7 +124,6 @@ mod tests {
                 assert_eq!(env.port, 3000);
                 assert_eq!(env.project_id, "test-project");
                 assert!(env.public_dir.is_none());
-                assert_eq!(env.service_account_email, "test@example.com");
 
                 Ok(())
             },
@@ -158,10 +151,6 @@ mod tests {
                 ("PORT", Some("8000")),
                 ("PROJECT_ID", Some("my-project")),
                 ("PUBLIC_DIR", Some("/var/www")),
-                (
-                    "SERVICE_ACCOUNT_EMAIL",
-                    Some("sa@my-project.iam.gserviceaccount.com"),
-                ),
             ],
             || {
                 let env = Env::from_env().map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -171,19 +160,15 @@ mod tests {
                 assert_eq!(env.oidc_issuer_url, "https://example.com");
                 assert_eq!(env.port, 8000);
                 assert_eq!(
-                    env.google_application_credentials,
-                    Some("/path/to/creds.json".to_owned())
-                );
-                assert_eq!(
                     env.firestore_emulator_host,
                     Some("localhost:8080".to_owned())
                 );
+                assert_eq!(
+                    env.google_application_credentials,
+                    Some("/path/to/creds.json".to_owned())
+                );
                 assert_eq!(env.project_id, "my-project");
                 assert_eq!(env.public_dir, Some(PathBuf::from("/var/www")));
-                assert_eq!(
-                    env.service_account_email,
-                    "sa@my-project.iam.gserviceaccount.com"
-                );
 
                 Ok(())
             },
@@ -201,7 +186,6 @@ mod tests {
                 ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
                 ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", Some("other-project")),
-                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
             || {
                 let env = Env::from_env().map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -222,26 +206,6 @@ mod tests {
                 ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
                 ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", None),
-                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
-            ],
-            || {
-                assert!(Env::from_env().is_err());
-                Ok(())
-            },
-        )
-    }
-
-    /// SERVICE_ACCOUNT_EMAIL が未設定のときエラーになる
-    #[test]
-    fn test_from_env_service_account_email未設定() -> anyhow::Result<()> {
-        temp_env::with_vars(
-            [
-                ("COOKIE_SIGNING_SECRET", Some(TEST_COOKIE_SECRET)),
-                ("OIDC_CLIENT_ID", Some(TEST_OIDC_CLIENT_ID)),
-                ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
-                ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
-                ("PROJECT_ID", Some("test-project")),
-                ("SERVICE_ACCOUNT_EMAIL", None),
             ],
             || {
                 assert!(Env::from_env().is_err());
@@ -260,7 +224,6 @@ mod tests {
                 ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
                 ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", Some("test-project")),
-                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
             || {
                 assert!(Env::from_env().is_err());
@@ -279,7 +242,6 @@ mod tests {
                 ("OIDC_CLIENT_SECRET", Some(TEST_OIDC_CLIENT_SECRET)),
                 ("OIDC_REDIRECT_URI", Some(TEST_OIDC_REDIRECT_URI)),
                 ("PROJECT_ID", Some("test-project")),
-                ("SERVICE_ACCOUNT_EMAIL", Some("test@example.com")),
             ],
             || {
                 assert!(Env::from_env().is_err());

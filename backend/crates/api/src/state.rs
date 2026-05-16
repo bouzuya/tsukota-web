@@ -5,15 +5,10 @@ use application::projection::CategoryProjection;
 use application::projection::MonthlySummaryProjection;
 use application::projection::TransactionProjection;
 use application::repository::AccountRepository;
-use application::repository::DeviceRepository;
-use application::repository::UserRepository;
-use application::session_token::SessionTokenCreator;
-use application::session_token::SessionTokenVerifier;
 use application::use_case::AddCategoryUseCase;
 use application::use_case::AddOwnerUseCase;
 use application::use_case::AddTransactionUseCase;
 use application::use_case::CreateAccountUseCase;
-use application::use_case::CreateSessionTokenUseCase;
 use application::use_case::DeleteAccountUseCase;
 use application::use_case::DeleteCategoryUseCase;
 use application::use_case::DeleteTransactionUseCase;
@@ -27,7 +22,6 @@ use application::use_case::RemoveOwnerUseCase;
 use application::use_case::UpdateAccountUseCase;
 use application::use_case::UpdateCategoryUseCase;
 use application::use_case::UpdateTransactionUseCase;
-use application::use_case::VerifySessionTokenUseCase;
 use axum::extract::FromRef;
 
 use crate::cookie_jar::BasePath;
@@ -37,9 +31,6 @@ use crate::cookie_jar::IsProd;
 /// Application state holding all use cases
 #[derive(Clone)]
 pub struct AppState {
-    // Auth use cases
-    pub verify_session_token: VerifySessionTokenUseCase,
-
     /// Cookie の Path 属性に使うベースパス
     pub base_path: BasePath,
 
@@ -63,7 +54,6 @@ pub struct AppState {
     pub add_transaction: AddTransactionUseCase,
     pub update_transaction: UpdateTransactionUseCase,
     pub delete_transaction: DeleteTransactionUseCase,
-    pub create_session_token: CreateSessionTokenUseCase,
 
     // Query use cases
     pub list_accounts: ListAccountsUseCase,
@@ -82,18 +72,11 @@ impl AppState {
         category_projection: Arc<dyn CategoryProjection>,
         monthly_summary_projection: Arc<dyn MonthlySummaryProjection>,
         transaction_projection: Arc<dyn TransactionProjection>,
-        device_repository: Arc<dyn DeviceRepository>,
-        creator: Arc<dyn SessionTokenCreator>,
-        verifier: Arc<dyn SessionTokenVerifier>,
-        user_repository: Arc<dyn UserRepository>,
         base_path: BasePath,
         cookie_key: CookieKey,
         is_prod: IsProd,
     ) -> Self {
         Self {
-            // Auth use cases
-            verify_session_token: VerifySessionTokenUseCase::new(verifier),
-
             // Cookie 関連
             base_path,
             cookie_key,
@@ -111,11 +94,6 @@ impl AppState {
             add_transaction: AddTransactionUseCase::new(account_repository.clone()),
             update_transaction: UpdateTransactionUseCase::new(account_repository.clone()),
             delete_transaction: DeleteTransactionUseCase::new(account_repository),
-            create_session_token: CreateSessionTokenUseCase::new(
-                device_repository,
-                creator,
-                user_repository,
-            ),
 
             // Query use cases
             list_accounts: ListAccountsUseCase::new(account_projection.clone()),
@@ -208,12 +186,6 @@ impl FromRef<AppState> for DeleteTransactionUseCase {
     }
 }
 
-impl FromRef<AppState> for CreateSessionTokenUseCase {
-    fn from_ref(state: &AppState) -> Self {
-        state.create_session_token.clone()
-    }
-}
-
 impl FromRef<AppState> for ListAccountsUseCase {
     fn from_ref(state: &AppState) -> Self {
         state.list_accounts.clone()
@@ -247,12 +219,6 @@ impl FromRef<AppState> for ListTransactionsUseCase {
 impl FromRef<AppState> for ExportTransactionsUseCase {
     fn from_ref(state: &AppState) -> Self {
         state.export_transactions.clone()
-    }
-}
-
-impl FromRef<AppState> for VerifySessionTokenUseCase {
-    fn from_ref(state: &AppState) -> Self {
-        state.verify_session_token.clone()
     }
 }
 

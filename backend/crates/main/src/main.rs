@@ -7,14 +7,11 @@ use api::AuthState;
 use api::BasePath;
 use api::CookieKey;
 use api::IsProd;
-use application::SessionTokenCreator;
-use application::SessionTokenVerifier;
 use application::projection::AccountProjection;
 use application::projection::CategoryProjection;
 use application::projection::MonthlySummaryProjection;
 use application::projection::TransactionProjection;
 use application::repository::AccountRepository;
-use application::repository::DeviceRepository;
 use application::repository::GoogleUserMapRepository;
 use application::repository::UserRepository;
 use application::use_case::SignInWithGoogleUseCase;
@@ -23,16 +20,10 @@ use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::FirestoreOptions;
 use env::Env;
 use infra::FirestoreAccountRepository;
-use infra::FirestoreDeviceRepository;
 use infra::FirestoreGoogleUserMapRepository;
 use infra::FirestoreProjection;
 use infra::FirestoreUserRepository;
 use infra::GoogleOidcClient;
-use infra::IamSessionTokenCreator;
-use infra::IamSessionTokenVerifier;
-use infra::PemSessionTokenCreator;
-use infra::PemSessionTokenVerifier;
-use infra::ServiceAccountCredentials;
 
 #[tokio::main]
 async fn main() {
@@ -68,8 +59,6 @@ async fn main() {
     // Create repositories with Arc<dyn T>
     let account_repository: Arc<dyn AccountRepository> =
         Arc::new(FirestoreAccountRepository::new(firestore.clone()));
-    let device_repository: Arc<dyn DeviceRepository> =
-        Arc::new(FirestoreDeviceRepository::new(firestore.clone()));
     let user_repository: Arc<dyn UserRepository> =
         Arc::new(FirestoreUserRepository::new(firestore.clone()));
     let google_user_map_repository: Arc<dyn GoogleUserMapRepository> =
@@ -82,34 +71,6 @@ async fn main() {
     let monthly_summary_projection: Arc<dyn MonthlySummaryProjection> =
         Arc::new(projection.clone());
     let transaction_projection: Arc<dyn TransactionProjection> = Arc::new(projection);
-
-    // Create session token creator and verifier (旧 Bearer 認証用、Step 8/9 で削除予定)
-    let (creator, verifier): (Arc<dyn SessionTokenCreator>, Arc<dyn SessionTokenVerifier>) =
-        match env.google_application_credentials {
-            Some(google_application_credentials) => {
-                match ServiceAccountCredentials::load(google_application_credentials) {
-                    Ok(credentials) => {
-                        let creator = PemSessionTokenCreator::new(&credentials.private_key)
-                            .expect("Failed to create session token creator");
-                        let verifier = PemSessionTokenVerifier::new(&credentials.private_key)
-                            .expect("Failed to create session token verifier");
-                        (Arc::new(creator), Arc::new(verifier))
-                    }
-                    Err(e) => {
-                        tracing::error!("認証情報の読み込みに失敗しました: {}", e);
-                        std::process::exit(1);
-                    }
-                }
-            }
-            None => {
-                tracing::info!(
-                    "GOOGLE_APPLICATION_CREDENTIALS が未設定のため IamSessionTokenCreator を使用します"
-                );
-                let creator = IamSessionTokenCreator::new(env.service_account_email.clone());
-                let verifier = IamSessionTokenVerifier::new(env.service_account_email.clone());
-                (Arc::new(creator), Arc::new(verifier))
-            }
-        };
 
     // OIDC client を起動時に discover
     let oidc_client = GoogleOidcClient::discover(
@@ -132,7 +93,7 @@ async fn main() {
     // Google サインイン / サインアップ use case
     let sign_in_with_google = SignInWithGoogleUseCase::new(google_user_map_repository.clone());
     let sign_up_with_google =
-        SignUpWithGoogleUseCase::new(google_user_map_repository, user_repository.clone());
+        SignUpWithGoogleUseCase::new(google_user_map_repository, user_repository);
 
     // Create application state
     let state = AppState::new(
@@ -141,10 +102,6 @@ async fn main() {
         category_projection,
         monthly_summary_projection,
         transaction_projection,
-        device_repository,
-        creator,
-        verifier,
-        user_repository,
         base_path.clone(),
         cookie_key.clone(),
         is_prod,
