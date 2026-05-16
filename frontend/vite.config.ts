@@ -7,5 +7,15 @@ export default defineConfig({
 	plugins: [react()],
 	server: {
 		host: "0.0.0.0",
+		proxy: {
+			"/lab/tsukota/api": {
+				target: "http://localhost:3002",
+				changeOrigin: false,
+			},
+			"/lab/tsukota/auth": {
+				target: "http://localhost:3002",
+				changeOrigin: false,
+			},
+		},
 	},
 });

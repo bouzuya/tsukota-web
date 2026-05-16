@@ -127,13 +127,3 @@ export interface ApiDeleteTransactionCommand {
 	account_id: string;
 	transaction_id: string;
 }
-
-// Authentication
-export interface ApiCreateSessionTokenCommand {
-	device_id: string;
-	device_secret: string;
-}
-
-export interface ApiCreateSessionTokenResponse {
-	session_token: string;
-}

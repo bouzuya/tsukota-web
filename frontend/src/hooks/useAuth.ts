@@ -5,12 +5,10 @@ import { getMe } from "../api/getMe";
 import {
 	authLoadingAtom,
 	currentUserAtom,
-	getAuthToken,
 	isAuthenticatedAtom,
-	setAuthToken,
-	setDeviceId,
-	setDeviceSecret,
 } from "../atoms/auth";
+
+const SIGNOUT_URL = "/lab/tsukota/auth/signout";
 
 export function useAuth() {
 	const [currentUser, setCurrentUser] = useAtom(currentUserAtom);
@@ -21,33 +19,32 @@ export function useAuth() {
 	const checkAuth = useCallback(async () => {
 		setAuthLoading(true);
 
-		const authToken = getAuthToken();
-		if (authToken) {
-			try {
-				const meResponse = await getMe();
-				setCurrentUser({
-					id: meResponse.userId,
-					email: "",
-					displayName: meResponse.userId,
-					createdAt: new Date().toISOString(),
-				});
-			} catch {
-				// トークンが無効な場合はサインアウト状態にする
-				setCurrentUser(null);
-			}
-		} else {
+		try {
+			const meResponse = await getMe();
+			setCurrentUser({
+				id: meResponse.userId,
+				email: "",
+				displayName: meResponse.userId,
+				createdAt: new Date().toISOString(),
+			});
+		} catch {
+			// Cookie が無い or 失効
 			setCurrentUser(null);
 		}
 
 		setAuthLoading(false);
 	}, [setCurrentUser, setAuthLoading]);
 
-	const logout = useCallback(() => {
-		setAuthToken(null);
-		setDeviceId(null);
-		setDeviceSecret(null);
-		setCurrentUser(null);
-		navigate("/login");
+	const logout = useCallback(async () => {
+		try {
+			await fetch(SIGNOUT_URL, {
+				method: "POST",
+				credentials: "include",
+			});
+		} finally {
+			setCurrentUser(null);
+			navigate("/login");
+		}
 	}, [setCurrentUser, navigate]);
 
 	return {
