@@ -20,9 +20,6 @@ pub enum ApplicationError {
     #[error("Category not found: {0}")]
     CategoryNotFound(String),
 
-    #[error("Device error: {0}")]
-    Device(#[source] domain::DeviceError),
-
     #[error("Transaction not found: {0}")]
     TransactionNotFound(String),
 

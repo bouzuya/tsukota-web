@@ -1,5 +1,4 @@
 mod account;
-mod device;
 mod user;
 
 pub use self::account::Account;
@@ -10,11 +9,6 @@ pub use self::account::AccountEventCommonProps;
 pub use self::account::AccountEventTransactionProps;
 pub use self::account::Category;
 pub use self::account::Transaction;
-pub use self::device::Device;
-pub use self::device::DeviceCommand;
-pub use self::device::DeviceError;
-pub use self::device::DeviceEvent;
-pub use self::device::DeviceEventCommonProps;
 pub use self::user::User;
 pub use self::user::UserCommand;
 pub use self::user::UserError;

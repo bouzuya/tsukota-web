@@ -27,11 +27,6 @@ impl IntoResponse for ApiError {
                 "category_not_found",
                 format!("The specified category was not found: {}", id),
             ),
-            ApplicationError::Device(_err) => (
-                StatusCode::UNAUTHORIZED,
-                "device_authentication_failed",
-                "Device authentication failed".to_owned(),
-            ),
             ApplicationError::TransactionNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "transaction_not_found",

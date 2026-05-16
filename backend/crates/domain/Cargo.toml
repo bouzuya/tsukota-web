@@ -6,7 +6,6 @@ license.workspace = true
 version.workspace = true
 
 [dependencies]
-bcrypt = "0.18"
 date-time.workspace = true
 serde.workspace = true
 serde_json.workspace = true

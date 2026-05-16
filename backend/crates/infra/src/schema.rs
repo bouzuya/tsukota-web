@@ -13,14 +13,6 @@ pub struct AccountEventStreamDocumentData {
     pub updated_at: String,
 }
 
-/// Device 集約のイベントストリームドキュメント (`aggregates/device/event_streams/{device_id}`)
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeviceEventStreamDocumentData {
-    pub id: String,
-    pub updated_at: String,
-}
-
 /// User 集約のイベントストリームドキュメント (`aggregates/user/event_streams/{user_id}`)
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,15 +29,6 @@ pub struct QueryAccountDocumentData {
     pub id: String,
     pub name: String,
     pub owners: Vec<String>,
-}
-
-/// Device ドキュメント (`devices/{device_id}`)
-#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QueryDeviceDocumentData {
-    pub encrypted_secret: String,
-    pub id: String,
-    pub uid: String,
 }
 
 /// User ドキュメント (`users/{user_id}`)

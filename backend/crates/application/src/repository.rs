@@ -2,8 +2,6 @@ use async_trait::async_trait;
 use domain::Account;
 use domain::AccountEvent;
 use domain::AccountId;
-use domain::DeviceEvent;
-use domain::DeviceId;
 use domain::GoogleUserId;
 use domain::UserEvent;
 use domain::UserId;
@@ -25,21 +23,6 @@ pub trait AccountRepository: Send + Sync {
         account_id: &AccountId,
         events: Vec<AccountEvent>,
         aggregate: &Account,
-    ) -> Result<(), ApplicationError>;
-}
-
-/// Device repository trait for persisting and loading events
-#[async_trait]
-pub trait DeviceRepository: Send + Sync {
-    /// Load all events for a given device
-    async fn load_events(&self, device_id: &DeviceId)
-    -> Result<Vec<DeviceEvent>, ApplicationError>;
-
-    /// Save new events for a given device
-    async fn save_events(
-        &self,
-        device_id: &DeviceId,
-        events: Vec<DeviceEvent>,
     ) -> Result<(), ApplicationError>;
 }
 

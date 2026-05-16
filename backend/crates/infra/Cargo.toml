@@ -10,19 +10,15 @@ application.workspace = true
 async-trait.workspace = true
 bouzuya-firestore-client.workspace = true
 domain.workspace = true
-google-cloud-iam-credentials-v1 = "1"
-jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 openidconnect = "4"
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
     "json",
 ] }
-rsa = { version = "0.9", features = ["pem"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-urlencoding = "2"
 
 [dev-dependencies]
 anyhow.workspace = true
