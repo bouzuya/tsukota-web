@@ -546,6 +546,7 @@ mod tests {
     /// テスト用のリポジトリを生成する
     async fn setup_repository() -> anyhow::Result<FirestoreAccountRepository> {
         let firestore = Firestore::new(FirestoreOptions {
+            database_id: None,
             project_id: Some("demo-project".to_string()),
         })?;
         Ok(FirestoreAccountRepository::new(firestore))

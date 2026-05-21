@@ -68,6 +68,7 @@ async fn main() {
         }
     }
     let firestore = Firestore::new(FirestoreOptions {
+        database_id: None,
         project_id: Some(env.project_id.clone()),
     })
     .expect("Failed to initialize Firestore");

@@ -195,10 +195,11 @@ dependencies = [
 
 [[package]]
 name = "bouzuya-firestore-client"
-version = "0.0.0"
-source = "git+https://github.com/bouzuya/bouzuya-firestore-client?rev=807c18ac519db38afb902f3d5af64fd7d249736f#807c18ac519db38afb902f3d5af64fd7d249736f"
+version = "3.2.0"
+source = "git+https://github.com/bouzuya/bouzuya-firestore-client?tag=3.2.0#5d689bc687e8da2ee633dc0bf6efe2f950c1772a"
 dependencies = [
  "firestore-path",
+ "firestore-structured-query",
  "google-cloud-auth",
  "http",
  "prost-types",
@@ -585,6 +586,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "firestore-structured-query"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aef62d915fc29cf757c968420412e180ca0a13eeafb698832d332b583f68bcb8"
+dependencies = [
+ "googleapis-tonic-google-firestore-v1",
+ "serde-firestore-value",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -803,9 +814,9 @@ dependencies = [
 
 [[package]]
 name = "googleapis-tonic-google-firestore-v1"
-version = "0.30.0"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cc52b1bd696237310727fa2ba3938114742a3202f20f6f0c7c811a7df9739b1"
+checksum = "836a83b91480812fb763764152fe2da191507d9d896aa94937e5eefdeef58df2"
 dependencies = [
  "googleapis-tonic-google-api",
  "googleapis-tonic-google-rpc",
@@ -2127,9 +2138,9 @@ dependencies = [
 
 [[package]]
 name = "serde-firestore-value"
-version = "0.26.1"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a21d8035338e52892252037ac2034accaa2afe5ea7b3acae7342fcb67f6135f"
+checksum = "e7624f58e3d2a2ca3021524af3cbca417f5268676852a647e47b82cf6a5cabae"
 dependencies = [
  "googleapis-tonic-google-firestore-v1",
  "prost",
