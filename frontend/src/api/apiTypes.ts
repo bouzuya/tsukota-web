@@ -38,6 +38,13 @@ export interface ApiTransaction {
 	updated_at: string;
 }
 
+// Monthly summary from API
+export interface ApiMonthlySummary {
+	account_id: string;
+	/** 月別合計金額 ("YYYY-MM" -> 合計金額) */
+	totals: Record<string, string>;
+}
+
 // Paginated response from API
 export interface ApiPaginatedResponse<T> {
 	items: T[];

@@ -8,6 +8,7 @@ import { AccountSettingsPage } from "./pages/AccountSettingsPage";
 import { CategoryManagePage } from "./pages/CategoryManagePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MonthlySummaryPage } from "./pages/MonthlySummaryPage";
 import { TransactionFormPage } from "./pages/TransactionFormPage";
 import { TransactionListPage } from "./pages/TransactionListPage";
 import { UserSettingsPage } from "./pages/UserSettingsPage";
@@ -41,6 +42,10 @@ function AppRoutes() {
 				element={<TransactionFormPage />}
 			/>
 			<Route path="/accounts/:id/categories" element={<CategoryManagePage />} />
+			<Route
+				path="/accounts/:id/stats/monthly"
+				element={<MonthlySummaryPage />}
+			/>
 			<Route path="/accounts/:id/settings" element={<AccountSettingsPage />} />
 			<Route path="/settings" element={<UserSettingsPage />} />
 			<Route path="*" element={<Navigate to="/" replace />} />

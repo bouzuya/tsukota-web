@@ -38,6 +38,13 @@ export interface Transaction {
 	updatedAt: string;
 }
 
+// Monthly summary
+export interface MonthlySummary {
+	accountId: string;
+	/** 月別合計金額 ("YYYY-MM" -> 合計金額) */
+	totals: Record<string, string>;
+}
+
 // Response types (camelCase)
 export interface CreateAccountResponse {
 	accountId: string;

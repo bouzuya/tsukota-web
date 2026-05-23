@@ -13,6 +13,7 @@ export function Navigation() {
 
 	const navItems: NavItem[] = [
 		{ to: `/accounts/${id}`, label: "収支一覧" },
+		{ to: `/accounts/${id}/stats/monthly`, label: "月別" },
 		{ to: `/accounts/${id}/categories`, label: "区分" },
 		{ to: `/accounts/${id}/settings`, label: "設定" },
 	];
