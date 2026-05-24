@@ -25,6 +25,15 @@ function formatMonthKey(monthKey: string): string {
 	return `${year}年${month}月`;
 }
 
+/**
+ * 金額文字列を i64 相当の数値に変換する。NaN なら 0 にフォールバックする。
+ */
+function parseAmount(amount: string | undefined): number {
+	if (amount === undefined) return 0;
+	const num = Number.parseInt(amount, 10);
+	return Number.isNaN(num) ? 0 : num;
+}
+
 export function MonthlySummaryPage() {
 	const { id } = useParams<{ id: string }>();
 	const { authLoading } = useRequireAuth();
@@ -55,9 +64,14 @@ export function MonthlySummaryPage() {
 		fetchSummary();
 	}, [id, authLoading, setSummary, setLoading]);
 
-	// "YYYY-MM" を降順 (新しい月が上) でソートしたエントリ
-	const sortedEntries = summary
-		? Object.entries(summary.totals).sort(([a], [b]) => (a < b ? 1 : -1))
+	// incomes/expenses に出現する月キーの和集合を降順 (新しい月が上) でソート
+	const sortedMonthKeys: string[] = summary
+		? Array.from(
+				new Set([
+					...Object.keys(summary.incomes),
+					...Object.keys(summary.expenses),
+				]),
+			).sort((a, b) => (a < b ? 1 : -1))
 		: [];
 
 	if (authLoading || loading) {
@@ -76,33 +90,51 @@ export function MonthlySummaryPage() {
 				<h1 className="text-2xl font-bold text-gray-900">月別集計</h1>
 			</div>
 
-			{sortedEntries.length === 0 ? (
+			{sortedMonthKeys.length === 0 ? (
 				<div className="bg-white rounded-lg shadow p-8 text-center">
 					<p className="text-gray-600">集計データがありません</p>
 				</div>
 			) : (
-				<div className="bg-white rounded-lg shadow divide-y">
-					{sortedEntries.map(([monthKey, total]) => {
-						const num = Number.parseInt(total, 10);
-						const isPositive = !Number.isNaN(num) && num >= 0;
-						return (
-							<div
-								key={monthKey}
-								className="flex justify-between items-center p-4"
-							>
-								<p className="font-medium text-gray-900">
-									{formatMonthKey(monthKey)}
-								</p>
-								<p
-									className={`text-lg font-semibold ${
-										isPositive ? "text-green-600" : "text-red-600"
-									}`}
+				<div className="bg-white rounded-lg shadow overflow-hidden">
+					<div className="grid grid-cols-4 gap-2 px-4 py-3 text-xs font-medium text-gray-500 bg-gray-50 border-b">
+						<div>月</div>
+						<div className="text-right">収入</div>
+						<div className="text-right">支出</div>
+						<div className="text-right">差引</div>
+					</div>
+					<div className="divide-y">
+						{sortedMonthKeys.map((monthKey) => {
+							const incomeNum = parseAmount(summary?.incomes[monthKey]);
+							const expenseNum = parseAmount(summary?.expenses[monthKey]);
+							// 差引は incomes + expenses (expenses は負値で保存)
+							const netNum = incomeNum + expenseNum;
+							const netIsPositive = netNum >= 0;
+							return (
+								<div
+									key={monthKey}
+									className="grid grid-cols-4 gap-2 px-4 py-3 items-center"
 								>
-									{formatAmount(total)}
-								</p>
-							</div>
-						);
-					})}
+									<div className="font-medium text-gray-900">
+										{formatMonthKey(monthKey)}
+									</div>
+									<div className="text-right text-green-600">
+										{formatAmount(incomeNum.toString())}
+									</div>
+									<div className="text-right text-red-600">
+										{/* 支出は負値で保存されているため絶対値表記にする */}
+										{formatAmount(Math.abs(expenseNum).toString())}
+									</div>
+									<div
+										className={`text-right font-semibold ${
+											netIsPositive ? "text-green-600" : "text-red-600"
+										}`}
+									>
+										{formatAmount(netNum.toString())}
+									</div>
+								</div>
+							);
+						})}
+					</div>
 				</div>
 			)}
 		</Layout>

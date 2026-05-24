@@ -51,7 +51,9 @@ pub struct QueryGoogleUserMapDocumentData {
 #[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryAccountMonthlySummaryDocumentData {
+    /// 月別支出合計 ("YYYY-MM" -> 0 未満の金額の合計、負の値で保存)
+    pub expenses: BTreeMap<String, String>,
     pub id: String,
-    /// 月別合計金額 ("YYYY-MM" -> 合計金額)
-    pub totals: BTreeMap<String, String>,
+    /// 月別収入合計 ("YYYY-MM" -> 0 以上の金額の合計、非負値)
+    pub incomes: BTreeMap<String, String>,
 }

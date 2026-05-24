@@ -41,8 +41,10 @@ export interface Transaction {
 // Monthly summary
 export interface MonthlySummary {
 	accountId: string;
-	/** 月別合計金額 ("YYYY-MM" -> 合計金額) */
-	totals: Record<string, string>;
+	/** 月別収入合計 ("YYYY-MM" -> 0 以上の金額の合計、非負値) */
+	incomes: Record<string, string>;
+	/** 月別支出合計 ("YYYY-MM" -> 0 未満の金額の合計、負の値) */
+	expenses: Record<string, string>;
 }
 
 // Response types (camelCase)

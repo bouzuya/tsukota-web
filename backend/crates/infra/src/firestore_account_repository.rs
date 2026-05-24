@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use crate::FirestoreUserRepository;
 use crate::repository::Repository;
 use crate::schema::AccountEventStreamDocumentData;
@@ -417,7 +415,7 @@ impl FirestoreAccountRepository {
             Some(result) => result?,
             None => QueryAccountMonthlySummaryDocumentData {
                 id: account_id.to_string(),
-                totals: BTreeMap::new(),
+                ..QueryAccountMonthlySummaryDocumentData::default()
             },
         };
         let is_update = document_snapshot
@@ -439,14 +437,8 @@ impl FirestoreAccountRepository {
                 AccountEvent::TransactionAdded { props, .. } => {
                     let month_key = Self::month_key_from_date(&props.date);
                     let amount = Self::parse_amount(&props.amount);
-                    let current = summary
-                        .totals
-                        .get(&month_key)
-                        .map(|s| Self::parse_amount(s))
-                        .unwrap_or(0);
-                    summary
-                        .totals
-                        .insert(month_key, (current + amount).to_string());
+                    // 追加: 元金額の符号で incomes/expenses を選び、その金額を加算
+                    Self::apply_summary_delta(&mut summary, &month_key, amount, amount);
                 }
                 AccountEvent::TransactionUpdated {
                     transaction_id,
@@ -458,29 +450,20 @@ impl FirestoreAccountRepository {
                         .parse()
                         .expect("Failed to parse transaction_id");
                     if let Some(old_tx) = transactions.get(&tid) {
-                        // 旧月から減算
+                        // 旧月の対応するバケットから減算
                         let old_month_key = Self::month_key_from_date(&old_tx.date);
-                        let old_current = summary
-                            .totals
-                            .get(&old_month_key)
-                            .map(|s| Self::parse_amount(s))
-                            .unwrap_or(0);
                         let old_amount = Self::parse_amount(&old_tx.amount);
-                        summary
-                            .totals
-                            .insert(old_month_key, (old_current - old_amount).to_string());
+                        Self::apply_summary_delta(
+                            &mut summary,
+                            &old_month_key,
+                            -old_amount,
+                            old_amount,
+                        );
                     }
-                    // 新月に加算
+                    // 新月の対応するバケットに加算
                     let new_month_key = Self::month_key_from_date(&props.date);
-                    let new_current = summary
-                        .totals
-                        .get(&new_month_key)
-                        .map(|s| Self::parse_amount(s))
-                        .unwrap_or(0);
                     let new_amount = Self::parse_amount(&props.amount);
-                    summary
-                        .totals
-                        .insert(new_month_key, (new_current + new_amount).to_string());
+                    Self::apply_summary_delta(&mut summary, &new_month_key, new_amount, new_amount);
                 }
                 AccountEvent::TransactionDeleted { transaction_id, .. } => {
                     // 旧トランザクションの金額・日付を集約から取得
@@ -489,15 +472,9 @@ impl FirestoreAccountRepository {
                         .expect("Failed to parse transaction_id");
                     if let Some(old_tx) = transactions.get(&tid) {
                         let month_key = Self::month_key_from_date(&old_tx.date);
-                        let current = summary
-                            .totals
-                            .get(&month_key)
-                            .map(|s| Self::parse_amount(s))
-                            .unwrap_or(0);
                         let amount = Self::parse_amount(&old_tx.amount);
-                        summary
-                            .totals
-                            .insert(month_key, (current - amount).to_string());
+                        // 削除: 元のバケットから減算
+                        Self::apply_summary_delta(&mut summary, &month_key, -amount, amount);
                     }
                 }
                 AccountEvent::AccountCreated { .. }
@@ -526,6 +503,29 @@ impl FirestoreAccountRepository {
         }
 
         Ok(())
+    }
+
+    /// 月別サマリーに金額を加減算する
+    ///
+    /// - `delta`: 対応するバケットに加算する値（削除側なら負）
+    /// - `classify_by`: バケット選択に使う元金額（正なら `incomes`、負なら `expenses`）
+    fn apply_summary_delta(
+        summary: &mut QueryAccountMonthlySummaryDocumentData,
+        month_key: &str,
+        delta: i64,
+        classify_by: i64,
+    ) {
+        // incomes (>= 0) / expenses (< 0)
+        let bucket = if classify_by >= 0 {
+            &mut summary.incomes
+        } else {
+            &mut summary.expenses
+        };
+        let bucket_current = bucket
+            .get(month_key)
+            .map(|s| Self::parse_amount(s))
+            .unwrap_or(0);
+        bucket.insert(month_key.to_string(), (bucket_current + delta).to_string());
     }
 }
 

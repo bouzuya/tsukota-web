@@ -4,6 +4,7 @@ import type { MonthlySummary } from "./types";
 export function toMonthlySummary(api: ApiMonthlySummary): MonthlySummary {
 	return {
 		accountId: api.account_id,
-		totals: api.totals,
+		incomes: api.incomes,
+		expenses: api.expenses,
 	};
 }

@@ -498,16 +498,16 @@ impl MonthlySummaryProjection for FirestoreProjection {
             .await
             .map_err(|e| E::GetMonthlySummary(*account_id, e))?;
 
-        let totals = document_snapshot
+        let data = document_snapshot
             .data::<QueryAccountMonthlySummaryDocumentData>()
             .transpose()
             .map_err(|e| E::DeserializeMonthlySummary(*account_id, e))?
-            .map(|data| data.totals)
             .unwrap_or_default();
 
         Ok(MonthlySummaryView {
             account_id: account_id.to_string(),
-            totals,
+            expenses: data.expenses,
+            incomes: data.incomes,
         })
     }
 }
