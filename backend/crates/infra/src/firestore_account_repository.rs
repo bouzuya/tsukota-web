@@ -3,6 +3,7 @@ use crate::repository::Repository;
 use crate::schema::AccountEventStreamDocumentData;
 use crate::schema::QueryAccountDocumentData;
 use crate::schema::QueryAccountMonthlySummaryDocumentData;
+use crate::schema::QueryAccountTransactionDocumentData;
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
 use application::repository::UserRepository;
@@ -42,6 +43,14 @@ impl FirestoreAccountRepository {
     /// Get the path to a query event document: `accounts/{account_id}/events/{event_id}`
     fn query_event_document_path(account_id: &AccountId, event_id: &str) -> String {
         format!("accounts/{}/events/{}", account_id, event_id)
+    }
+
+    /// 取引クエリ用ドキュメントのパス: `accounts/{account_id}/transactions/{transaction_id}`
+    fn query_transaction_document_path(
+        account_id: &AccountId,
+        transaction_id: &TransactionId,
+    ) -> String {
+        format!("accounts/{}/transactions/{}", account_id, transaction_id)
     }
 }
 
@@ -382,6 +391,135 @@ impl FirestoreAccountRepository {
         Self::update_monthly_summary_in_tx(firestore, account_id, events, aggregate, transaction)
             .await?;
 
+        // 取引クエリ用ドキュメントの更新
+        Self::update_query_transactions_in_tx(firestore, account_id, events, transaction).await?;
+
+        Ok(())
+    }
+
+    /// 取引クエリ用ドキュメント (`accounts/{account_id}/transactions/{transaction_id}`)
+    /// をトランザクション内で更新する
+    ///
+    /// 参照系 (`TransactionProjection`) で event replay を回避するための read model。
+    /// - `TransactionAdded`: ドキュメントを新規作成
+    /// - `TransactionUpdated`: 既存ドキュメントから `created_at` を保持しつつ他フィールドを更新。
+    ///   既存ドキュメントが無い場合 (backfill 未実施のレガシーデータ) は新規作成にフォールバック。
+    /// - `TransactionDeleted`: ドキュメントを削除。既存が無ければ no-op。
+    async fn update_query_transactions_in_tx(
+        firestore: &Firestore,
+        account_id: &AccountId,
+        events: &[AccountEvent],
+        transaction: &mut bouzuya_firestore_client::Transaction,
+    ) -> Result<(), bouzuya_firestore_client::Error> {
+        for event in events {
+            match event {
+                AccountEvent::TransactionAdded {
+                    common,
+                    props,
+                    transaction_id,
+                } => {
+                    let transaction_id: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id");
+                    let document_path =
+                        Self::query_transaction_document_path(account_id, &transaction_id);
+                    let document_ref = firestore.doc(document_path)?;
+                    let data = QueryAccountTransactionDocumentData {
+                        account_id: account_id.to_string(),
+                        amount: props.amount.clone(),
+                        category_id: props.category_id.clone(),
+                        comment: props.comment.clone(),
+                        created_at: common.at.clone(),
+                        date: props.date.clone(),
+                        id: transaction_id.to_string(),
+                        updated_at: common.at.clone(),
+                    };
+                    transaction.create(&document_ref, &data)?;
+                }
+                AccountEvent::TransactionUpdated {
+                    common,
+                    props,
+                    transaction_id,
+                } => {
+                    let transaction_id: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id");
+                    let document_path =
+                        Self::query_transaction_document_path(account_id, &transaction_id);
+                    let document_ref = firestore.doc(document_path)?;
+                    let document_snapshot = transaction.get(&document_ref).await?;
+
+                    match document_snapshot.data::<QueryAccountTransactionDocumentData>() {
+                        Some(result) => {
+                            let existing = result?;
+                            let data = QueryAccountTransactionDocumentData {
+                                account_id: account_id.to_string(),
+                                amount: props.amount.clone(),
+                                category_id: props.category_id.clone(),
+                                comment: props.comment.clone(),
+                                created_at: existing.created_at,
+                                date: props.date.clone(),
+                                id: transaction_id.to_string(),
+                                updated_at: common.at.clone(),
+                            };
+                            transaction.update(
+                                &document_ref,
+                                &data,
+                                Precondition {
+                                    exists: Some(true),
+                                    last_update_time: None,
+                                },
+                            )?;
+                        }
+                        None => {
+                            // backfill 未実施の transaction に対する update。
+                            // created_at が不明なので updated_at と同値で新規作成する。
+                            let data = QueryAccountTransactionDocumentData {
+                                account_id: account_id.to_string(),
+                                amount: props.amount.clone(),
+                                category_id: props.category_id.clone(),
+                                comment: props.comment.clone(),
+                                created_at: common.at.clone(),
+                                date: props.date.clone(),
+                                id: transaction_id.to_string(),
+                                updated_at: common.at.clone(),
+                            };
+                            transaction.create(&document_ref, &data)?;
+                        }
+                    }
+                }
+                AccountEvent::TransactionDeleted { transaction_id, .. } => {
+                    let transaction_id: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id");
+                    let document_path =
+                        Self::query_transaction_document_path(account_id, &transaction_id);
+                    let document_ref = firestore.doc(document_path)?;
+                    let document_snapshot = transaction.get(&document_ref).await?;
+                    if document_snapshot
+                        .data::<QueryAccountTransactionDocumentData>()
+                        .is_some()
+                    {
+                        transaction.delete(
+                            &document_ref,
+                            Precondition {
+                                exists: Some(true),
+                                last_update_time: None,
+                            },
+                        )?;
+                    }
+                    // 既存ドキュメントが無ければ no-op (backfill 未実施)
+                }
+                AccountEvent::AccountCreated { .. }
+                | AccountEvent::AccountDeleted { .. }
+                | AccountEvent::AccountUpdated { .. }
+                | AccountEvent::CategoryAdded { .. }
+                | AccountEvent::CategoryDeleted { .. }
+                | AccountEvent::CategoryUpdated { .. }
+                | AccountEvent::OwnerAdded { .. }
+                | AccountEvent::OwnerRemoved { .. } => {}
+            }
+        }
         Ok(())
     }
 
@@ -542,6 +680,8 @@ mod tests {
     use application::repository::AccountRepository;
     use bouzuya_firestore_client::FirestoreOptions;
     use domain::AccountEventCommonProps;
+    use domain::AccountEventTransactionProps;
+    use domain::TransactionId;
 
     /// テスト用のリポジトリを生成する
     async fn setup_repository() -> anyhow::Result<FirestoreAccountRepository> {
@@ -567,6 +707,94 @@ mod tests {
         }
     }
 
+    /// テスト用の TransactionAdded イベントを生成する
+    fn transaction_added_event(
+        account_id: &AccountId,
+        event_id: &str,
+        at: &str,
+        transaction_id: &TransactionId,
+        amount: &str,
+        date: &str,
+        comment: &str,
+    ) -> AccountEvent {
+        AccountEvent::TransactionAdded {
+            common: AccountEventCommonProps {
+                account_id: account_id.to_string(),
+                at: at.to_string(),
+                id: event_id.to_string(),
+                protocol_version: 3,
+            },
+            props: AccountEventTransactionProps {
+                amount: amount.to_string(),
+                category_id: "00000000-0000-0000-0000-000000000001".to_string(),
+                comment: comment.to_string(),
+                date: date.to_string(),
+            },
+            transaction_id: transaction_id.to_string(),
+        }
+    }
+
+    /// テスト用の TransactionUpdated イベントを生成する
+    fn transaction_updated_event(
+        account_id: &AccountId,
+        event_id: &str,
+        at: &str,
+        transaction_id: &TransactionId,
+        amount: &str,
+        date: &str,
+        comment: &str,
+    ) -> AccountEvent {
+        AccountEvent::TransactionUpdated {
+            common: AccountEventCommonProps {
+                account_id: account_id.to_string(),
+                at: at.to_string(),
+                id: event_id.to_string(),
+                protocol_version: 3,
+            },
+            props: AccountEventTransactionProps {
+                amount: amount.to_string(),
+                category_id: "00000000-0000-0000-0000-000000000001".to_string(),
+                comment: comment.to_string(),
+                date: date.to_string(),
+            },
+            transaction_id: transaction_id.to_string(),
+        }
+    }
+
+    /// テスト用の TransactionDeleted イベントを生成する
+    fn transaction_deleted_event(
+        account_id: &AccountId,
+        event_id: &str,
+        at: &str,
+        transaction_id: &TransactionId,
+    ) -> AccountEvent {
+        AccountEvent::TransactionDeleted {
+            common: AccountEventCommonProps {
+                account_id: account_id.to_string(),
+                at: at.to_string(),
+                id: event_id.to_string(),
+                protocol_version: 3,
+            },
+            transaction_id: transaction_id.to_string(),
+        }
+    }
+
+    /// 取引クエリ用ドキュメントを Firestore から読み出す
+    async fn read_query_transaction_doc(
+        repo: &FirestoreAccountRepository,
+        account_id: &AccountId,
+        transaction_id: &TransactionId,
+    ) -> anyhow::Result<Option<QueryAccountTransactionDocumentData>> {
+        let path =
+            FirestoreAccountRepository::query_transaction_document_path(account_id, transaction_id);
+        let document_ref = repo.firestore.doc(path)?;
+        let snapshot = document_ref.get().await?;
+        Ok(snapshot
+            .data::<QueryAccountTransactionDocumentData>()
+            .transpose()?)
+    }
+
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_load_events_empty() -> anyhow::Result<()> {
         let repo = setup_repository().await?;
@@ -578,6 +806,7 @@ mod tests {
         Ok(())
     }
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_load_events_single_event() -> anyhow::Result<()> {
         let repo = setup_repository().await?;
@@ -592,6 +821,7 @@ mod tests {
         Ok(())
     }
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_load_events_sorted_by_at() -> anyhow::Result<()> {
         let repo = setup_repository().await?;
@@ -619,6 +849,147 @@ mod tests {
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded[0], event1);
         assert_eq!(loaded[1], event2);
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_transaction_added_creates_query_doc() -> anyhow::Result<()> {
+        let repo = setup_repository().await?;
+        let account_id = AccountId::generate();
+        let transaction_id = TransactionId::generate();
+
+        // AccountCreated を保存して Active 状態にする
+        let created = account_created_event(&account_id, "evt-001", "2024-01-01T00:00:00Z");
+        let aggregate = Account::Empty;
+        AccountRepository::save_events(&repo, &account_id, vec![created.clone()], &aggregate)
+            .await?;
+
+        // TransactionAdded を保存
+        let added = transaction_added_event(
+            &account_id,
+            "evt-002",
+            "2024-01-02T10:00:00Z",
+            &transaction_id,
+            "-1000",
+            "2024-01-02",
+            "ランチ",
+        );
+        let aggregate = Account::from_events(vec![created.clone()]);
+        AccountRepository::save_events(&repo, &account_id, vec![added.clone()], &aggregate).await?;
+
+        // 取引クエリ用ドキュメントが生成されている
+        let doc = read_query_transaction_doc(&repo, &account_id, &transaction_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("query transaction doc not found"))?;
+        assert_eq!(doc.id, transaction_id.to_string());
+        assert_eq!(doc.account_id, account_id.to_string());
+        assert_eq!(doc.amount, "-1000");
+        assert_eq!(doc.category_id, "00000000-0000-0000-0000-000000000001");
+        assert_eq!(doc.comment, "ランチ");
+        assert_eq!(doc.date, "2024-01-02");
+        assert_eq!(doc.created_at, "2024-01-02T10:00:00Z");
+        assert_eq!(doc.updated_at, "2024-01-02T10:00:00Z");
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_transaction_updated_preserves_created_at() -> anyhow::Result<()> {
+        let repo = setup_repository().await?;
+        let account_id = AccountId::generate();
+        let transaction_id = TransactionId::generate();
+
+        // AccountCreated + TransactionAdded を保存
+        let created = account_created_event(&account_id, "evt-001", "2024-01-01T00:00:00Z");
+        AccountRepository::save_events(&repo, &account_id, vec![created.clone()], &Account::Empty)
+            .await?;
+
+        let added = transaction_added_event(
+            &account_id,
+            "evt-002",
+            "2024-01-02T10:00:00Z",
+            &transaction_id,
+            "-1000",
+            "2024-01-02",
+            "初期",
+        );
+        let aggregate = Account::from_events(vec![created.clone()]);
+        AccountRepository::save_events(&repo, &account_id, vec![added.clone()], &aggregate).await?;
+
+        // TransactionUpdated を保存
+        let updated = transaction_updated_event(
+            &account_id,
+            "evt-003",
+            "2024-01-03T11:00:00Z",
+            &transaction_id,
+            "-2000",
+            "2024-01-15",
+            "更新後",
+        );
+        let aggregate = Account::from_events(vec![created, added]);
+        AccountRepository::save_events(&repo, &account_id, vec![updated], &aggregate).await?;
+
+        let doc = read_query_transaction_doc(&repo, &account_id, &transaction_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("query transaction doc not found"))?;
+        assert_eq!(doc.amount, "-2000");
+        assert_eq!(doc.date, "2024-01-15");
+        assert_eq!(doc.comment, "更新後");
+        // created_at は保持される
+        assert_eq!(doc.created_at, "2024-01-02T10:00:00Z");
+        // updated_at は新しい event の at に更新される
+        assert_eq!(doc.updated_at, "2024-01-03T11:00:00Z");
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_transaction_deleted_removes_query_doc() -> anyhow::Result<()> {
+        let repo = setup_repository().await?;
+        let account_id = AccountId::generate();
+        let transaction_id = TransactionId::generate();
+
+        // AccountCreated + TransactionAdded を保存
+        let created = account_created_event(&account_id, "evt-001", "2024-01-01T00:00:00Z");
+        AccountRepository::save_events(&repo, &account_id, vec![created.clone()], &Account::Empty)
+            .await?;
+
+        let added = transaction_added_event(
+            &account_id,
+            "evt-002",
+            "2024-01-02T10:00:00Z",
+            &transaction_id,
+            "-1000",
+            "2024-01-02",
+            "",
+        );
+        let aggregate = Account::from_events(vec![created.clone()]);
+        AccountRepository::save_events(&repo, &account_id, vec![added.clone()], &aggregate).await?;
+
+        // 削除前は存在する
+        assert!(
+            read_query_transaction_doc(&repo, &account_id, &transaction_id)
+                .await?
+                .is_some()
+        );
+
+        // TransactionDeleted を保存
+        let deleted = transaction_deleted_event(
+            &account_id,
+            "evt-003",
+            "2024-01-03T12:00:00Z",
+            &transaction_id,
+        );
+        let aggregate = Account::from_events(vec![created, added]);
+        AccountRepository::save_events(&repo, &account_id, vec![deleted], &aggregate).await?;
+
+        // 削除後は無い
+        assert!(
+            read_query_transaction_doc(&repo, &account_id, &transaction_id)
+                .await?
+                .is_none()
+        );
         Ok(())
     }
 }

@@ -280,6 +280,7 @@ mod tests {
         }
     }
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_load_events_empty() -> anyhow::Result<()> {
         let repo = setup_repository().await?;
@@ -291,6 +292,7 @@ mod tests {
         Ok(())
     }
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_store_and_load_single_event() -> anyhow::Result<()> {
         let repo = setup_repository().await?;
@@ -309,6 +311,7 @@ mod tests {
         Ok(())
     }
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_store_and_load_multiple_events() -> anyhow::Result<()> {
         let repo = setup_repository().await?;
@@ -336,6 +339,7 @@ mod tests {
         Ok(())
     }
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_load_events_sorted_by_at() -> anyhow::Result<()> {
         let repo = setup_repository().await?;
@@ -359,6 +363,7 @@ mod tests {
         Ok(())
     }
 
+    #[serial_test::serial]
     #[tokio::test]
     async fn test_store_events_empty() -> anyhow::Result<()> {
         let repo = setup_repository().await?;

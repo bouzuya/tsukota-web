@@ -22,4 +22,5 @@ tokio.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true
+serial_test.workspace = true
 uuid.workspace = true
