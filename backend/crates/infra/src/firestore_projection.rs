@@ -1,4 +1,5 @@
 use crate::schema::QueryAccountMonthlySummaryDocumentData;
+use crate::schema::QueryAccountTransactionDocumentData;
 use crate::schema::QueryUserDocumentData;
 use application::error::ApplicationError;
 use application::projection::AccountProjection;
@@ -17,6 +18,21 @@ use domain::AccountEvent;
 use domain::AccountId;
 use domain::TransactionId;
 use domain::UserId;
+
+impl From<QueryAccountTransactionDocumentData> for TransactionView {
+    fn from(data: QueryAccountTransactionDocumentData) -> Self {
+        TransactionView {
+            id: data.id,
+            account_id: data.account_id,
+            amount: data.amount,
+            category_id: data.category_id,
+            date: data.date,
+            comment: data.comment,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+        }
+    }
+}
 
 /// Internal error type for FirestoreProjection operations
 #[derive(Debug, thiserror::Error)]

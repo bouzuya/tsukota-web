@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use bouzuya_firestore_client::Firestore;
 use bouzuya_firestore_client::Precondition;
-use bouzuya_firestore_client::Transaction as FirestoreTransaction;
 use bouzuya_firestore_client::TransactionOptions;
 use std::future::Future;
 use std::pin::Pin;
@@ -10,7 +9,7 @@ use std::pin::Pin;
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 type SaveEventsCallback = Box<
     dyn for<'a> FnOnce(
-            &'a mut FirestoreTransaction,
+            &'a mut bouzuya_firestore_client::Transaction,
         ) -> BoxFuture<'a, Result<(), bouzuya_firestore_client::Error>>
         + Send
         + Sync,

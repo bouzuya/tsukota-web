@@ -57,3 +57,21 @@ pub struct QueryAccountMonthlySummaryDocumentData {
     /// 月別収入合計 ("YYYY-MM" -> 0 以上の金額の合計、非負値)
     pub incomes: BTreeMap<String, String>,
 }
+
+/// 取引クエリ用ドキュメント (`accounts/{account_id}/transactions/{transaction_id}`)
+///
+/// 取引参照系の高速化のため、書き込み時に同一トランザクションで更新する read model。
+/// `date` は "YYYY-MM-DD" 形式で辞書順 = 時系列順。Firestore の `order_by` / `where`
+/// で直接ソート・範囲検索が可能。
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryAccountTransactionDocumentData {
+    pub account_id: String,
+    pub amount: String,
+    pub category_id: String,
+    pub comment: String,
+    pub created_at: String,
+    pub date: String,
+    pub id: String,
+    pub updated_at: String,
+}
