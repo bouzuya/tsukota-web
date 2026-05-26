@@ -78,6 +78,21 @@ enum E {
 
     #[error("invalid monthly summary document path for account {0}")]
     InvalidMonthlySummaryDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid transaction document path for account {0}")]
+    InvalidQueryTransactionDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("get transaction document for account {0}")]
+    GetQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("deserialize transaction document for account {0}")]
+    DeserializeQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid transactions collection path for account {0}")]
+    InvalidQueryTransactionsCollectionPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("query transactions for account {0}")]
+    QueryTransactions(AccountId, #[source] bouzuya_firestore_client::Error),
 }
 
 impl From<E> for ApplicationError {
@@ -113,6 +128,19 @@ impl FirestoreProjection {
     /// Get the path to the events collection: `accounts/{accountId}/events`
     fn events_collection_path(account_id: &AccountId) -> String {
         format!("accounts/{}/events", account_id)
+    }
+
+    /// 取引クエリ用ドキュメントのパス: `accounts/{account_id}/transactions/{transaction_id}`
+    fn query_transaction_document_path(
+        account_id: &AccountId,
+        transaction_id: &TransactionId,
+    ) -> String {
+        format!("accounts/{}/transactions/{}", account_id, transaction_id)
+    }
+
+    /// 取引クエリ用コレクションのパス: `accounts/{account_id}/transactions`
+    fn query_transactions_collection_path(account_id: &AccountId) -> String {
+        format!("accounts/{}/transactions", account_id)
     }
 
     /// Get the path to a user document: `users/{uid}`
@@ -249,58 +277,6 @@ impl FirestoreProjection {
             Account::Empty => vec![],
         }
     }
-
-    fn build_transaction_views(
-        account_id: &str,
-        account: &Account,
-        events: &[AccountEvent],
-    ) -> Vec<TransactionView> {
-        match account {
-            Account::Active { transactions, .. } => transactions
-                .values()
-                .map(|tx| {
-                    // Find TransactionAdded event for created_at
-                    let created_at = events
-                        .iter()
-                        .find_map(|e| match e {
-                            AccountEvent::TransactionAdded {
-                                transaction_id,
-                                common,
-                                ..
-                            } if transaction_id == &tx.id.to_string() => Some(common.at.clone()),
-                            _ => None,
-                        })
-                        .unwrap_or_default();
-
-                    // Find latest TransactionUpdated or use created_at for updated_at
-                    let updated_at = events
-                        .iter()
-                        .rev()
-                        .find_map(|e| match e {
-                            AccountEvent::TransactionUpdated {
-                                transaction_id,
-                                common,
-                                ..
-                            } if transaction_id == &tx.id.to_string() => Some(common.at.clone()),
-                            _ => None,
-                        })
-                        .unwrap_or_else(|| created_at.clone());
-
-                    TransactionView {
-                        id: tx.id.to_string(),
-                        account_id: account_id.to_string(),
-                        amount: tx.amount.clone(),
-                        category_id: tx.category_id.to_string(),
-                        date: tx.date.clone(),
-                        comment: tx.comment.clone(),
-                        created_at,
-                        updated_at,
-                    }
-                })
-                .collect(),
-            Account::Empty => vec![],
-        }
-    }
 }
 
 #[async_trait]
@@ -414,37 +390,67 @@ impl TransactionProjection for FirestoreProjection {
         cursor: Option<String>,
         limit: usize,
     ) -> Result<PaginatedList<TransactionView>, ApplicationError> {
-        let events = self.load_events(account_id).await?;
-
-        let mut transactions = if events.is_empty() {
-            vec![]
-        } else {
-            let account = Account::from_events(events.clone());
-            Self::build_transaction_views(&account_id.to_string(), &account, &events)
+        // cursor が指定されていれば、その doc から (date, id) を取得して start_after に使う。
+        // cursor の doc が消えていた場合は先頭から (None)。
+        let start_after: Option<(String, String)> = match cursor {
+            None => None,
+            Some(cursor_tx_id) => {
+                let cursor_id: TransactionId = cursor_tx_id.parse().map_err(|_| {
+                    ApplicationError::InvalidRequest("invalid cursor: not a transaction id".into())
+                })?;
+                let cursor_path = Self::query_transaction_document_path(account_id, &cursor_id);
+                let cursor_ref = self
+                    .firestore
+                    .doc(cursor_path)
+                    .map_err(|e| E::InvalidQueryTransactionDocumentPath(*account_id, e))?;
+                let cursor_snapshot = cursor_ref
+                    .get()
+                    .await
+                    .map_err(|e| E::GetQueryTransactionDocument(*account_id, e))?;
+                cursor_snapshot
+                    .data::<QueryAccountTransactionDocumentData>()
+                    .transpose()
+                    .map_err(|e| E::DeserializeQueryTransactionDocument(*account_id, e))?
+                    .map(|data| (data.date, data.id))
+            }
         };
 
-        // Sort by date descending
-        transactions.sort_by(|a, b| b.date.cmp(&a.date));
+        let collection_path = Self::query_transactions_collection_path(account_id);
+        let collection_ref = self
+            .firestore
+            .collection(collection_path)
+            .map_err(|e| E::InvalidQueryTransactionsCollectionPath(*account_id, e))?;
 
-        // Apply cursor-based pagination
-        let start_idx = if let Some(cursor) = cursor {
-            transactions
-                .iter()
-                .position(|t| t.id == cursor)
-                .map(|i| i + 1)
-                .unwrap_or(0)
-        } else {
-            0
+        let query = collection_ref
+            .order_by("date", "desc")
+            .map_err(|e| E::QueryTransactions(*account_id, e))?
+            .order_by("id", "desc")
+            .map_err(|e| E::QueryTransactions(*account_id, e))?;
+        let query = match start_after {
+            Some((date, id)) => query
+                .start_after([date, id])
+                .map_err(|e| E::QueryTransactions(*account_id, e))?,
+            None => query,
         };
+        let query = query
+            .limit(i32::try_from(limit + 1).expect("limit overflow"))
+            .map_err(|e| E::QueryTransactions(*account_id, e))?;
+        let snapshot = query
+            .get()
+            .await
+            .map_err(|e| E::QueryTransactions(*account_id, e))?;
 
-        let paginated: Vec<_> = transactions
+        let mut items: Vec<TransactionView> = snapshot
             .into_iter()
-            .skip(start_idx)
-            .take(limit + 1)
-            .collect();
+            .map(|d| {
+                d.data::<QueryAccountTransactionDocumentData>()
+                    .map(Into::into)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| E::DeserializeQueryTransactionDocument(*account_id, e))?;
 
-        let has_more = paginated.len() > limit;
-        let items: Vec<_> = paginated.into_iter().take(limit).collect();
+        let has_more = items.len() > limit;
+        items.truncate(limit);
         let next_cursor = if has_more {
             items.last().map(|t| t.id.clone())
         } else {
@@ -459,18 +465,20 @@ impl TransactionProjection for FirestoreProjection {
         account_id: &AccountId,
         transaction_id: &TransactionId,
     ) -> Result<Option<TransactionView>, ApplicationError> {
-        let events = self.load_events(account_id).await?;
-
-        let transactions = if events.is_empty() {
-            vec![]
-        } else {
-            let account = Account::from_events(events.clone());
-            Self::build_transaction_views(&account_id.to_string(), &account, &events)
-        };
-
-        Ok(transactions
-            .into_iter()
-            .find(|t| t.id == transaction_id.to_string()))
+        let path = Self::query_transaction_document_path(account_id, transaction_id);
+        let document_ref = self
+            .firestore
+            .doc(path)
+            .map_err(|e| E::InvalidQueryTransactionDocumentPath(*account_id, e))?;
+        let snapshot = document_ref
+            .get()
+            .await
+            .map_err(|e| E::GetQueryTransactionDocument(*account_id, e))?;
+        Ok(snapshot
+            .data::<QueryAccountTransactionDocumentData>()
+            .transpose()
+            .map_err(|e| E::DeserializeQueryTransactionDocument(*account_id, e))?
+            .map(TransactionView::from))
     }
 
     async fn list_transactions_for_month(
@@ -479,23 +487,41 @@ impl TransactionProjection for FirestoreProjection {
         year: i32,
         month: u32,
     ) -> Result<Vec<TransactionView>, ApplicationError> {
-        let events = self.load_events(account_id).await?;
-
-        let mut transactions = if events.is_empty() {
-            vec![]
+        // [YYYY-MM-01, YYYY-(M+1)-01) の範囲で date を絞る (12 月は翌年 1 月へ繰り上げ)
+        let prefix_start = format!("{:04}-{:02}-01", year, month);
+        let prefix_end = if month == 12 {
+            format!("{:04}-01-01", year + 1)
         } else {
-            let account = Account::from_events(events.clone());
-            Self::build_transaction_views(&account_id.to_string(), &account, &events)
+            format!("{:04}-{:02}-01", year, month + 1)
         };
 
-        // Filter by year and month (date format: YYYY-MM-DD)
-        let prefix = format!("{:04}-{:02}", year, month);
-        transactions.retain(|t| t.date.starts_with(&prefix));
+        let collection_path = Self::query_transactions_collection_path(account_id);
+        let collection_ref = self
+            .firestore
+            .collection(collection_path)
+            .map_err(|e| E::InvalidQueryTransactionsCollectionPath(*account_id, e))?;
 
-        // Sort by date
-        transactions.sort_by(|a, b| a.date.cmp(&b.date));
+        let snapshot = collection_ref
+            .r#where(("date", ">=", prefix_start))
+            .map_err(|e| E::QueryTransactions(*account_id, e))?
+            .r#where(("date", "<", prefix_end))
+            .map_err(|e| E::QueryTransactions(*account_id, e))?
+            .order_by("date", "asc")
+            .map_err(|e| E::QueryTransactions(*account_id, e))?
+            .get()
+            .await
+            .map_err(|e| E::QueryTransactions(*account_id, e))?;
 
-        Ok(transactions)
+        let items: Vec<TransactionView> = snapshot
+            .into_iter()
+            .map(|d| {
+                d.data::<QueryAccountTransactionDocumentData>()
+                    .map(Into::into)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| E::DeserializeQueryTransactionDocument(*account_id, e))?;
+
+        Ok(items)
     }
 }
 
@@ -525,5 +551,276 @@ impl MonthlySummaryProjection for FirestoreProjection {
             expenses: data.expenses,
             incomes: data.incomes,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FirestoreAccountRepository;
+    use application::repository::AccountRepository;
+    use bouzuya_firestore_client::FirestoreOptions;
+    use domain::AccountEventCommonProps;
+    use domain::AccountEventTransactionProps;
+
+    fn setup() -> anyhow::Result<(FirestoreAccountRepository, FirestoreProjection)> {
+        let firestore = Firestore::new(FirestoreOptions {
+            database_id: None,
+            project_id: Some("demo-project".to_string()),
+        })?;
+        let repo = FirestoreAccountRepository::new(firestore.clone());
+        let projection = FirestoreProjection::new(firestore);
+        Ok((repo, projection))
+    }
+
+    fn account_created_event(account_id: &AccountId, event_id: &str, at: &str) -> AccountEvent {
+        AccountEvent::AccountCreated {
+            common: AccountEventCommonProps {
+                account_id: account_id.to_string(),
+                at: at.to_string(),
+                id: event_id.to_string(),
+                protocol_version: 3,
+            },
+            name: "テストアカウント".to_string(),
+            owners: vec![],
+        }
+    }
+
+    fn transaction_added_event(
+        account_id: &AccountId,
+        event_id: &str,
+        at: &str,
+        transaction_id: &TransactionId,
+        amount: &str,
+        date: &str,
+        comment: &str,
+    ) -> AccountEvent {
+        AccountEvent::TransactionAdded {
+            common: AccountEventCommonProps {
+                account_id: account_id.to_string(),
+                at: at.to_string(),
+                id: event_id.to_string(),
+                protocol_version: 3,
+            },
+            props: AccountEventTransactionProps {
+                amount: amount.to_string(),
+                category_id: "00000000-0000-0000-0000-000000000001".to_string(),
+                comment: comment.to_string(),
+                date: date.to_string(),
+            },
+            transaction_id: transaction_id.to_string(),
+        }
+    }
+
+    /// AccountCreated を保存して、続けて指定された (tx_id, date) 列で TransactionAdded を保存する。
+    /// 各 save_events 呼び出しには「直前までに保存した全イベントから再構築した集約」を渡す。
+    async fn seed_transactions(
+        repo: &FirestoreAccountRepository,
+        account_id: &AccountId,
+        transactions: &[(TransactionId, &str)],
+    ) -> anyhow::Result<()> {
+        let mut all_events: Vec<AccountEvent> = vec![];
+
+        let created = account_created_event(account_id, "evt-create", "2024-01-01T00:00:00Z");
+        let aggregate_before = Account::from_events(all_events.clone());
+        AccountRepository::save_events(repo, account_id, vec![created.clone()], &aggregate_before)
+            .await?;
+        all_events.push(created);
+
+        for (i, (tx_id, date)) in transactions.iter().enumerate() {
+            let added = transaction_added_event(
+                account_id,
+                &format!("evt-tx-{:03}", i),
+                &format!("2024-01-01T00:00:{:02}Z", i + 1),
+                tx_id,
+                "-1000",
+                date,
+                "",
+            );
+            let aggregate_before = Account::from_events(all_events.clone());
+            AccountRepository::save_events(
+                repo,
+                account_id,
+                vec![added.clone()],
+                &aggregate_before,
+            )
+            .await?;
+            all_events.push(added);
+        }
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_get_transaction_returns_view() -> anyhow::Result<()> {
+        let (repo, projection) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_id = TransactionId::generate();
+
+        seed_transactions(&repo, &account_id, &[(tx_id, "2024-01-15")]).await?;
+
+        let view = TransactionProjection::get_transaction(&projection, &account_id, &tx_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("expected transaction"))?;
+        assert_eq!(view.id, tx_id.to_string());
+        assert_eq!(view.date, "2024-01-15");
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_get_transaction_returns_none_when_missing() -> anyhow::Result<()> {
+        let (_repo, projection) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_id = TransactionId::generate();
+
+        let view = TransactionProjection::get_transaction(&projection, &account_id, &tx_id).await?;
+        assert!(view.is_none());
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_list_transactions_empty() -> anyhow::Result<()> {
+        let (_repo, projection) = setup()?;
+        let account_id = AccountId::generate();
+
+        let result =
+            TransactionProjection::list_transactions(&projection, &account_id, None, 20).await?;
+        assert!(result.items.is_empty());
+        assert!(result.next_cursor.is_none());
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_list_transactions_sorted_desc_with_pagination() -> anyhow::Result<()> {
+        let (repo, projection) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_a = TransactionId::generate();
+        let tx_b = TransactionId::generate();
+        let tx_c = TransactionId::generate();
+
+        // 日付順 (古→新): A=01-10, B=01-20, C=02-05
+        seed_transactions(
+            &repo,
+            &account_id,
+            &[
+                (tx_a, "2024-01-10"),
+                (tx_b, "2024-01-20"),
+                (tx_c, "2024-02-05"),
+            ],
+        )
+        .await?;
+
+        // limit=2 で 1 ページ目を取得: 新しい順 C, B が返る。next_cursor は B
+        let page1 =
+            TransactionProjection::list_transactions(&projection, &account_id, None, 2).await?;
+        assert_eq!(page1.items.len(), 2);
+        assert_eq!(page1.items[0].id, tx_c.to_string());
+        assert_eq!(page1.items[1].id, tx_b.to_string());
+        assert_eq!(
+            page1.next_cursor.as_deref(),
+            Some(tx_b.to_string().as_str())
+        );
+
+        // 2 ページ目: cursor = B → 残り A だけ。next_cursor は None
+        let page2 = TransactionProjection::list_transactions(
+            &projection,
+            &account_id,
+            page1.next_cursor,
+            2,
+        )
+        .await?;
+        assert_eq!(page2.items.len(), 1);
+        assert_eq!(page2.items[0].id, tx_a.to_string());
+        assert!(page2.next_cursor.is_none());
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_list_transactions_cursor_missing_returns_from_start() -> anyhow::Result<()> {
+        let (repo, projection) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_a = TransactionId::generate();
+        let missing_cursor = TransactionId::generate();
+
+        seed_transactions(&repo, &account_id, &[(tx_a, "2024-01-10")]).await?;
+
+        // 存在しない cursor は先頭から扱い
+        let page = TransactionProjection::list_transactions(
+            &projection,
+            &account_id,
+            Some(missing_cursor.to_string()),
+            10,
+        )
+        .await?;
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].id, tx_a.to_string());
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_list_transactions_for_month_filters_and_sorts_asc() -> anyhow::Result<()> {
+        let (repo, projection) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_in_a = TransactionId::generate();
+        let tx_in_b = TransactionId::generate();
+        let tx_out_prev = TransactionId::generate();
+        let tx_out_next = TransactionId::generate();
+
+        seed_transactions(
+            &repo,
+            &account_id,
+            &[
+                (tx_out_prev, "2023-12-31"),
+                (tx_in_a, "2024-01-20"),
+                (tx_in_b, "2024-01-05"),
+                (tx_out_next, "2024-02-01"),
+            ],
+        )
+        .await?;
+
+        let items =
+            TransactionProjection::list_transactions_for_month(&projection, &account_id, 2024, 1)
+                .await?;
+        // 月内のみ、日付昇順
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].id, tx_in_b.to_string()); // 01-05
+        assert_eq!(items[1].id, tx_in_a.to_string()); // 01-20
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_list_transactions_for_month_year_boundary() -> anyhow::Result<()> {
+        let (repo, projection) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_dec = TransactionId::generate();
+        let tx_jan = TransactionId::generate();
+
+        seed_transactions(
+            &repo,
+            &account_id,
+            &[(tx_dec, "2024-12-31"), (tx_jan, "2025-01-01")],
+        )
+        .await?;
+
+        // 12 月クエリ: 12-31 のみ
+        let december =
+            TransactionProjection::list_transactions_for_month(&projection, &account_id, 2024, 12)
+                .await?;
+        assert_eq!(december.len(), 1);
+        assert_eq!(december[0].id, tx_dec.to_string());
+
+        // 翌 1 月クエリ: 01-01 のみ
+        let january =
+            TransactionProjection::list_transactions_for_month(&projection, &account_id, 2025, 1)
+                .await?;
+        assert_eq!(january.len(), 1);
+        assert_eq!(january[0].id, tx_jan.to_string());
+        Ok(())
     }
 }
