@@ -1,3 +1,4 @@
+pub mod backfill;
 mod firestore_account_repository;
 mod firestore_google_user_map_repository;
 mod firestore_projection;

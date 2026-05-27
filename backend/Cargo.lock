@@ -1249,6 +1249,7 @@ dependencies = [
  "serial_test",
  "thiserror 2.0.17",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

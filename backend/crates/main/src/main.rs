@@ -38,6 +38,33 @@ async fn main() {
             println!("{}", hex::encode(key.master()));
             return;
         }
+        Some("backfill-transactions") => {
+            // 取引クエリ用ドキュメント (accounts/{id}/transactions/{tx_id}) を
+            // events から一括再構築する。本番反映前に 1 度だけ実行する想定。
+            //
+            // 必要な env: GOOGLE_CLOUD_PROJECT (または GCLOUD_PROJECT),
+            //   GOOGLE_APPLICATION_CREDENTIALS, 任意で FIRESTORE_EMULATOR_HOST。
+            // サーバ起動用の OIDC / Cookie 等の env は不要。
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+                )
+                .init();
+
+            // project_id は Firestore client が GOOGLE_CLOUD_PROJECT / GCLOUD_PROJECT から
+            // 自動検出する。
+            let firestore = Firestore::new(FirestoreOptions::default())
+                .expect("Failed to initialize Firestore");
+            let account_repository = FirestoreAccountRepository::new(firestore.clone());
+
+            let stats =
+                infra::backfill::backfill_query_transactions(&firestore, &account_repository)
+                    .await
+                    .expect("backfill failed");
+            tracing::info!(?stats, "backfill complete");
+            return;
+        }
         Some(_) | None => {
             // フォールスルー: 従来通りサーバーを起動する
         }
