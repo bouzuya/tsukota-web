@@ -12,7 +12,14 @@ export class ApiError extends Error {
 	}
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/lab/tsukota/api";
+// ビルド時に注入される API のベースパス。
+// - 未設定 (主に dev): 既定値 "/lab/tsukota/api" を使う
+// - 空文字列: ベースパスが消えて誤ったオリジン (例: https://example.com/me) へ
+//   リクエストしてしまうため、フォールバックせず明示的にエラーにする
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+if (API_BASE === "") {
+	throw new Error("VITE_API_BASE is not set");
+}
 const SIGNIN_URL = "/lab/tsukota/auth/signin";
 
 export interface ApiRequestOptions {
