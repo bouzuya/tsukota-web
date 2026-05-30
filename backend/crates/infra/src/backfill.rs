@@ -5,6 +5,7 @@
 //! 本番反映前に CLI 経由で 1 度だけ実行する想定。Idempotent (再実行しても結果は同じ)。
 
 use crate::FirestoreAccountRepository;
+use crate::schema::QueryAccountMonthlySummaryDocumentData;
 use crate::schema::QueryAccountTransactionDocumentData;
 use application::error::ApplicationError;
 use application::repository::AccountRepository;
@@ -30,6 +31,12 @@ pub enum BackfillError {
 
     #[error("set transaction document for account {0}")]
     SetQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid monthly summary document path for account {0}")]
+    InvalidMonthlySummaryDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("set monthly summary document for account {0}")]
+    SetMonthlySummaryDocument(AccountId, #[source] bouzuya_firestore_client::Error),
 }
 
 /// backfill 実行結果の集計
@@ -41,6 +48,17 @@ pub struct BackfillStats {
     pub accounts_processed: usize,
     /// 書き込んだ取引ドキュメント数
     pub transactions_written: usize,
+}
+
+/// 月別サマリー backfill 実行結果の集計
+#[derive(Clone, Debug, Default)]
+pub struct MonthlySummaryBackfillStats {
+    /// 走査したアカウント数
+    pub accounts_scanned: usize,
+    /// AccountId として parse 可能で events を持っていたアカウント数
+    pub accounts_processed: usize,
+    /// 書き込んだ月別サマリードキュメント数
+    pub monthly_summaries_written: usize,
 }
 
 /// 全アカウントの取引クエリ用ドキュメントを events から再構築する。
@@ -107,6 +125,81 @@ pub async fn backfill_query_transactions(
     Ok(stats)
 }
 
+/// 全アカウントの月別サマリードキュメント (`accounts/{id}/stats/monthly`) を
+/// events から再構築する。
+///
+/// 1. `aggregates/account/event_streams` 配下を列挙してアカウント ID を取得
+/// 2. 各アカウントの events を `AccountRepository::load_events` で取得
+/// 3. `Account::from_events` で集約を再構築し、現在 active な transactions を
+///    月キー ("YYYY-MM") で集計
+/// 4. `accounts/{id}/stats/monthly` に `set` で書き込み (upsert)
+///
+/// active な transactions が無いアカウント (集約が `Empty`、または全取引が削除済み)
+/// では書き込みを行わない。これは write 経路 (`update_monthly_summary_in_tx`) が
+/// 取引イベント発生時にのみサマリードキュメントを生成する挙動と揃えるため。
+/// Idempotent (再実行しても結果は同じ)。
+pub async fn backfill_monthly_summaries(
+    firestore: &Firestore,
+    account_repository: &FirestoreAccountRepository,
+) -> Result<MonthlySummaryBackfillStats, BackfillError> {
+    let event_streams = firestore
+        .collection("aggregates/account/event_streams")
+        .map_err(BackfillError::InvalidEventStreamsCollectionPath)?
+        .list_documents()
+        .await
+        .map_err(BackfillError::ListEventStreamsDocuments)?;
+
+    let mut stats = MonthlySummaryBackfillStats::default();
+    for stream_ref in event_streams {
+        stats.accounts_scanned += 1;
+
+        let id_str = stream_ref.id();
+        let account_id: AccountId = match id_str.parse() {
+            Ok(id) => id,
+            Err(_) => {
+                tracing::warn!(id = %id_str, "skipping non-uuid event stream id");
+                continue;
+            }
+        };
+
+        let events = AccountRepository::load_events(account_repository, &account_id)
+            .await
+            .map_err(|e| BackfillError::LoadEvents(account_id, e))?;
+        if events.is_empty() {
+            tracing::debug!(account_id = %account_id, "no events; skipping");
+            continue;
+        }
+        stats.accounts_processed += 1;
+
+        let account = Account::from_events(events.clone());
+        let summary = build_monthly_summary_document(&account_id, &account);
+
+        // active な取引が 1 件も無い場合はサマリードキュメントを作らない。
+        if summary.incomes.is_empty() && summary.expenses.is_empty() {
+            tracing::debug!(account_id = %account_id, "no active transactions; skipping summary");
+            continue;
+        }
+
+        let path = format!("accounts/{}/stats/monthly", account_id);
+        firestore
+            .doc(path)
+            .map_err(|e| BackfillError::InvalidMonthlySummaryDocumentPath(account_id, e))?
+            .set(&summary)
+            .await
+            .map_err(|e| BackfillError::SetMonthlySummaryDocument(account_id, e))?;
+
+        stats.monthly_summaries_written += 1;
+        tracing::info!(
+            account_id = %account_id,
+            months_incomes = summary.incomes.len(),
+            months_expenses = summary.expenses.len(),
+            "backfilled monthly summary",
+        );
+    }
+
+    Ok(stats)
+}
+
 /// 現在 active な transactions について、events から created_at / updated_at を補完して
 /// `QueryAccountTransactionDocumentData` の列を作る。
 ///
@@ -164,6 +257,47 @@ fn build_query_transaction_documents(
             }
         })
         .collect()
+}
+
+/// 現在 active な transactions を月キー ("YYYY-MM") で集計し、
+/// `QueryAccountMonthlySummaryDocumentData` を組み立てる。
+///
+/// 金額が 0 以上なら `incomes`、負なら `expenses` バケットに月ごとに合算する
+/// (write 経路 `update_monthly_summary_in_tx` と同じ分類規則)。金額・月キーの
+/// 抽出も write 経路と揃える (date は "YYYY-MM-DD" 前提で先頭 7 文字を月キーに、
+/// 金額は i64 へパースし不正値は 0 とみなす)。`Account::Empty` の場合は
+/// `id` のみ持つ空サマリーを返す。
+fn build_monthly_summary_document(
+    account_id: &AccountId,
+    account: &Account,
+) -> QueryAccountMonthlySummaryDocumentData {
+    let mut summary = QueryAccountMonthlySummaryDocumentData {
+        id: account_id.to_string(),
+        ..QueryAccountMonthlySummaryDocumentData::default()
+    };
+
+    let transactions = match account {
+        Account::Active { transactions, .. } => transactions,
+        Account::Empty => return summary,
+    };
+
+    for tx in transactions.values() {
+        let month_key = tx.date[..7].to_string();
+        let amount = tx.amount.parse::<i64>().unwrap_or(0);
+        // incomes (>= 0) / expenses (< 0)
+        let bucket = if amount >= 0 {
+            &mut summary.incomes
+        } else {
+            &mut summary.expenses
+        };
+        let current = bucket
+            .get(&month_key)
+            .map(|s| s.parse::<i64>().unwrap_or(0))
+            .unwrap_or(0);
+        bucket.insert(month_key, (current + amount).to_string());
+    }
+
+    summary
 }
 
 #[cfg(test)]
@@ -288,6 +422,31 @@ mod tests {
         Ok(())
     }
 
+    /// 月別サマリードキュメントを Firestore から読み出す
+    async fn read_summary(
+        firestore: &Firestore,
+        account_id: &AccountId,
+    ) -> anyhow::Result<Option<QueryAccountMonthlySummaryDocumentData>> {
+        let path = format!("accounts/{}/stats/monthly", account_id);
+        let snapshot = firestore.doc(path)?.get().await?;
+        Ok(snapshot
+            .data::<QueryAccountMonthlySummaryDocumentData>()
+            .transpose()?)
+    }
+
+    /// 月別サマリードキュメントを削除する
+    async fn delete_summary(firestore: &Firestore, account_id: &AccountId) -> anyhow::Result<()> {
+        let path = format!("accounts/{}/stats/monthly", account_id);
+        firestore
+            .doc(path)?
+            .delete(Precondition {
+                exists: None,
+                last_update_time: None,
+            })
+            .await?;
+        Ok(())
+    }
+
     #[serial_test::serial]
     #[tokio::test]
     async fn test_backfill_recreates_deleted_transaction_doc() -> anyhow::Result<()> {
@@ -348,6 +507,80 @@ mod tests {
             .await?
             .ok_or_else(|| anyhow::anyhow!("expected doc"))?;
         assert_eq!(doc.date, "2024-01-15");
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_backfill_monthly_summaries_recreates_deleted_summary_doc() -> anyhow::Result<()> {
+        let (firestore, repo) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_id1 = TransactionId::generate();
+        let tx_id2 = TransactionId::generate();
+
+        // 1. events と summary doc を作成 (write 経路)。同月の支出 2 件。
+        seed_events(
+            &repo,
+            &account_id,
+            &[(tx_id1, "2024-01-15"), (tx_id2, "2024-01-20")],
+        )
+        .await?;
+        let before = read_summary(&firestore, &account_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("precondition: summary should exist after seed"))?;
+        assert_eq!(
+            before.expenses.get("2024-01").map(String::as_str),
+            Some("-2000")
+        );
+
+        // 2. summary doc を削除して "backfill 前" 状態を模擬
+        delete_summary(&firestore, &account_id).await?;
+        assert!(
+            read_summary(&firestore, &account_id).await?.is_none(),
+            "precondition: summary should be gone after delete"
+        );
+
+        // 3. backfill を実行
+        let stats = backfill_monthly_summaries(&firestore, &repo).await?;
+        assert!(
+            stats.monthly_summaries_written >= 1,
+            "expected at least 1 summary written, got {}",
+            stats.monthly_summaries_written
+        );
+
+        // 4. summary が events から再生成されていることを確認
+        let after = read_summary(&firestore, &account_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("expected summary to be recreated"))?;
+        assert_eq!(after.id, account_id.to_string());
+        assert_eq!(
+            after.expenses.get("2024-01").map(String::as_str),
+            Some("-2000")
+        );
+        assert!(after.incomes.is_empty(), "no positive amounts were seeded");
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_backfill_monthly_summaries_is_idempotent() -> anyhow::Result<()> {
+        let (firestore, repo) = setup()?;
+        let account_id = AccountId::generate();
+        let tx_id = TransactionId::generate();
+
+        seed_events(&repo, &account_id, &[(tx_id, "2024-01-15")]).await?;
+
+        // 2 回連続実行してもエラーにならず、結果も変わらない
+        backfill_monthly_summaries(&firestore, &repo).await?;
+        backfill_monthly_summaries(&firestore, &repo).await?;
+
+        let summary = read_summary(&firestore, &account_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("expected summary"))?;
+        assert_eq!(
+            summary.expenses.get("2024-01").map(String::as_str),
+            Some("-1000")
+        );
         Ok(())
     }
 }

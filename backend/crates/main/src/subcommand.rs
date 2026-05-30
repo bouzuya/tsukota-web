@@ -5,6 +5,7 @@
 
 mod add_dummy_transactions;
 mod add_owner;
+mod backfill_monthly_summaries;
 mod backfill_transactions;
 mod generate_cookie_key;
 mod run_server;
@@ -50,6 +51,13 @@ pub(crate) enum Subcommand {
     /// (または GCLOUD_PROJECT), GOOGLE_APPLICATION_CREDENTIALS,
     /// 任意で FIRESTORE_EMULATOR_HOST。サーバ起動用の OIDC / Cookie 等の env は不要。
     BackfillTransactions,
+    /// 月別サマリードキュメント (accounts/{id}/stats/monthly) を events から
+    /// 一括再構築する。
+    ///
+    /// 集計が欠損・破損した場合や、`BackfillTransactions` と同様に既存アカウントの
+    /// read model を初期化する際に実行する。active な取引から再集計するため
+    /// Idempotent。必要な env は `BackfillTransactions` と同じ。
+    BackfillMonthlySummaries,
     /// Cookie 署名鍵 (64 byte) を生成し hex 化して標準出力に書き出す。
     ///
     /// 出力は `COOKIE_SIGNING_SECRET` にそのまま設定できる形式。
@@ -70,6 +78,7 @@ impl Subcommand {
                 user_id,
                 acting_user_id,
             } => add_owner::run(&account_id, &user_id, &acting_user_id).await,
+            Subcommand::BackfillMonthlySummaries => backfill_monthly_summaries::run().await,
             Subcommand::BackfillTransactions => backfill_transactions::run().await,
             Subcommand::GenerateCookieKey => generate_cookie_key::run(),
             Subcommand::RunServer => run_server::run().await,
