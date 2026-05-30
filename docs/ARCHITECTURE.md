@@ -98,6 +98,17 @@ https://github.com/bouzuya/tsukota/blob/master/packages/account-events/src/accou
 
 SPEC.md に記載されているデータモデルは、この読み取りモデルに相当します。
 
+#### 永続化済み読み取りモデル
+
+参照系の高速化のため、一部の読み取りモデルは書き込み時に同一 Firestore トランザクション内で更新し、Firestore に永続化しています。読み取り時は事前に作られたドキュメントを直接取得するだけで、event replay は不要です。
+
+| 読み取りモデル | Firestore パス | 更新タイミング | 主な利用クエリ |
+|-------------|---------------|--------------|-------------|
+| 取引 (`Transaction`) | `accounts/{account_id}/transactions/{transaction_id}` | `TransactionAdded` / `TransactionUpdated` / `TransactionDeleted` | `list_transactions` (date DESC, id DESC + cursor), `get_transaction`, `list_transactions_for_month` (date 範囲) |
+| 月別サマリー (`MonthlySummary`) | `accounts/{account_id}/stats/monthly` | 同上 | `get_monthly_summary` |
+
+既存アカウント (永続化導入前) に対する初期化は、`cargo run -p main -- backfill-transactions` で events から一括再構築します (idempotent)。詳細は CLAUDE.md / AGENTS.md の「CLI サブコマンド」参照。
+
 #### スキーマ定義
 
 スキーマ定義は以下を参照：
@@ -146,5 +157,5 @@ https://github.com/bouzuya/tsukota/blob/master/packages/schema/src/schema.ts
 ## 今後の検討事項
 
 - イベントのスナップショット作成による読み取り性能向上
-- 読み取りモデルのキャッシュ戦略
+- 残りの読み取りモデル (`Account`, `Category`) の Firestore 永続化
 - イベントストアのパーティショニング戦略

@@ -61,6 +61,22 @@ npm run lint
 npm run check
 ```
 
+### CLI サブコマンド (backend)
+
+`tsukota-server` バイナリは第 1 引数で運用サブコマンドを受け付けます。未指定時は API サーバーとして起動します。
+
+```bash
+# Cookie 署名鍵を生成 (COOKIE_SIGNING_SECRET に設定する hex 文字列)
+cargo run -p main -- generate-cookie-key
+
+# 取引クエリ用ドキュメント (accounts/{id}/transactions/{tx_id}) を events から
+# 一括再構築する。永続化 read model 導入後に既存アカウントを初期化するため 1 度だけ実行。
+# 必要 env: GOOGLE_CLOUD_PROJECT (または GCLOUD_PROJECT) と
+#           GOOGLE_APPLICATION_CREDENTIALS。任意で FIRESTORE_EMULATOR_HOST。
+# OIDC / Cookie 関連の env は不要。Idempotent (再実行しても結果は同じ)。
+cargo run -p main -- backfill-transactions
+```
+
 ## プロジェクト構造
 
 ```
