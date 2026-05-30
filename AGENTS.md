@@ -75,6 +75,14 @@ cargo run -p main -- generate-cookie-key
 #           GOOGLE_APPLICATION_CREDENTIALS。任意で FIRESTORE_EMULATOR_HOST。
 # OIDC / Cookie 関連の env は不要。Idempotent (再実行しても結果は同じ)。
 cargo run -p main -- backfill-transactions
+
+# 画面表示の確認用に、指定アカウントへ直近 2 年分のダミー取引を一括投入する。
+# AddTransactionUseCase を 1 件ずつ呼ぶので、本番経路と同じ集約再構築・query
+# ドキュメント更新を経る。事前に最低 1 件の区分 (Category) を登録しておくこと。
+# 引数: [account_id] [count]。省略時は account_id=bc6d2814-... / count=1000。
+# 必要 env: backfill-transactions と同じ (Firestore Emulator 想定)。
+cargo run -p main -- add-dummy-transactions
+cargo run -p main -- add-dummy-transactions <account-id> 500
 ```
 
 ## プロジェクト構造
