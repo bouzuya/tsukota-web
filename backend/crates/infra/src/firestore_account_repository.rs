@@ -1,5 +1,6 @@
 use crate::FirestoreUserRepository;
 use crate::repository::Repository;
+use crate::repository::RepositoryError;
 use crate::schema::AccountEventStreamDocumentData;
 use crate::schema::QueryAccountDocumentData;
 use crate::schema::QueryAccountMonthlySummaryDocumentData;
@@ -17,6 +18,41 @@ use domain::TransactionId;
 use domain::User;
 use domain::UserCommand;
 use domain::UserId;
+
+/// FirestoreAccountRepository 内部で発生し得るエラー (module local)
+///
+/// 変換時に `ApplicationError::Repository(_)` に潰されるため、
+/// 元の発生箇所が追えるよう操作単位で variant を切ってある。
+#[derive(Debug, thiserror::Error)]
+enum E {
+    /// update_user_aggregates: User 集約のコマンド処理失敗
+    /// (skip 対象 = `AccountAlreadyAdded` / `AccountNotFound` を除く)
+    #[error("handle user command")]
+    HandleUserCommand(#[source] domain::UserError),
+
+    /// AccountRepository::load_events: イベントストリーム読み込み失敗
+    #[error("load account events")]
+    LoadEvents(#[source] RepositoryError),
+
+    /// update_user_aggregates: User 集約のイベント読み込み失敗
+    #[error("load user events")]
+    LoadUserEvents(#[source] ApplicationError),
+
+    /// AccountRepository::save_events: イベントストリーム書き込み
+    /// (および同一トランザクション内のクエリドキュメント更新) の失敗
+    #[error("save account events")]
+    SaveEvents(#[source] RepositoryError),
+
+    /// update_user_aggregates: User 集約のイベント書き込み失敗
+    #[error("save user events")]
+    SaveUserEvents(#[source] ApplicationError),
+}
+
+impl From<E> for ApplicationError {
+    fn from(err: E) -> Self {
+        ApplicationError::Repository(err.to_string())
+    }
+}
 
 /// Firestore-based event store implementation
 #[derive(Clone)]
@@ -163,9 +199,10 @@ impl AccountRepository for FirestoreAccountRepository {
         &self,
         account_id: &AccountId,
     ) -> Result<Vec<AccountEvent>, ApplicationError> {
-        Repository::load_events(self, account_id)
+        let events = Repository::load_events(self, account_id)
             .await
-            .map_err(|e| ApplicationError::Repository(e.to_string()))
+            .map_err(E::LoadEvents)?;
+        Ok(events)
     }
 
     async fn save_events(
@@ -201,12 +238,11 @@ impl AccountRepository for FirestoreAccountRepository {
             }),
         )
         .await
-        .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+        .map_err(E::SaveEvents)?;
 
         // User 集約の更新 (別トランザクション)
         self.update_user_aggregates(account_id, user_updates)
-            .await
-            .map_err(|e| ApplicationError::Repository(e.to_string()))?;
+            .await?;
 
         Ok(())
     }
@@ -255,10 +291,12 @@ impl FirestoreAccountRepository {
         &self,
         account_id: &AccountId,
         user_updates: Vec<(UserId, UserUpdateAction)>,
-    ) -> Result<(), ApplicationError> {
+    ) -> Result<(), E> {
         for (user_id, action) in user_updates {
             // User 集約を読み込み
-            let user_events = UserRepository::load_events(&self.user_repository, &user_id).await?;
+            let user_events = UserRepository::load_events(&self.user_repository, &user_id)
+                .await
+                .map_err(E::LoadUserEvents)?;
             let user = User::from_events(user_events);
 
             // コマンドを実行
@@ -283,14 +321,14 @@ impl FirestoreAccountRepository {
                     // 既に削除済み - スキップ
                     continue;
                 }
-                Err(e) => {
-                    return Err(ApplicationError::Repository(e.to_string()));
-                }
+                Err(e) => return Err(E::HandleUserCommand(e)),
             };
 
             // 新しいイベントを保存
             if !new_events.is_empty() {
-                UserRepository::save_events(&self.user_repository, &user_id, new_events).await?;
+                UserRepository::save_events(&self.user_repository, &user_id, new_events)
+                    .await
+                    .map_err(E::SaveUserEvents)?;
             }
         }
 
