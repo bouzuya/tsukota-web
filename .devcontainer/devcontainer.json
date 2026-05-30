@@ -23,6 +23,9 @@
 		},
 		"ghcr.io/devcontainers/features/rust:1": {}
 	},
+	"forwardPorts": [
+		5173
+	],
 	"postCreateCommand": "bash .devcontainer/post-create.sh",
 	"name": "tsukota-web",
 	"remoteUser": "vscode",
