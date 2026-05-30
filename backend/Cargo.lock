@@ -1365,6 +1365,8 @@ dependencies = [
  "api",
  "application",
  "bouzuya-firestore-client",
+ "date-time",
+ "domain",
  "hex",
  "infra",
  "temp-env",
