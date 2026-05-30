@@ -116,6 +116,23 @@ frontend/
 - インポートは `imports_granularity = "Item"` に従い個別に記述
 - テストは `anyhow::Result<()>` を返す（`unwrap()` を避ける）
 - コメントは日本語で記述
+- エラーの `Display` 表現（`thiserror` の `#[error("...")]` を含む）は
+  [Rust API Guidelines C-GOOD-ERR](https://rust-lang.github.io/api-guidelines/interoperability.html#error-types-are-meaningful-and-well-behaved-c-good-err)
+  に従い、**小文字始まり・末尾の句読点なし・簡潔** に書く。
+  例: `"invalid account id"` (✓) / `"Invalid account ID."` (✗)。
+  これは他の文字列に埋め込まれて表示されることが多いため。
+- **module local なエラー定義**: ファイル内に閉じた処理経路のエラーは
+  そのファイル内に `enum E` (短名で module local であることを強調) として
+  `thiserror::Error` derive 付きで定義する。`pub` にしない。
+  - `map_err` でどの処理に由来するエラーかが分かるよう、**処理単位で
+    variant を切る** (例: `LoadEvents` / `SaveEvents` / `LoadUserEvents`)。
+  - 元エラーは `#[source]` で保持し、source chain を切らない。
+  - 公開エラー型 (`ApplicationError` 等) への変換は
+    `impl From<E> for ApplicationError` 1 箇所で行う。呼び出し側は
+    `.map_err(E::Variant)?` だけで `?` 経由で上位エラーに変換される。
+  - variant も derive と同様に **アルファベット順** で並べる。
+  - 参考実装: `backend/crates/infra/src/firestore_projection.rs` /
+    `backend/crates/infra/src/firestore_account_repository.rs`。
 
 ### TypeScript/React
 
