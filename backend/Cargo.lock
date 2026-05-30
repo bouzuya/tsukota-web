@@ -78,7 +78,7 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
 name = "api"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "application",
@@ -95,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "application"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -501,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "date-time"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "domain"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "date-time",
@@ -1331,7 +1331,7 @@ dependencies = [
 
 [[package]]
 name = "infra"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "application",
@@ -1461,7 +1461,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "main"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "anyhow",
  "api",
