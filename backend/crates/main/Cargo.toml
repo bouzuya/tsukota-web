@@ -17,6 +17,7 @@ temp-env = "0.3"
 api.workspace = true
 application.workspace = true
 bouzuya-firestore-client.workspace = true
+clap = { version = "4", features = ["derive"] }
 date-time.workspace = true
 domain.workspace = true
 hex = "0.4"
