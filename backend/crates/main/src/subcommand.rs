@@ -4,6 +4,7 @@
 //! `Subcommand` 定義とディスパッチのみを行う。
 
 mod add_dummy_transactions;
+mod add_owner;
 mod backfill_transactions;
 mod generate_cookie_key;
 mod run_server;
@@ -29,6 +30,19 @@ pub(crate) enum Subcommand {
         #[arg(default_value_t = 1000)]
         count: usize,
     },
+    /// 指定アカウントの owners に指定ユーザーを追加する。
+    ///
+    /// 通常の API と同じく AddOwnerUseCase 経由でコマンドを処理する。
+    /// 必要な env: GOOGLE_CLOUD_PROJECT (または GCLOUD_PROJECT),
+    /// GOOGLE_APPLICATION_CREDENTIALS, 任意で FIRESTORE_EMULATOR_HOST。
+    AddOwner {
+        /// 対象アカウント ID (UUID)
+        account_id: String,
+        /// owner に追加するユーザー ID (UUID)
+        user_id: String,
+        /// コマンドを実行するユーザー ID (UUID)。本番経路の認証済みユーザに相当。
+        acting_user_id: String,
+    },
     /// 取引クエリ用ドキュメント (accounts/{id}/transactions/{tx_id}) を
     /// events から一括再構築する。
     ///
@@ -51,6 +65,11 @@ impl Subcommand {
             Subcommand::AddDummyTransactions { account_id, count } => {
                 add_dummy_transactions::run(&account_id, count).await
             }
+            Subcommand::AddOwner {
+                account_id,
+                user_id,
+                acting_user_id,
+            } => add_owner::run(&account_id, &user_id, &acting_user_id).await,
             Subcommand::BackfillTransactions => backfill_transactions::run().await,
             Subcommand::GenerateCookieKey => generate_cookie_key::run(),
             Subcommand::RunServer => run_server::run().await,
