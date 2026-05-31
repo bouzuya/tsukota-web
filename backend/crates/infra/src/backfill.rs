@@ -55,8 +55,10 @@ pub struct BackfillStats {
 pub struct MonthlySummaryBackfillStats {
     /// 走査したアカウント数
     pub accounts_scanned: usize,
-    /// AccountId として parse 可能で events を持っていたアカウント数
+    /// events を持ち、正常に処理できたアカウント数 (書き込みのスキップを含む)
     pub accounts_processed: usize,
+    /// 処理中にエラーが発生しスキップしたアカウント数
+    pub accounts_failed: usize,
     /// 書き込んだ月別サマリードキュメント数
     pub monthly_summaries_written: usize,
 }
@@ -138,6 +140,12 @@ pub async fn backfill_query_transactions(
 /// では書き込みを行わない。これは write 経路 (`update_monthly_summary_in_tx`) が
 /// 取引イベント発生時にのみサマリードキュメントを生成する挙動と揃えるため。
 /// Idempotent (再実行しても結果は同じ)。
+///
+/// あるアカウントの処理 (events ロード / サマリー書き込み) が失敗しても全体を
+/// 中断せず、エラーをログに残してそのアカウントをスキップし、後続のアカウントの
+/// 処理を継続する。スキップ件数は `accounts_failed` に集計する。一方で
+/// event_streams コレクションの列挙失敗は全アカウントに影響するため fatal とし、
+/// `Err` を返す。
 pub async fn backfill_monthly_summaries(
     firestore: &Firestore,
     account_repository: &FirestoreAccountRepository,
@@ -162,42 +170,83 @@ pub async fn backfill_monthly_summaries(
             }
         };
 
-        let events = AccountRepository::load_events(account_repository, &account_id)
-            .await
-            .map_err(|e| BackfillError::LoadEvents(account_id, e))?;
-        if events.is_empty() {
-            tracing::debug!(account_id = %account_id, "no events; skipping");
-            continue;
+        // 1 アカウントの失敗で全体を止めない。エラーはログに残してスキップし、
+        // 次のアカウントの処理を続行する。
+        match backfill_one_monthly_summary(firestore, account_repository, &account_id).await {
+            Ok(MonthlySummaryOutcome::NoEvents) => {}
+            Ok(MonthlySummaryOutcome::Skipped) => {
+                stats.accounts_processed += 1;
+            }
+            Ok(MonthlySummaryOutcome::Written) => {
+                stats.accounts_processed += 1;
+                stats.monthly_summaries_written += 1;
+            }
+            Err(e) => {
+                stats.accounts_failed += 1;
+                tracing::error!(
+                    account_id = %account_id,
+                    error = ?e,
+                    "failed to backfill monthly summary; skipping account",
+                );
+            }
         }
-        stats.accounts_processed += 1;
-
-        let account = Account::from_events(events.clone());
-        let summary = build_monthly_summary_document(&account_id, &account);
-
-        // active な取引が 1 件も無い場合はサマリードキュメントを作らない。
-        if summary.incomes.is_empty() && summary.expenses.is_empty() {
-            tracing::debug!(account_id = %account_id, "no active transactions; skipping summary");
-            continue;
-        }
-
-        let path = format!("accounts/{}/stats/monthly", account_id);
-        firestore
-            .doc(path)
-            .map_err(|e| BackfillError::InvalidMonthlySummaryDocumentPath(account_id, e))?
-            .set(&summary)
-            .await
-            .map_err(|e| BackfillError::SetMonthlySummaryDocument(account_id, e))?;
-
-        stats.monthly_summaries_written += 1;
-        tracing::info!(
-            account_id = %account_id,
-            months_incomes = summary.incomes.len(),
-            months_expenses = summary.expenses.len(),
-            "backfilled monthly summary",
-        );
     }
 
     Ok(stats)
+}
+
+/// 1 アカウント分の月別サマリー再構築の結果。
+enum MonthlySummaryOutcome {
+    /// events が 1 件も無く処理対象外だった。
+    NoEvents,
+    /// events はあるが active な取引が無く、書き込みをスキップした。
+    Skipped,
+    /// サマリードキュメントを書き込んだ。
+    Written,
+}
+
+/// 1 アカウント分の月別サマリードキュメントを events から再構築する。
+///
+/// `backfill_monthly_summaries` のループ本体を切り出したもの。`?` による
+/// エラー伝播はこのアカウント単位で完結し、呼び出し側で `Err` をログ・スキップ
+/// できるようにする。
+async fn backfill_one_monthly_summary(
+    firestore: &Firestore,
+    account_repository: &FirestoreAccountRepository,
+    account_id: &AccountId,
+) -> Result<MonthlySummaryOutcome, BackfillError> {
+    let events = AccountRepository::load_events(account_repository, account_id)
+        .await
+        .map_err(|e| BackfillError::LoadEvents(*account_id, e))?;
+    if events.is_empty() {
+        tracing::debug!(account_id = %account_id, "no events; skipping");
+        return Ok(MonthlySummaryOutcome::NoEvents);
+    }
+
+    let account = Account::from_events(events);
+    let summary = build_monthly_summary_document(account_id, &account);
+
+    // active な取引が 1 件も無い場合はサマリードキュメントを作らない。
+    if summary.incomes.is_empty() && summary.expenses.is_empty() {
+        tracing::debug!(account_id = %account_id, "no active transactions; skipping summary");
+        return Ok(MonthlySummaryOutcome::Skipped);
+    }
+
+    let path = format!("accounts/{}/stats/monthly", account_id);
+    firestore
+        .doc(path)
+        .map_err(|e| BackfillError::InvalidMonthlySummaryDocumentPath(*account_id, e))?
+        .set(&summary)
+        .await
+        .map_err(|e| BackfillError::SetMonthlySummaryDocument(*account_id, e))?;
+
+    tracing::info!(
+        account_id = %account_id,
+        months_incomes = summary.incomes.len(),
+        months_expenses = summary.expenses.len(),
+        "backfilled monthly summary",
+    );
+    Ok(MonthlySummaryOutcome::Written)
 }
 
 /// 現在 active な transactions について、events から created_at / updated_at を補完して
@@ -581,6 +630,111 @@ mod tests {
             summary.expenses.get("2024-01").map(String::as_str),
             Some("-1000")
         );
+        Ok(())
+    }
+
+    /// デシリアライズ不能な event を持つアカウントを 1 件作る。
+    ///
+    /// event_streams ドキュメント (列挙対象にするため) と、`AccountEvent` として
+    /// 解釈できない event ドキュメントを書き込む。これにより `load_events` が
+    /// このアカウントで失敗する状況を再現する。
+    async fn seed_broken_account(
+        firestore: &Firestore,
+        account_id: &AccountId,
+    ) -> anyhow::Result<()> {
+        #[derive(serde::Serialize)]
+        struct BogusEvent {
+            bogus: String,
+        }
+
+        let stream_path = format!("aggregates/account/event_streams/{}", account_id);
+        firestore
+            .doc(stream_path)?
+            .set(&crate::schema::AccountEventStreamDocumentData {
+                id: account_id.to_string(),
+                last_event_id: "evt-bogus".to_string(),
+                owners: vec![],
+                protocol_version: 3,
+                updated_at: "2024-01-01T00:00:00Z".to_string(),
+            })
+            .await?;
+        let event_path = format!(
+            "aggregates/account/event_streams/{}/events/evt-bogus",
+            account_id
+        );
+        firestore
+            .doc(event_path)?
+            .set(&BogusEvent {
+                bogus: "not an account event".to_string(),
+            })
+            .await?;
+        Ok(())
+    }
+
+    #[serial_test::serial]
+    #[tokio::test]
+    async fn test_backfill_monthly_summaries_skips_failing_account() -> anyhow::Result<()> {
+        let (firestore, repo) = setup()?;
+        let good_account_id = AccountId::generate();
+        let good_tx_id = TransactionId::generate();
+        let broken_account_id = AccountId::generate();
+
+        // 正常アカウントと、events が壊れたアカウントを用意する。
+        seed_events(&repo, &good_account_id, &[(good_tx_id, "2024-01-15")]).await?;
+        seed_broken_account(&firestore, &broken_account_id).await?;
+
+        // 壊れたアカウントでエラーが出ても全体は Ok で完了する。
+        let stats = backfill_monthly_summaries(&firestore, &repo).await?;
+
+        // アサーション前に検証対象を読み出しておく。
+        let broken_summary = read_summary(&firestore, &broken_account_id).await?;
+        let good_summary = read_summary(&firestore, &good_account_id).await?;
+
+        // 壊れたアカウントは他テストの全件 backfill を巻き込むため、アサーションの
+        // 成否に関わらず確実に後始末する (assert より前に削除する)。
+        delete_broken_account(&firestore, &broken_account_id).await?;
+
+        // 壊れたアカウントは failed に計上される。
+        assert!(
+            stats.accounts_failed >= 1,
+            "expected at least 1 failed account, got {}",
+            stats.accounts_failed
+        );
+        // 壊れたアカウントのサマリーは書かれない。
+        assert!(
+            broken_summary.is_none(),
+            "broken account should not get a summary"
+        );
+        // 正常アカウントは壊れたアカウントの失敗に関係なく処理される。
+        let good = good_summary
+            .ok_or_else(|| anyhow::anyhow!("good account should be processed despite failure"))?;
+        assert_eq!(
+            good.expenses.get("2024-01").map(String::as_str),
+            Some("-1000")
+        );
+        Ok(())
+    }
+
+    /// `seed_broken_account` で作成したドキュメントを削除する
+    async fn delete_broken_account(
+        firestore: &Firestore,
+        account_id: &AccountId,
+    ) -> anyhow::Result<()> {
+        for path in [
+            format!(
+                "aggregates/account/event_streams/{}/events/evt-bogus",
+                account_id
+            ),
+            format!("aggregates/account/event_streams/{}", account_id),
+        ] {
+            firestore
+                .doc(path)?
+                .delete(Precondition {
+                    exists: None,
+                    last_update_time: None,
+                })
+                .await?;
+        }
         Ok(())
     }
 }
