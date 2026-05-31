@@ -120,10 +120,10 @@ pub fn create_auth_router(state: AuthState) -> Router<()> {
 
 /// auth router 内で発生し得るエラー
 enum AuthRouteError {
-    /// 必須クエリ/Cookie の欠損や state 不一致など
-    BadRequest(String),
     /// Application 層のエラー (Forbidden / Unauthorized / Repository など)
     Application(ApplicationError),
+    /// 必須クエリ/Cookie の欠損や state 不一致など
+    BadRequest(String),
     /// OIDC クライアントの内部エラー
     Internal(String),
 }

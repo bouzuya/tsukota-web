@@ -18,8 +18,26 @@ pub enum AccountError {
     #[error("Account not found")]
     AccountNotFound,
 
+    #[error("Cannot remove the last owner")]
+    CannotRemoveLastOwner,
+
+    #[error("Category already deleted")]
+    CategoryAlreadyDeleted,
+
+    #[error("Category not found")]
+    CategoryNotFound,
+
     #[error("Account name cannot be empty")]
     EmptyAccountName,
+
+    #[error("Amount cannot be empty")]
+    EmptyAmount,
+
+    #[error("Category name cannot be empty")]
+    EmptyCategoryName,
+
+    #[error("Invalid date format")]
+    InvalidDateFormat,
 
     #[error("Owner already exists")]
     OwnerAlreadyExists,
@@ -27,26 +45,8 @@ pub enum AccountError {
     #[error("Owner not found")]
     OwnerNotFound,
 
-    #[error("Cannot remove the last owner")]
-    CannotRemoveLastOwner,
-
-    #[error("Category not found")]
-    CategoryNotFound,
-
-    #[error("Category already deleted")]
-    CategoryAlreadyDeleted,
-
-    #[error("Category name cannot be empty")]
-    EmptyCategoryName,
-
     #[error("Transaction not found")]
     TransactionNotFound,
-
-    #[error("Invalid date format")]
-    InvalidDateFormat,
-
-    #[error("Amount cannot be empty")]
-    EmptyAmount,
 }
 
 /// 区分の状態
@@ -70,8 +70,6 @@ pub struct Transaction {
 /// アカウント集約
 #[derive(Clone, Debug, PartialEq)]
 pub enum Account {
-    /// アカウント作成前の空の状態
-    Empty,
     /// アカウント作成後のアクティブな状態
     Active {
         /// アカウント ID
@@ -85,6 +83,8 @@ pub enum Account {
         /// 取引のマップ
         transactions: BTreeMap<TransactionId, Transaction>,
     },
+    /// アカウント作成前の空の状態
+    Empty,
 }
 
 impl Default for Account {
@@ -197,22 +197,6 @@ impl Account {
                 Account::Empty => unreachable!("AccountUpdated event applied to Empty account"),
             },
 
-            AccountEvent::OwnerAdded { owner, .. } => match self {
-                Account::Active { owners, .. } => {
-                    let user_id: UserId = owner.parse().expect("Failed to parse owner from event");
-                    owners.insert(user_id);
-                }
-                Account::Empty => unreachable!("OwnerAdded event applied to Empty account"),
-            },
-
-            AccountEvent::OwnerRemoved { owner, .. } => match self {
-                Account::Active { owners, .. } => {
-                    let user_id: UserId = owner.parse().expect("Failed to parse owner from event");
-                    owners.remove(&user_id);
-                }
-                Account::Empty => unreachable!("OwnerRemoved event applied to Empty account"),
-            },
-
             AccountEvent::CategoryAdded {
                 category_id, name, ..
             } => match self {
@@ -234,6 +218,20 @@ impl Account {
                 }
             },
 
+            AccountEvent::CategoryDeleted { category_id, .. } => match self {
+                Account::Active { categories, .. } => {
+                    let id: CategoryId = category_id
+                        .parse()
+                        .expect("Failed to parse category_id from event");
+                    if let Some(category) = categories.get_mut(&id) {
+                        category.deleted = true;
+                    }
+                }
+                Account::Empty => {
+                    unreachable!("CategoryDeleted event applied to Empty account")
+                }
+            },
+
             AccountEvent::CategoryUpdated {
                 category_id, name, ..
             } => match self {
@@ -250,18 +248,20 @@ impl Account {
                 }
             },
 
-            AccountEvent::CategoryDeleted { category_id, .. } => match self {
-                Account::Active { categories, .. } => {
-                    let id: CategoryId = category_id
-                        .parse()
-                        .expect("Failed to parse category_id from event");
-                    if let Some(category) = categories.get_mut(&id) {
-                        category.deleted = true;
-                    }
+            AccountEvent::OwnerAdded { owner, .. } => match self {
+                Account::Active { owners, .. } => {
+                    let user_id: UserId = owner.parse().expect("Failed to parse owner from event");
+                    owners.insert(user_id);
                 }
-                Account::Empty => {
-                    unreachable!("CategoryDeleted event applied to Empty account")
+                Account::Empty => unreachable!("OwnerAdded event applied to Empty account"),
+            },
+
+            AccountEvent::OwnerRemoved { owner, .. } => match self {
+                Account::Active { owners, .. } => {
+                    let user_id: UserId = owner.parse().expect("Failed to parse owner from event");
+                    owners.remove(&user_id);
                 }
+                Account::Empty => unreachable!("OwnerRemoved event applied to Empty account"),
             },
 
             AccountEvent::TransactionAdded {
@@ -292,6 +292,18 @@ impl Account {
                 }
             },
 
+            AccountEvent::TransactionDeleted { transaction_id, .. } => match self {
+                Account::Active { transactions, .. } => {
+                    let id: TransactionId = transaction_id
+                        .parse()
+                        .expect("Failed to parse transaction_id from event");
+                    transactions.remove(&id);
+                }
+                Account::Empty => {
+                    unreachable!("TransactionDeleted event applied to Empty account")
+                }
+            },
+
             AccountEvent::TransactionUpdated {
                 transaction_id,
                 props,
@@ -313,18 +325,6 @@ impl Account {
                 }
                 Account::Empty => {
                     unreachable!("TransactionUpdated event applied to Empty account")
-                }
-            },
-
-            AccountEvent::TransactionDeleted { transaction_id, .. } => match self {
-                Account::Active { transactions, .. } => {
-                    let id: TransactionId = transaction_id
-                        .parse()
-                        .expect("Failed to parse transaction_id from event");
-                    transactions.remove(&id);
-                }
-                Account::Empty => {
-                    unreachable!("TransactionDeleted event applied to Empty account")
                 }
             },
         }

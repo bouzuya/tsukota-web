@@ -22,10 +22,10 @@ pub enum UserError {
 /// ユーザー集約
 #[derive(Clone, Debug, PartialEq)]
 pub enum User {
-    /// ユーザー作成前の空の状態
-    Empty,
     /// ユーザー作成後のアクティブな状態
     Active(ActiveUser),
+    /// ユーザー作成前の空の状態
+    Empty,
 }
 
 #[derive(Clone, Debug, PartialEq)]

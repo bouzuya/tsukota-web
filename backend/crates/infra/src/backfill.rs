@@ -20,23 +20,23 @@ pub enum BackfillError {
     #[error("invalid event_streams collection path")]
     InvalidEventStreamsCollectionPath(#[source] bouzuya_firestore_client::Error),
 
+    #[error("invalid monthly summary document path for account {0}")]
+    InvalidMonthlySummaryDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid transaction document path for account {0}")]
+    InvalidQueryTransactionDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
     #[error("list event_streams documents")]
     ListEventStreamsDocuments(#[source] bouzuya_firestore_client::Error),
 
     #[error("load events for account {0}")]
     LoadEvents(AccountId, #[source] ApplicationError),
 
-    #[error("invalid transaction document path for account {0}")]
-    InvalidQueryTransactionDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
+    #[error("set monthly summary document for account {0}")]
+    SetMonthlySummaryDocument(AccountId, #[source] bouzuya_firestore_client::Error),
 
     #[error("set transaction document for account {0}")]
     SetQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("invalid monthly summary document path for account {0}")]
-    InvalidMonthlySummaryDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("set monthly summary document for account {0}")]
-    SetMonthlySummaryDocument(AccountId, #[source] bouzuya_firestore_client::Error),
 }
 
 /// backfill 実行結果の集計

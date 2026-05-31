@@ -46,6 +46,12 @@ enum E {
     #[error("deserialize event for account {0}")]
     DeserializeEvent(AccountId, #[source] bouzuya_firestore_client::Error),
 
+    #[error("deserialize monthly summary for account {0}")]
+    DeserializeMonthlySummary(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("deserialize transaction document for account {0}")]
+    DeserializeQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+
     #[error("deserialize user for user {0}")]
     DeserializeUser(UserId, #[source] bouzuya_firestore_client::Error),
 
@@ -58,23 +64,17 @@ enum E {
     #[error("get all event documents for account {0}")]
     GetAllEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
 
+    #[error("get monthly summary for account {0}")]
+    GetMonthlySummary(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("get transaction document for account {0}")]
+    GetQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
+
     #[error("get user document for user {0}")]
     GetUserDocument(UserId, #[source] bouzuya_firestore_client::Error),
 
     #[error("invalid account document path for account {0}")]
     InvalidAccountDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("invalid user document path: {0}")]
-    InvalidUserDocumentPath(UserId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("list event documents for account {0}")]
-    ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("get monthly summary for account {0}")]
-    GetMonthlySummary(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("deserialize monthly summary for account {0}")]
-    DeserializeMonthlySummary(AccountId, #[source] bouzuya_firestore_client::Error),
 
     #[error("invalid monthly summary document path for account {0}")]
     InvalidMonthlySummaryDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
@@ -82,14 +82,14 @@ enum E {
     #[error("invalid transaction document path for account {0}")]
     InvalidQueryTransactionDocumentPath(AccountId, #[source] bouzuya_firestore_client::Error),
 
-    #[error("get transaction document for account {0}")]
-    GetQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
-
-    #[error("deserialize transaction document for account {0}")]
-    DeserializeQueryTransactionDocument(AccountId, #[source] bouzuya_firestore_client::Error),
-
     #[error("invalid transactions collection path for account {0}")]
     InvalidQueryTransactionsCollectionPath(AccountId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("invalid user document path: {0}")]
+    InvalidUserDocumentPath(UserId, #[source] bouzuya_firestore_client::Error),
+
+    #[error("list event documents for account {0}")]
+    ListEventDocuments(AccountId, #[source] bouzuya_firestore_client::Error),
 
     #[error("query transactions for account {0}")]
     QueryTransactions(AccountId, #[source] bouzuya_firestore_client::Error),

@@ -44,13 +44,6 @@ pub(crate) enum Subcommand {
         /// コマンドを実行するユーザー ID (UUID)。本番経路の認証済みユーザに相当。
         acting_user_id: String,
     },
-    /// 取引クエリ用ドキュメント (accounts/{id}/transactions/{tx_id}) を
-    /// events から一括再構築する。
-    ///
-    /// 本番反映前に 1 度だけ実行する想定。必要な env: GOOGLE_CLOUD_PROJECT
-    /// (または GCLOUD_PROJECT), GOOGLE_APPLICATION_CREDENTIALS,
-    /// 任意で FIRESTORE_EMULATOR_HOST。サーバ起動用の OIDC / Cookie 等の env は不要。
-    BackfillTransactions,
     /// 月別サマリードキュメント (accounts/{id}/stats/monthly) を events から
     /// 一括再構築する。
     ///
@@ -58,6 +51,13 @@ pub(crate) enum Subcommand {
     /// read model を初期化する際に実行する。active な取引から再集計するため
     /// Idempotent。必要な env は `BackfillTransactions` と同じ。
     BackfillMonthlySummaries,
+    /// 取引クエリ用ドキュメント (accounts/{id}/transactions/{tx_id}) を
+    /// events から一括再構築する。
+    ///
+    /// 本番反映前に 1 度だけ実行する想定。必要な env: GOOGLE_CLOUD_PROJECT
+    /// (または GCLOUD_PROJECT), GOOGLE_APPLICATION_CREDENTIALS,
+    /// 任意で FIRESTORE_EMULATOR_HOST。サーバ起動用の OIDC / Cookie 等の env は不要。
+    BackfillTransactions,
     /// Cookie 署名鍵 (64 byte) を生成し hex 化して標準出力に書き出す。
     ///
     /// 出力は `COOKIE_SIGNING_SECRET` にそのまま設定できる形式。
