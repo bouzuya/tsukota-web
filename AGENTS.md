@@ -65,30 +65,32 @@ npm run check
 
 `tsukota-server` バイナリは第 1 引数で運用サブコマンドを受け付けます。未指定時は API サーバーとして起動します。
 
+各サブコマンドの詳細 (必要な env / 引数とデフォルト値 / Idempotent かどうか等) は
+clap が doc comment から自動生成する `--help` を**正** とします。手元の説明より
+こちらを優先してください。
+
 ```bash
-# Cookie 署名鍵を生成 (COOKIE_SIGNING_SECRET に設定する hex 文字列)
-cargo run -p main -- generate-cookie-key
+# サブコマンド一覧 (1 行サマリ)
+cargo run -- --help
 
-# 取引クエリ用ドキュメント (accounts/{id}/transactions/{tx_id}) を events から
-# 一括再構築する。永続化 read model 導入後に既存アカウントを初期化するため 1 度だけ実行。
-# 必要 env: GOOGLE_CLOUD_PROJECT (または GCLOUD_PROJECT) と
-#           GOOGLE_APPLICATION_CREDENTIALS。任意で FIRESTORE_EMULATOR_HOST。
-# OIDC / Cookie 関連の env は不要。Idempotent (再実行しても結果は同じ)。
-cargo run -p main -- backfill-transactions
+# 個別サブコマンドの詳細 (必要 env・引数・デフォルト値・注意点)
+cargo run -- <subcommand> --help
+```
 
-# 月別サマリードキュメント (accounts/{id}/stats/monthly) を events から一括再構築する。
-# 集計が欠損・破損した場合や、backfill-transactions と同様に既存アカウントの
-# read model を初期化する際に実行する。現在 active な取引から再集計するので
-# Idempotent。必要 env は backfill-transactions と同じ。
-cargo run -p main -- backfill-monthly-summaries
+利用可能なサブコマンド (詳細は上記 `--help`):
 
-# 画面表示の確認用に、指定アカウントへ直近 2 年分のダミー取引を一括投入する。
-# AddTransactionUseCase を 1 件ずつ呼ぶので、本番経路と同じ集約再構築・query
-# ドキュメント更新を経る。事前に最低 1 件の区分 (Category) を登録しておくこと。
-# 引数: [account_id] [count]。省略時は account_id=bc6d2814-... / count=1000。
-# 必要 env: backfill-transactions と同じ (Firestore Emulator 想定)。
-cargo run -p main -- add-dummy-transactions
-cargo run -p main -- add-dummy-transactions <account-id> 500
+- `add-dummy-transactions` — 画面確認用のダミー取引を一括投入する
+- `add-owner` — 指定アカウントの owners にユーザーを追加する
+- `backfill-monthly-summaries` — 月別サマリードキュメントを events から一括再構築する
+- `backfill-transactions` — 取引クエリ用ドキュメントを events から一括再構築する
+- `generate-cookie-key` — Cookie 署名鍵を生成する
+
+位置引数を取るものの例 (`add-dummy-transactions`):
+
+```bash
+# 省略時は account_id=bc6d2814-... / count=1000
+cargo run -- add-dummy-transactions
+cargo run -- add-dummy-transactions <account-id> 500
 ```
 
 ## プロジェクト構造
@@ -121,7 +123,6 @@ frontend/
 - derive マクロは alphabetical order で記述
 - インポートは `imports_granularity = "Item"` に従い個別に記述
 - テストは `anyhow::Result<()>` を返す（`unwrap()` を避ける）
-- コメントは日本語で記述
 - エラーの `Display` 表現（`thiserror` の `#[error("...")]` を含む）は
   [Rust API Guidelines C-GOOD-ERR](https://rust-lang.github.io/api-guidelines/interoperability.html#error-types-are-meaningful-and-well-behaved-c-good-err)
   に従い、**小文字始まり・末尾の句読点なし・簡潔** に書く。
@@ -163,8 +164,3 @@ api → application → domain
 - `domain` は他のレイヤーに依存しない
 - `infra` は `domain` の trait を実装
 - イベントソーシングで状態管理（集約単位は Account のみ）
-
-## 重要なルール
-
-- 日本語でコメント・ドキュメントを書く、ただしコミットログは英語で書く
-- **テスト**: `anyhow::Result<()>` を返す、`unwrap()` を避ける
