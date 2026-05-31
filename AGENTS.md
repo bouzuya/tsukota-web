@@ -76,6 +76,12 @@ cargo run -p main -- generate-cookie-key
 # OIDC / Cookie 関連の env は不要。Idempotent (再実行しても結果は同じ)。
 cargo run -p main -- backfill-transactions
 
+# 月別サマリードキュメント (accounts/{id}/stats/monthly) を events から一括再構築する。
+# 集計が欠損・破損した場合や、backfill-transactions と同様に既存アカウントの
+# read model を初期化する際に実行する。現在 active な取引から再集計するので
+# Idempotent。必要 env は backfill-transactions と同じ。
+cargo run -p main -- backfill-monthly-summaries
+
 # 画面表示の確認用に、指定アカウントへ直近 2 年分のダミー取引を一括投入する。
 # AddTransactionUseCase を 1 件ずつ呼ぶので、本番経路と同じ集約再構築・query
 # ドキュメント更新を経る。事前に最低 1 件の区分 (Category) を登録しておくこと。
