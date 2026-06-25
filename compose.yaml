@@ -13,4 +13,3 @@ services:
       - .:/workspaces/tsukota-web:cached
       - ~/.agents:/home/vscode/.agents
       - ~/.claude:/home/vscode/.claude
-      - ~/.copilot:/home/vscode/.copilot
